@@ -1,0 +1,53 @@
+body {
+  padding: 0;
+  margin: 0;
+}
+
+div {
+  width: 100%;
+}
+
+.ball {
+  padding: 1em 0;
+  width: 4em;
+  position: absolute;
+  background: black;
+  left: 100px;
+  text-align: center;
+  font-family: Avenir;
+  color: white;
+}
+
+.t1 {
+  top: 0px;
+  background-color: hsl(0, 0%, 0%);
+}
+
+.t2 {
+  top: 50px;
+  background-color: hsl(0, 0%, 10%);
+}
+
+.t3 {
+  top: 100px;
+  background-color: hsl(0, 0%, 20%);
+}
+
+.t4 {
+  top: 150px;
+  background-color: hsl(0, 0%, 30%);
+}
+
+.t5 {
+  top: 200px;
+  background-color: hsl(0, 0%, 40%);
+}
+
+.t6 {
+  top: 250px;
+  background-color: hsl(0, 0%, 50%);
+}
+
+canvas {
+  display: inline-block;
+}

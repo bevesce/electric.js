@@ -1,0 +1,18 @@
+body {
+	font-family: "Avenir", sans-serif;
+	color: #202020;
+}
+
+h1 {
+	font-size: 1.1em;
+}
+
+ul {
+	padding: 5px;
+}
+
+li {
+	font-size: 1.1em;
+	list-style: none;
+	padding: 0;
+}
