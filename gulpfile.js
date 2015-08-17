@@ -21,7 +21,7 @@ gulp.task('build-test', function() {
 });
 
 gulp.task('build-server', function() {
-	var tsResult = gulp.src(['./src/*.ts', './src/receivers/*.ts'])
+	var tsResult = gulp.src(['./src/*.ts', './src/**/*.ts'])
 		.pipe(typescript({
 			noImplicitAny: true,
 			module: 'commonjs'
@@ -30,10 +30,11 @@ gulp.task('build-server', function() {
 });
 
 gulp.task('build-client', function() {
-	var tsResult = gulp.src(['./src/*.ts', './src/receivers/*.ts'])
+	var tsResult = gulp.src(['./src/*.ts', './src/**/*.ts'])
 		.pipe(typescript({
 			noImplicitAny: true,
-			module: 'amd'
+			module: 'amd',
+			jsx: 'react'
 		}));
 	return tsResult.js.pipe(gulp.dest('build/client/'));
 });
@@ -53,7 +54,7 @@ gulp.task('server', function() {
 		livereload: true
 	});
 	gulp.watch(
-		['./examples/*.*', './examples/receivers/*.*'],
+		['./examples/*.*', './examples/**/*.*'],
 		['livereload']);
 });
 
@@ -74,8 +75,8 @@ gulp.task('livereload', function(){
 // });
 
 gulp.task('wtest', function(){
-	gulp.watch(['./src/*.ts', './src/receivers/*.ts'], ['build-server']);
-	gulp.watch(['./src/*.ts', './src/receivers/*.ts'], ['build-client']);
+	gulp.watch(['./src/*.ts', './src/**/*.ts'], ['build-server']);
+	gulp.watch(['./src/*.ts', './src/**/*.ts'], ['build-client']);
 	gulp.watch('./build/server/*.js', ['test']);
 	gulp.watch('./build/test/*.js', ['test']);
 	gulp.watch('./test/*.ts', ['build-test']);
