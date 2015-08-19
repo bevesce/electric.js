@@ -353,13 +353,34 @@ export function transformTime<Out>(
 			}
 		}
 	}
-	return namedTransformator('transform time', emitters, transform);
+	return namedTransformator('transform time', emitters, transform, initialValue);
 }
 
-emitter.Emitter.prototype.transformTime = function transformTimeWith<Out>(
+(<any>emitter.Emitter.prototype).transformTime = function transformTimeWith<Out>(
+	initialValue: Out,
 	timeTransformation: (t: number) => number,
 	t0?: number
 ) {
 	var t0 = t0 || 0;
-	return transformTime(timeTransformation, t0, this);
+	return transformTime(initialValue, timeTransformation, t0, this);
 }
+
+export function hold<InOut>(
+	initialValue: InOut,
+	...emitters: inf.IEmitter<InOut>[]
+) {
+	function transform(emit: inf.IEmitterFunction<InOut>) {
+		return function holdTransform(v: InOut[], i: Identifier) {
+			if (v[i] !== undefined) {
+				emit(v[i]);
+			}
+		}
+	}
+	return namedTransformator('filter', emitters, transform, initialValue);
+};
+
+(<any>emitter.Emitter.prototype).hold = function holdValueOf<Out>(
+	initialValue: Out
+) {
+	return hold(initialValue, this)
+};
