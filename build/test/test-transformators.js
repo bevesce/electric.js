@@ -403,10 +403,36 @@ describe('change to when', function () {
         var done = false;
         var switcher = emitter1.change({
             to: function (x, y) {
-                emmiter2;
+                emitter2;
             },
             when: emitter2
         });
         expect(switcher).to.emit.values('1-0');
+    });
+    it('should work when "to" is an emitter, not a function', function () {
+        var m = electric.emitter.manual(undefined);
+        var t = electric.emitter.manual(2);
+        var s = electric.emitter.constant(1).change({ to: t, when: m });
+        expect(s).to.emit
+            .values(1)
+            .after(function () { return m.impulse(null); })
+            .values(2)
+            .after(function () { return t.emit(3); })
+            .values(3);
+    });
+    it('should work when "to" is the same emitter as "when', function () {
+        var m = electric.emitter.manual(undefined);
+        var s = electric.emitter.constant(1).change({ to: function () { return m; }, when: m });
+        expect(s).to.emit
+            .values(1)
+            .after(function () { return m.impulse(0); })
+            .after(function () { return m.emit(3); })
+            .after(function () { return m.emit(4); })
+            .values(undefined, 3, 4);
+        // semantics
+        // f.change({to: g, when: h})(t)
+        // = f(t) if t <= tx where tx: h(tx) is true and ty < tx where h(ty) is false
+        // = g(f(ts), h(ts))(t) where ts: h(ts) is true and t > ts and h(tx) if false where tx: ts < tx < t
+        // so s doesnt see 0 (from impulse(0)) because its time is ts, so t > ts is not met
     });
 });

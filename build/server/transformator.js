@@ -73,6 +73,7 @@ function generic(emitters, transform) {
 exports.generic = generic;
 ;
 function namedTransformator(name, emitters, transform, initialValue) {
+    if (transform === void 0) { transform = undefined; }
     var t = new Transformator(emitters, transform, initialValue);
     t.name = name;
     return t;
@@ -237,9 +238,17 @@ emitter.Emitter.prototype.throttle = function (deylayInMiliseconds) {
 // 	};
 // 	return namedTransformator('drop repeats', emitters, transform);
 // };
-emitter.Emitter.prototype.dropRepeats = function () {
-    return dropRepeats(this);
-};
+// (<any>emitter.Emitter.prototype).dropRepeats = function() {
+// 	return dropRepeats(this);
+// };
+function callIfFunction(obj, arg1, arg2) {
+    if (typeof obj === 'function') {
+        return obj(arg1, arg2);
+    }
+    else {
+        return obj;
+    }
+}
 function change(switchers, emitter) {
     function transform(emit) {
         return function changeTransform(v, i) {
@@ -248,7 +257,8 @@ function change(switchers, emitter) {
                 emit(v[0]);
             }
             else if (v[i] !== undefined) {
-                var e = switchers[i - 1].to(v[0], v[i]);
+                var to = switchers[i - 1].to;
+                var e = callIfFunction(to, v[0], v[i]);
                 this._wires[0].unplug();
                 this._wires[0] = new Wire(e, this, function (x) { return _this.receiveOn(x, 0); });
             }
@@ -290,17 +300,18 @@ exports.changes = changes;
 emitter.Emitter.prototype.changes = function onlyChanges() {
     return changes(this);
 };
-function transformTime(timeTransformation, t0) {
+function transformTime(initialValue, timeTransformation, t0) {
     var emitters = [];
-    for (var _i = 2; _i < arguments.length; _i++) {
-        emitters[_i - 2] = arguments[_i];
+    for (var _i = 3; _i < arguments.length; _i++) {
+        emitters[_i - 3] = arguments[_i];
     }
     var firstEmitted = false;
     function transform(emit) {
         return function timeTransform(v, i) {
             if (firstEmitted) {
                 var delay = timeTransformation(scheduler.now() - t0) + t0 - scheduler.now();
-                scheduler.scheduleTimeout(function () { return emit(v[i]); }, delay);
+                var toEmit = v[i];
+                scheduler.scheduleTimeout(function () { return emit(toEmit); }, delay);
             }
             else {
                 emit(v[i]);
@@ -308,10 +319,29 @@ function transformTime(timeTransformation, t0) {
             }
         };
     }
-    return namedTransformator('transform time', emitters, transform);
+    return namedTransformator('transform time', emitters, transform, initialValue);
 }
 exports.transformTime = transformTime;
-emitter.Emitter.prototype.transformTime = function transformTimeWith(timeTransformation, t0) {
+emitter.Emitter.prototype.transformTime = function transformTimeWith(initialValue, timeTransformation, t0) {
     var t0 = t0 || 0;
-    return transformTime(timeTransformation, t0, this);
+    return transformTime(initialValue, timeTransformation, t0, this);
+};
+function hold(initialValue) {
+    var emitters = [];
+    for (var _i = 1; _i < arguments.length; _i++) {
+        emitters[_i - 1] = arguments[_i];
+    }
+    function transform(emit) {
+        return function holdTransform(v, i) {
+            if (v[i] !== undefined) {
+                emit(v[i]);
+            }
+        };
+    }
+    return namedTransformator('filter', emitters, transform, initialValue);
+}
+exports.hold = hold;
+;
+emitter.Emitter.prototype.hold = function holdValueOf(initialValue) {
+    return hold(initialValue, this);
 };

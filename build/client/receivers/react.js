@@ -1,4 +1,4 @@
-define(["require", "exports", '../../bower_components/react/react', './utils'], function (require, exports, React, utils) {
+define(["require", "exports", '../../../bower_components/react/react', './utils'], function (require, exports, React, utils) {
     function jsxReceiver(nodeOrId) {
         var node = utils.getNode(nodeOrId);
         return function (jsx) {

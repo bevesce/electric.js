@@ -4,7 +4,8 @@ define(["require", "exports", './scheduler', './emitter', './transformator'], fu
     exports.transformator = transformator;
     function clock(args) {
         var e = exports.emitter.manual(exports.scheduler.now());
-        exports.scheduler.scheduleInterval(function () { return e.emit(exports.scheduler.now()); }, args.intervalInMs);
+        var interval = args.intervalInMs || 1 / args.fps * 1000;
+        exports.scheduler.scheduleInterval(function () { return e.emit(exports.scheduler.now()); }, interval);
         return e;
     }
     exports.clock = clock;
@@ -30,7 +31,7 @@ define(["require", "exports", './scheduler', './emitter', './transformator'], fu
     exports.eclock = eclock;
     function integral(f) {
         var initialAcc = { time: exports.scheduler.now(), value: 0, sum: 0 };
-        return f.accumulate(initialAcc, function (acc, v) {
+        var result = f.accumulate(initialAcc, function (acc, v) {
             var dt = (v.time - acc.time) / 1000;
             return {
                 time: v.time,
@@ -39,6 +40,11 @@ define(["require", "exports", './scheduler', './emitter', './transformator'], fu
                 dt: dt
             };
         }).map(function (v) { return ({ time: v.time, value: v.sum }); });
+        function equalsWithTime(x, y) {
+            return x.time === y.time && x.value === y.value;
+        }
+        result.setEquals(equalsWithTime);
+        return result;
     }
     exports.integral = integral;
 });

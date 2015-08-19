@@ -10,13 +10,17 @@ define(["require", "exports", './transformator'], function (require, exports, tr
         };
     }
     exports.htmlReceiverById = htmlReceiverById;
-    function log(message) {
+    function logReceiver(message) {
         if (!message) {
             message = '';
         }
         return function (x) {
             console.log(message, x);
         };
+    }
+    exports.logReceiver = logReceiver;
+    function log(emitter) {
+        emitter.plugReceiver(logReceiver(emitter.name));
     }
     exports.log = log;
 });

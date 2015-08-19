@@ -1,4 +1,4 @@
-define(["require", "exports", '../../bower_components/virtual-dom/dist/virtual-dom', './utils'], function (require, exports, vdom, utils) {
+define(["require", "exports", '../../../bower_components/virtual-dom/dist/virtual-dom', './utils'], function (require, exports, vdom, utils) {
     function virtualDomReceiver(nodeOrId) {
         var node = utils.getNode(nodeOrId);
         var previousTree = vdom.h();
