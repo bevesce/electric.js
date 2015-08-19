@@ -45,16 +45,16 @@ export function eclock<T>(
 	return new transformator.Transformator([emitter, time], timeSampling);
 }
 
-interface IIntegrable {
+export interface ITimeValue {
 	time: number;
 	value: number;
 	sum?: number;
 	dt?: number;
 }
 
-export function integral(f: emitter.Emitter<IIntegrable>) {
+export function integral(f: emitter.Emitter<ITimeValue>) {
 	var initialAcc = { time: scheduler.now(), value: 0, sum: 0 };
-	return f.accumulate(initialAcc, (acc: IIntegrable, v: IIntegrable) => {
+	var result = f.accumulate(initialAcc, (acc: ITimeValue, v: ITimeValue) => {
 		var dt = (v.time - acc.time) / 1000;
 		return {
 			time: v.time,
@@ -62,5 +62,10 @@ export function integral(f: emitter.Emitter<IIntegrable>) {
 			sum: acc.sum + (acc.value + v.value) / 2 * dt,
 			dt: dt
 		}
-	}).map((v: IIntegrable) => ({ time: v.time, value: v.sum }));
+	}).map((v: ITimeValue) => ({ time: v.time, value: v.sum }));
+	function equalsWithTime(x, y) {
+		return x.time === y.time && x.value === y.value;
+	}
+	result.setEquals(equalsWithTime);
+	return result;
 }
