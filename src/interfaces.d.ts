@@ -22,8 +22,10 @@ export interface IEmitter<T>
 	extends ITransformable
 {
 	plugReceiver(receiver: IReceiverFunction<T> | IReceiver<T> | IWire<T>): IDisposable;
-	unplugReceiver: (index: IDisposable) => void;
-	dirtyCurrentValue: () => T;
+	unplugReceiver(index: IDisposable): void;
+	dirtyCurrentValue(): T;
+	stabilize(): void;
+	setReleaseResources(releaseResources: () => void): void;
 }
 
 export interface IEmitterFunction<T> {
