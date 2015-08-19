@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width">
+    <link rel="stylesheet" href="style.css" type="text/css" />
+	<script src="http://localhost:35729/livereload.js"></script>
+    <title>ui</title>
+</head>
+<body>
+
+<div class="container">
+	<div class="box left-box" id="clicker">
+		click me
+	</div>
+	<div class="box right-box" id="clicked">
+		not clicked
+	</div>
+</div>
+
+<div class="container">
+	<div class="box left-box" id="clicker">
+		0 <button id="button0">click me</button>
+		1 <button id="button1">click me</button>
+	</div>
+	<div class="box right-box" id="buttoned">
+		not clicked
+	</div>
+</div>
+
+<div class="container">
+	<div class="box left-box">
+		<input type="text" id="text" placeholder="type in me" />
+	</div>
+	<div class="box right-box" id="typed">
+
+	</div>
+</div>
+
+<div class="container">
+	<div class="box left-box">
+		<textarea id="textarea" name="textarea" rows="2" cols="50" placeholder="write in me"></textarea>
+	</div>
+	<div class="box right-box" id="written">
+
+	</div>
+</div>
+
+<div class="container">
+	<div class="box left-box">
+		<input type="checkbox" id="checkbox" />
+	</div>
+	<div class="box right-box" id="checked">
+
+	</div>
+</div>
+
+<div class="container">
+	<div class="box left-box">
+		0 <input type="checkbox" id="checkbox0" />
+		1 <input type="checkbox" id="checkbox1" />
+		2 <input type="checkbox" id="checkbox2" />
+		3 <input type="checkbox" id="checkbox3" />
+	</div>
+	<div class="box right-box" id="checkers">
+
+	</div>
+</div>
+
+<div class="container">
+	<div class="box left-box">
+		0 <input type="radio" name="radio" id="radio0" />
+		1 <input type="radio" name="radio" id="radio1" />
+		2 <input type="radio" name="radio" id="radio2" />
+		3 <input type="radio" name="radio" id="radio3" />
+	</div>
+	<div class="box right-box" id="radioed">
+
+	</div>
+</div>
+
+<div class="container">
+	<div class="box left-box">
+		<select id="select">
+			<option>00000</option>
+			<option>00001</option>
+			<option>00002</option>
+			<option>00003</option>
+			<option>00004</option>
+			<option>00005</option>
+			<option>00006</option>
+		</select>
+	</div>
+	<div class="box right-box" id="selected">
+
+	</div>
+</div>
+
+<div class="container">
+	<div class="box left-box trackpad" style="height: 200px" id="mouse">
+		mouse on me
+	</div>
+	<div class="box right-box" id="moused">
+
+	</div>
+</div>
+
+<div class="container">
+	<div class="box left-box trackpad" style="height: 200px" id="trackpad">
+		drag on me
+	</div>
+	<div class="box right-box no-padding">
+		<canvas id="canvas" class="canvas" style="width: 100%; height: 200px;"></canvas>
+	</div>
+</div>
+
+<script src="main.js"></script>
+
+
+</body>
+</html>

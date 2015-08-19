@@ -1,4 +1,4 @@
-import React = require('../../../bower_components/react/react');
+import React = require('react');
 import utils = require('./utils');
 import inf = require('../interfaces');
 

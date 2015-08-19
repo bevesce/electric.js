@@ -2,7 +2,7 @@ var chai = require("chai");
 var electricKettle = require('./electric-kettle');
 electricKettle.pour(chai);
 var expect = chai.expect;
-var electric = require("../server/electric");
+var electric = require("../src/electric");
 describe('electric emitter', function () {
     var emitted;
     function receiver(x) {
@@ -123,7 +123,7 @@ describe('electric placeholder / recursion', function () {
         }
         ;
         // v = ∫ a - kv dt
-        var aT = electric.clock.fclock(a, { intervalInMs: 1000 });
+        var aT = electric.clock.fclock(a, { intervalInMs: 1 });
         var vTs = electric.emitter.placeholder();
         var vT = electric.clock.integral(electric.transformator.map(function (a, v) {
             if (!v) {
@@ -138,9 +138,20 @@ describe('electric placeholder / recursion', function () {
         vTs.is(vT.transformTime({ value: 0, time: now }, function (t) { return t + 1; }));
         var r = [];
         vT.plugReceiver(function (x) { return r.push(x); });
-        expect(vT).to.emit
-            .after(function () { return electric.scheduler.advance(5000); })
-            .values({ time: now + 0000, value: 0 }, { time: now + 1000, value: 10 }, { time: now + 2000, value: 20 - 10 * 0.1 }, { time: now + 3000, value: 30 - 10 * 0.1 - 0.1 * (20 - 10 * 0.1) }, { time: now + 4000, value: 40 - 10 * 0.1 - 0.1 * (20 - 10 * 0.1) - 0.1 * (30 - 10 * 0.1 - 0.1 * (20 - 10 * 0.1)) });
+        electric.scheduler.advance(5);
+        var expecteds = [
+            { time: now + 0, value: 0 },
+            { time: now + 1, value: 0.001 * (10) },
+            { time: now + 2, value: 0.001 * (20 - 10 * 0.1) },
+            { time: now + 3, value: 0.001 * (30 - 10 * 0.1 - 0.1 * (20 - 10 * 0.1)) },
+            { time: now + 4, value: 0.001 * (40 - 10 * 0.1 - 0.1 * (20 - 10 * 0.1) - 0.1 * (30 - 10 * 0.1 - 0.1 * (20 - 10 * 0.1))) }
+        ];
+        for (var i in expecteds) {
+            var expected = expecteds[i];
+            var given = r[i];
+            expect(given.time).to.equal(expected.time);
+            expect(given.value).to.be.within(expected.value - 0.01, expected.value + 0.01);
+        }
     });
 });
 describe('electric manual emitter', function () {

@@ -2,7 +2,7 @@
 // import electricKettle = require('./electric-kettle');
 // electricKettle.pour(chai);
 // var expect = chai.expect;
-// import electric = require("../server/electric");
+// import electric = require("../src/electric");
 // describe('lifting', function() {
 // 	it('should lift functions to functions of emitters', function() {
 // 		var emitter0 = electric.emitter.manual('0');
@@ -78,11 +78,12 @@
 // 		var r: number[] = [];
 // 		sT.plugReceiver((x: number) => r.push(x));
 // 		electric.scheduler.advance(4);
+// 		// value in v is expressed in [unit/s]
 // 		expect(r).to.deep.equal([
-// 			{time: time + 0, value: 0},
-// 			{time: time + 1, value: 2},
-// 			{time: time + 2, value: 4},
-// 			{time: time + 3, value: 6},
+// 			{time: time + 0, value: 0.000},
+// 			{time: time + 1, value: 0.002},
+// 			{time: time + 2, value: 0.004},
+// 			{time: time + 3, value: 0.006},
 // 		]);
 // 	});
 // 	it('should be composable', function() {
@@ -94,15 +95,16 @@
 // 		var vT = electric.clock.integral(aT);
 // 		var sT = electric.clock.integral(vT);
 // 		var r: number[] = [];
+// 		// value in a is expressed in [unit/s]
 // 		(<any>expect(sT)).to.emit.after(() => {
 // 			electric.scheduler.advance(6);
 // 		}).values(
-// 			{ time: time + 0, value: 0 },
-// 			{ time: time + 1, value: 1 },
-// 			{ time: time + 2, value: 4 },
-// 			{ time: time + 3, value: 9 },
-// 			{ time: time + 4, value: 16 },
-// 			{ time: time + 5, value: 25 }
+// 			{ time: time + 0, value: 0.000000 },
+// 			{ time: time + 1, value: 0.000001 },
+// 			{ time: time + 2, value: 0.000004 },
+// 			{ time: time + 3, value: 0.000009 },
+// 			{ time: time + 4, value: 0.000016 },
+// 			{ time: time + 5, value: 0.000025 }
 // 		);
 // 	});
 // });

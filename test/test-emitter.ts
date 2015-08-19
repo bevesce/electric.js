@@ -2,9 +2,9 @@ import chai = require("chai");
 import electricKettle = require('./electric-kettle');
 electricKettle.pour(chai);
 var expect = chai.expect;
-import electric = require("../server/electric");
-import ui = require('../server/emitters/ui');
-import emitterFromPromise = require('../server/emitters/fromPromise');
+import electric = require("../src/electric");
+import ui = require('../src/emitters/ui');
+import emitterFromPromise = require('../src/emitters/fromPromise');
 
 
 describe('electric emitter', function() {
@@ -149,7 +149,7 @@ describe('electric placeholder / recursion', function() {
             return 10
         };
         // v = ∫ a - kv dt
-        var aT = electric.clock.fclock(a, { intervalInMs: 1000 });
+        var aT = electric.clock.fclock(a, { intervalInMs: 1 });
         var vTs = electric.emitter.placeholder();
         var vT = electric.clock.integral(
             electric.transformator.map(
@@ -168,15 +168,21 @@ describe('electric placeholder / recursion', function() {
         vTs.is(vT.transformTime({ value: 0, time: now }, (t: number) => t + 1));
         var r: electric.clock.ITimeValue[] = [];
         vT.plugReceiver((x: electric.clock.ITimeValue) => r.push(x));
-        (<any>expect(vT)).to.emit
-            .after(() => electric.scheduler.advance(5000))
-            .values(
-                { time: now + 0000, value: 0 },
-                { time: now + 1000, value: 10 },
-                { time: now + 2000, value: 20 - 10 * 0.1 },
-                { time: now + 3000, value: 30 - 10 * 0.1 - 0.1 * (20 - 10 * 0.1) },
-                { time: now + 4000, value: 40 - 10 * 0.1 - 0.1 * (20 - 10 * 0.1) - 0.1 * (30 - 10 * 0.1 - 0.1 * (20 - 10 * 0.1)) }
-            );
+        electric.scheduler.advance(5)
+        var expecteds = [
+            { time: now + 0, value: 0 },
+            { time: now + 1, value: 0.001 * (10) },
+            { time: now + 2, value: 0.001 * (20 - 10 * 0.1) },
+            { time: now + 3, value: 0.001 * (30 - 10 * 0.1 - 0.1 * (20 - 10 * 0.1)) },
+            { time: now + 4, value: 0.001 * (40 - 10 * 0.1 - 0.1 * (20 - 10 * 0.1) - 0.1 * (30 - 10 * 0.1 - 0.1 * (20 - 10 * 0.1))) }
+        ];
+
+        for (var i in expecteds) {
+            var expected = expecteds[i];
+            var given = r[i];
+        	expect(given.time).to.equal(expected.time);
+        	expect(given.value).to.be.within(expected.value - 0.01, expected.value + 0.01);
+        }
     });
 });
 

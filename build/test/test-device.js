@@ -2,7 +2,7 @@
 // import electricKettle = require('./electric-kettle');
 // electricKettle.pour(chai);
 // var expect = chai.expect;
-// import electric = require("../server/electric");
+// import electric = require("../src/electric");
 // describe('electric device', function() {
 // 	it('should run creating function', function() {
 // 		var haveRun = false;
