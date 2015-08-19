@@ -75,21 +75,10 @@ gulp.task('livereload', function(){
 	    .pipe(connect.reload());
 });
 
-// gulp.task('inject', function(){
-// 	var target = gulp.src('./build/index.html');
-// 	var sources = gulp.src(['./build/scripts/*.js', './build/styles/*.css'], {read: false});
-
-// 	return target.pipe(inject(sources))
-// 		.pipe(gulp.dest('./build'));
-// });
-
-gulp.task('wtest', function(){
+gulp.task('watch', function(){
 	gulp.watch(['./src/*.ts', './src/**/*.ts'], ['build-src']);
 	gulp.watch(['./examples/*.ts', './examples/**/*.ts'], ['build-examples']);
 	gulp.watch('./build/src/*.js', ['test']);
 	gulp.watch('./build/test/*.js', ['test']);
 	gulp.watch('./test/*.ts', ['build-test']);
 });
-
-// gulp.task('default', ['server', 'watch']);
-
