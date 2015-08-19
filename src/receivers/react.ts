@@ -1,7 +1,6 @@
-import React = require('../../bower_components/react/react');
+import React = require('../../../bower_components/react/react');
 import utils = require('./utils');
 import inf = require('../interfaces');
-
 
 
 export function jsxReceiver(nodeOrId: utils.Node | string) {

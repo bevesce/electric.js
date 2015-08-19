@@ -1,10 +1,11 @@
 requirejs([
 	'../../build/client/electric',
 	'../../bower_components/react/react.js',
-	'../../build/client/react'
+	'../../build/client/receivers/react'
 ], function(
 	electric, React, electricReact
 ) {
+	console.log(electric);
 	electric.clock.clock({intervalInMs: 1000})
 		.map(function(t) {
 			return React.createElement("h1", null, t)
@@ -35,9 +36,9 @@ requirejs([
 		{
 			render: function() {
 				return (
-					React.createElement("div", null, 
-						React.createElement("h1", null, this.state.time), 
-						React.createElement("ul", null, 
+					React.createElement("div", null,
+						React.createElement("h1", null, this.state.time),
+						React.createElement("ul", null,
 							this.state.list.map(function(item) {
 								return React.createElement("li", {key: item}, item)
 							})

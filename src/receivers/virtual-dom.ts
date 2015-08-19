@@ -1,4 +1,4 @@
-import vdom = require('../../bower_components/virtual-dom/dist/virtual-dom');
+import vdom = require('../../../bower_components/virtual-dom/dist/virtual-dom');
 import utils = require('./utils');
 
 function virtualDomReceiver(nodeOrId: utils.Node | string) {

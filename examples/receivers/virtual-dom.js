@@ -1,13 +1,11 @@
 requirejs([
 	'../../build/client/electric',
 	'../../bower_components/virtual-dom/dist/virtual-dom.js',
-	'../../build/client/virtual-dom.js'
+	'../../build/client/receivers/virtual-dom.js'
 
 ], function(
 	electric, vdom, virtualDomReceiver
 ) {
-	console.log('x');
-
 	var h = vdom.h;
 	var diff = vdom.diff;
 	var patch = vdom.patch
