@@ -272,9 +272,21 @@ emitter.Emitter.prototype.throttle = function(deylayInMiliseconds: number) {
 // 	return namedTransformator('drop repeats', emitters, transform);
 // };
 
-emitter.Emitter.prototype.dropRepeats = function() {
-	return dropRepeats(this);
-};
+// (<any>emitter.Emitter.prototype).dropRepeats = function() {
+// 	return dropRepeats(this);
+// };
+
+
+function callIfFunction<Out, Arg1, Arg2>(
+	obj: (arg1: Arg1, arg2: Arg2) => Out | Out, arg1: Arg1, arg2: Arg2
+) {
+	if (typeof obj === 'function') {
+		return obj(arg1, arg2);
+	}
+	else {
+		return obj;
+	}
+}
 
 
 export function change<Out, OtherOut>(
