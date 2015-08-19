@@ -12,9 +12,10 @@ export function clock(
 	args: { intervalInMs?: number, fps?: number }
 ) {
 	var e = emitter.manual(scheduler.now());
+	var interval = args.intervalInMs || 1 / args.fps * 1000;
 	scheduler.scheduleInterval(
 		() => e.emit(scheduler.now()),
-		args.intervalInMs
+		interval
 	);
 	return e;
 }
