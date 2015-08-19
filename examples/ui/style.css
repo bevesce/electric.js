@@ -1,0 +1,53 @@
+body {
+	font-family: "Avenir", sans-serif;
+	color: #202020;
+	padding: 0;
+	margin: 0;
+}
+
+.container {
+	margin: 10px 0;
+	width: 100%;
+	overflow: hidden;
+}
+
+.box {
+	display: inline-block;
+	width: 50%;
+	float: left;
+	padding: 50px;
+	text-align: center;
+	box-sizing: border-box;
+}
+
+.left-box {
+	color: white;
+	background: black;
+}
+
+.right-box {
+	background: white;
+
+}
+
+.big-text {
+	font-size: 3em;
+}
+
+.canvas {
+
+}
+
+.no-padding {
+	padding: 0;
+}
+
+.trackpad {
+	-webkit-touch-callout: none;
+    -webkit-user-select: none;
+    -khtml-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+    cursor: crosshair;
+}
