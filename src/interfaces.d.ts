@@ -26,6 +26,7 @@ export interface IEmitter<T>
 	dirtyCurrentValue(): T;
 	stabilize(): void;
 	setReleaseResources(releaseResources: () => void): void;
+	setEquals(equals: (x: T, y: T) => boolean): void;
 }
 
 export interface IEmitterFunction<T> {

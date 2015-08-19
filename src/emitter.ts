@@ -64,11 +64,19 @@ export class Emitter<Out>
 	}
 
 	protected _emit(value: Out) {
-		if (this._currentValue === value){
+		if (this._equals(this._currentValue, value)) {
 			return;
 		}
 		this._dispatchToReceivers(value);
 		this._currentValue = value;
+	}
+
+	private _equals(x: Out, y: Out) {
+		return x === y;
+	}
+
+	setEquals(equals: (x: Out, y: Out) => boolean) {
+		this._equals = equals;
 	}
 
 	protected _impulse(value: Out) {
