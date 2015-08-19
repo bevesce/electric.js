@@ -103,7 +103,12 @@ export function generic<In>(
 };
 
 
-function namedTransformator(name, emitters, transform, initialValue?) {
+function namedTransformator<In>(
+	name: string,
+	emitters: Array<inf.IEmitter<In>>,
+	transform: ITransformGeneratorFunction<In> = undefined,
+	initialValue?: any
+) {
 	var t = new Transformator(emitters, transform, initialValue);
 	t.name = name;
 	return t;
@@ -322,12 +327,13 @@ export function changes<Out>(
 	return namedTransformator('change', emitters, transform);
 };
 
-emitter.Emitter.prototype.changes = function onlyChanges<Out>() {
+(<any>emitter.Emitter.prototype).changes = function onlyChanges<Out>() {
 	return changes(this);
 }
 
 
 export function transformTime<Out>(
+	initialValue: Out,
 	timeTransformation: (t: number) => number,
 	t0: number,
 	...emitters: Array<inf.IEmitter<Out>>
