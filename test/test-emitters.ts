@@ -3,96 +3,95 @@ import electricKettle = require('./electric-kettle');
 electricKettle.pour(chai);
 var expect = chai.expect;
 import electric = require("../server/electric");
+import fromPromise = require("../server/emitters/fromPromise");
+import ui = require("../server/emitters/ui");
 
 
-describe('electric emitter', function() {
-    var emitted: number;
-    function receiver(x: number){
-        emitted = x;
-    }
 
-    it('should be pluggable', function() {
-        var emitter = electric.emitter.manual(0);
-        emitter.plugReceiver(receiver);
-        emitter.emit(1);
-        expect(emitted).to.equal(1);
-    });
-    it('should be unpluggable be id', function() {
-        var emitter = electric.emitter.manual(0);
-        var id = emitter.plugReceiver(receiver);
-        emitter.unplugReceiver(id);
-        emitter.emit(1);
-        expect(emitted).to.equal(0);
-    });
-    it('should be unpluggable be receiver itself', function() {
-        var emitter = electric.emitter.manual(0);
-        emitter.plugReceiver(receiver);
-        emitter.unplugReceiver(receiver);
-        emitter.emit(1);
-        expect(emitted).to.equal(0);
-    });
-});
-
-describe('electric manual emitter', function() {
-    it('should be exported', function() {
-        expect(electric.emitter.manual).to.not.be.undefined;
-    });
-    it('should pass values to receivers', function() {
-        var emitter = electric.emitter.manual(0);
-        (<any>expect(2)).receivers.ofA(emitter)
-            .to.receive(2).when.emitted(2).from(emitter)
-            .to.receive(3).when.emitted(3).from(emitter);
-    });
-    it('should provide current value on pluggin', function() {
-        var emitter = electric.emitter.manual(13);
-        var r: number;
-        emitter.plugReceiver(x => r = x);
-        expect(r).to.equal(13);
-        var r2: number;
-        emitter.emit(2);
-        emitter.plugReceiver(x => r2 = x);
-        expect(r).to.equal(2);
-        expect(r2).to.equal(2);
-    });
-    it('should be pluggable by receivers', function() {
-        var r: number;
-        var i: number;
-        var emitter = electric.emitter.manual(13);
-        var receiver: any = electric.receiver.hanging();
-        receiver.receiveOn = function(x: number, y: number){
-            r = x;
-            i = y;
+describe('emitter from event', function() {
+    var mockTarget = {
+        listeners: <{ [type: string]: any }>{},
+        event: function(x: any) {
+            for (var k in this.listeners) {
+                if (this.listeners[k]) {
+                    this.listeners[k](x);
+                }
+            }
+        },
+        addEventListener: function(type: string, callback: (v: any) => void, useCapture?: boolean) {
+            this.listeners[type] = callback;
+        },
+        removeEventListener: function(type: string, callback: (v: any) => void, useCapture?: boolean) {
+            this.listeners[type] = undefined;
         }
-        emitter.plugReceiver(receiver)
-        expect(r).to.equal(13);
-        expect(i).to.equal(0);
-        emitter.emit(14);
-        expect(r).to.equal(14);
-        expect(i).to.equal(0);
+    };
+    it('should be tested by working mock target', function() {
+        var r = 0;
+        var f = (x: number) => r = x;
+        mockTarget.addEventListener('click', f);
+        mockTarget.event(1);
+        expect(r).to.equal(1);
+        mockTarget.removeEventListener('click', f);
+        mockTarget.event(2);
+        expect(r).to.equal(1);
+    });
+
+    it('should impulse events', function() {
+        (<any>expect(ui.fromEvent(mockTarget, 'click'))).to.emit
+            .values(undefined)
+            .after(() => mockTarget.event(1))
+            .values(1, undefined)
+            .after(() => mockTarget.event(1))
+            .values(1, undefined);
+        expect(mockTarget.listeners['click']).to.not.be.undefined;
+    });
+    it('should remove listener on stabilize', function() {
+        var mouse = ui.fromEvent(mockTarget, 'mouse');
+        expect(mockTarget.listeners['mouse']).to.not.be.undefined;
+        mouse.stabilize();
+        expect(mockTarget.listeners['mouse']).to.be.undefined;
     });
 });
 
-
-describe('emitters impulse', function() {
-    it('should return to value before impulse', function() {
-        var emitter = electric.emitter.manual(0);
-        (<any>expect(emitter)).to.emit
-            .values(0)
-            .after(() => {
-                emitter.impulse(1);
-            })
-            .values(1, 0);
+describe('emitter from Promise', function() {
+    var mockPromise = {
+        then: function(onFulfilled: any, onRejected: any) {
+            this.onFulfilled = onFulfilled;
+            this.onRejected = onRejected;
+        },
+        fulfill: function(x: any) {
+            this.onFulfilled(x);
+        },
+        reject: function(x: any) {
+            this.onRejected(x);
+        }
+    };
+    it('should be tested by working mock promise', function() {
+        var r = 0;
+        var e = 0;
+        mockPromise.then(
+            (x: number) => r = x,
+            (x: number) => e = x
+			);
+        mockPromise.fulfill(1);
+        expect(r).to.equal(1);
+        mockPromise.reject(2);
+        expect(e).to.equal(2);
     });
-    it('it should not go to new receivers', function() {
-        var emitter = electric.emitter.manual(0);
-        var r: string[] = [];
-        emitter.plugReceiver(x => r.push('a' + x));
-        emitter.impulse(1);
-        emitter.plugReceiver(x => r.push('b' + x));
-        emitter.impulse(2);
-        expect(r).to.deep.equal([
-            'a0', 'a1', 'a0', 'b0', 'a2', 'b2', 'a0', 'b0'
-        ]);
-    })
+    it('should emit "pending" state upon creation', function() {
+        (<any>expect(fromPromise(mockPromise))).to.emit
+            .values({ status: 'pending' });
+    });
+    it('should emit "fulfilled" state and data upon fulfillment', function() {
+        (<any>expect(fromPromise(mockPromise))).to.emit
+            .values({ status: 'pending' })
+            .after(() => mockPromise.fulfill(1))
+            .values({ status: 'fulfilled', data: 1 });
+    });
+    it('should emit "rejected" state and data upon fulfillment', function() {
+        (<any>expect(fromPromise(mockPromise))).to.emit
+            .values({ status: 'pending' })
+            .after(() => mockPromise.reject(3))
+            .values({ status: 'rejected', data: 3 });
+    });
 });
-
