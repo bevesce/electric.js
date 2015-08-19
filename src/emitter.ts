@@ -2,7 +2,13 @@ import inf = require('./interfaces');
 import fp = require('./fp');
 
 
+export class Transformable<Out> {
+
+}
+
+
 export class Emitter<Out>
+	extends Transformable<Out>
 	implements inf.IEmitter<Out>
 {
 	name: string;
@@ -128,39 +134,61 @@ export function constant<T>(value: T): inf.IEmitter<T> {
 	return e;
 }
 
-interface AddEventListenerFunction {
-	(type: string, listener: (event: any) => void, useCapture?: boolean): void
+class Placeholder<Out>
+	extends Emitter<Out>
+	implements inf.IEmitter<Out>
+{
+	private _emitter: inf.IEmitter<Out>;
+	private _actions = [];
+
+	is(emitter: inf.IEmitter<Out>) {
+		this._emitter = emitter;
+		for (var action of this._actions) {
+			action(this._emitter);
+		}
+	}
+
+	private _doOrQueue(action: (emitter) => any): any {
+		if (this._emitter) {
+			return action(this._emitter);
+		}
+		else {
+			this._actions.push(action);
+		}
+	}
+
+	plugReceiver(receiver: IReceiverFunction<T> | IReceiver<T> | IWire<T>): IDisposable {
+		return this._doOrQueue(
+			(emitter) => emitter.plugReceiver(receiver)
+		);
+	};
+
+	unplugReceiver(index: IDisposable): void {
+		this._doOrQueue(
+			(emitter) => emitter.unplugReceiver(index)
+		);
+	}
+
+	dirtyCurrentValue(): T {
+		if (this._emitter) {
+			return this._emitter.dirtyCurrentValue();
+		}
+		return undefined;
+	}
+
+	stabilize(): void {
+		this._doOrQueue(
+			(emitter) => emitter.stabilize(index)
+		);
+	}
+
+	setReleaseResources(releaseResources: () => void): void {
+		this._doOrQueue(
+			(emitter) => emitter.setReleaseResources(releaseResources)
+		)
+	}
 }
 
-export function fromEvent(
-	target: {addEventListener: AddEventListenerFunction},
-	type: string, useCapture = false
-) {
-	var e = new ManualEmitter(undefined);
-	e.name = 'event(' + type + ' - ' + target + ')';
-	target.addEventListener(
-		type,
-		(event: any) => {
-			e.impulse(event);
-		},
-		useCapture
-	);
-	return e;
-}
-
-interface Promise<Of, Err> {
-	then(
-		onFulfilled: (value: Of) => void,
-		onRejected: (err: Err) => void
-	): any
-}
-
-export function fromPromise<Of, Err>(promise: Promise<Of, Err>) {
-	var e = new ManualEmitter(undefined);
-	e.name = 'promise(' + promise + ')';
-	promise.then(
-		(value: Of) => e.impulse(fp.either.right(value)),
-		(err: Err) => e.impulse(fp.either.left(err))
-	);
-	return e;
+export function placeholder() {
+	return new Placeholder();
 }
