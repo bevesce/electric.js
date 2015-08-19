@@ -1,3 +1,4 @@
+import inf = require('./interfaces');
 import transformator = require('./transformator')
 
 
@@ -12,11 +13,15 @@ export function htmlReceiverById(id: string) {
 		}
 	}
 
-export function log(message: string) {
+export function logReceiver(message: string) {
 	if (!message) {
 		message = ''
 	}
 	return function(x: any) {
 		console.log(message, x);
 	}
+}
+
+export function log(emitter: inf.IEmitter<any>) {
+	emitter.plugReceiver(logReceiver(emitter.name));
 }
