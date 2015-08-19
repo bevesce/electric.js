@@ -127,10 +127,9 @@ export function map<In, Out>(
 	return namedTransformator('map', emitters, transform);
 };
 
-emitter.Emitter.prototype.map = function mapWith<Out, NewOut>(mapping: (arg: Out) => NewOut) {
+(<any>emitter.Emitter.prototype).map = function mapWith<Out, NewOut>(mapping: (arg: Out) => NewOut) {
 	return map(mapping, this);
 }
-
 
 export function filter<InOut>(
 	initialValue: InOut,
@@ -148,8 +147,8 @@ export function filter<InOut>(
 
 };
 
-emitter.Emitter.prototype.filter = function filterBy<Out>(
-	initialValue, predicate: (arg: Out) => boolean
+(<any>emitter.Emitter.prototype).filter = function filterBy<Out>(
+	initialValue: Out, predicate: (arg: Out) => boolean
 ) {
 	return filter(initialValue, predicate, this);
 }
@@ -161,7 +160,7 @@ export function merge<InOut>(
 	return namedTransformator('merge', emitters, undefined);
 };
 
-emitter.Emitter.prototype.merge = function mergeWith<Out>(...emitters: inf.IEmitter<Out>[]) {
+(<any>emitter.Emitter.prototype).merge = function mergeWith<Out>(...emitters: inf.IEmitter<Out>[]) {
 	return merge(this, ...emitters);
 }
 
@@ -180,7 +179,7 @@ export function accumulate<In, Out>(
 	return namedTransformator('accumulate', emitters, transform);
 };
 
-emitter.Emitter.prototype.accumulate = function accumulateWith<NewOut, Out>(
+(<any>emitter.Emitter.prototype).accumulate = function accumulateWith<NewOut, Out>(
 	initValue: NewOut, accumulator: (accumulated: NewOut, value: Out) => NewOut
 ) {
 	return accumulate(initValue, accumulator, this);
@@ -201,7 +200,7 @@ export function flatten<InOut>(
 	return transformator;
 };
 
-emitter.Emitter.prototype.flatten = function() {
+(<any>emitter.Emitter.prototype).flatten = function() {
 	return flatten(<any>this);
 }
 
@@ -222,7 +221,7 @@ export function sample<InOut>(
 	return namedTransformator('sample', emitters, transform);
 };
 
-emitter.Emitter.prototype.sampleBy = function(...emitters: inf.IEmitter<any>[]) {
+(<any>emitter.Emitter.prototype).sampleBy = function(...emitters: inf.IEmitter<any>[]) {
 	return sample(this, ...emitters);
 }
 
@@ -252,7 +251,7 @@ export function throttle<InOut>(
 	return namedTransformator('throttle', emitters, transform, []);
 };
 
-emitter.Emitter.prototype.throttle = function(deylayInMiliseconds: number) {
+(<any>emitter.Emitter.prototype).throttle = function(deylayInMiliseconds: number) {
 	return throttle(deylayInMiliseconds, this)
 };
 
@@ -315,7 +314,7 @@ export function change<Out, OtherOut>(
 	return namedTransformator('change', allEmitters, transform);
 }
 
-emitter.Emitter.prototype.change = function changeToWhen<OtherOut, Out>(
+(<any>emitter.Emitter.prototype).change = function changeToWhen<OtherOut, Out>(
 	...switchers: { when: inf.IEmitter<OtherOut>, to: (x: Out, y: OtherOut) => inf.IEmitter<Out> }[]
 ) {
 	return change(switchers, this);
