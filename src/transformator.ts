@@ -287,7 +287,8 @@ export function change<Out, OtherOut>(
 				emit(<Out>v[0]);
 			}
 			else if (v[i] !== undefined){
-				var e = switchers[i - 1].to(<Out>v[0], <OtherOut>v[i]);
+				var to = switchers[i - 1].to;
+				var e = callIfFunction(to, <Out>v[0], <OtherOut>v[i]);
 				this._wires[0].unplug();
 				this._wires[0] = new Wire(
 					e,
