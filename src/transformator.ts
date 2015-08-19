@@ -343,8 +343,9 @@ export function transformTime<Out>(
 		return function timeTransform(v: Out[], i: number){
 			if (firstEmitted){
 				var delay = timeTransformation(scheduler.now() - t0) + t0 - scheduler.now();
+				var toEmit = v[i];
 				scheduler.scheduleTimeout(
-					() => emit(v[i]), delay
+					() => emit(toEmit), delay
 				);
 			}
 			else {
