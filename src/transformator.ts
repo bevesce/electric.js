@@ -88,7 +88,9 @@ class Wire<InOut>
 	}
 
 	unplug() {
-		this.input.unplugReceiver(this.receiverId);
+		if (this.input){
+			this.input.unplugReceiver(this.receiverId);
+		}
 		this.input = undefined;
 		this.output = undefined;
 	}
@@ -277,13 +279,13 @@ export function throttle<InOut>(
 
 
 function callIfFunction<Out, Arg1, Arg2>(
-	obj: (arg1: Arg1, arg2: Arg2) => Out | Out, arg1: Arg1, arg2: Arg2
-) {
+	obj: Out | ((arg1: Arg1, arg2: Arg2) => Out), arg1: Arg1, arg2: Arg2
+): Out {
 	if (typeof obj === 'function') {
-		return obj(arg1, arg2);
+		return (<((arg1: Arg1, arg2: Arg2) => Out)>obj)(arg1, arg2);
 	}
 	else {
-		return obj;
+		return <Out>obj;
 	}
 }
 

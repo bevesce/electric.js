@@ -8,7 +8,6 @@ export class Transformable<Out> {
 
 
 export class Emitter<Out>
-	extends Transformable<Out>
 	implements inf.IEmitter<Out>
 {
 	name: string;
@@ -47,7 +46,7 @@ export class Emitter<Out>
 		}
 	}
 
-	dirtyCurrentValue() {
+	dirtyCurrentValue(): Out {
 		return this._currentValue;
 	}
 
@@ -100,7 +99,7 @@ export class Emitter<Out>
 		}
 	}
 
-	private _dispatchToReceiver(value: Out, receiver: any) {
+	protected _dispatchToReceiver(value: Out, receiver: any) {
 		if (typeof receiver === 'function'){
 			receiver(value);
 		}
@@ -139,7 +138,13 @@ class Placeholder<Out>
 	implements inf.IEmitter<Out>
 {
 	private _emitter: inf.IEmitter<Out>;
-	private _actions = [];
+	private _actions: Array<((emitter: inf.IEmitter<Out>) => any)> = [];
+	private _initialValue: Out;
+
+	constructor(initialValue: Out) {
+		super(initialValue);
+		this._initialValue = initialValue;
+	}
 
 	is(emitter: inf.IEmitter<Out>) {
 		this._emitter = emitter;
@@ -148,37 +153,44 @@ class Placeholder<Out>
 		}
 	}
 
-	private _doOrQueue(action: (emitter) => any): any {
+	private _doOrQueue(
+		action: (emitter: inf.IEmitter<Out>) => any,
+		eventually?: () => void
+	): any {
 		if (this._emitter) {
 			return action(this._emitter);
 		}
 		else {
 			this._actions.push(action);
+			if (eventually) {
+				eventually();
+			}
 		}
 	}
 
-	plugReceiver(receiver: IReceiverFunction<T> | IReceiver<T> | IWire<T>): IDisposable {
+	plugReceiver(receiver: inf.IReceiverFunction<Out> | inf.IReceiver<Out> | inf.IWire<Out>): inf.IDisposable {
 		return this._doOrQueue(
-			(emitter) => emitter.plugReceiver(receiver)
+			(emitter) => emitter.plugReceiver(receiver),
+			() => this._dispatchToReceiver(this._initialValue, receiver)
 		);
 	};
 
-	unplugReceiver(index: IDisposable): void {
+	unplugReceiver(index: inf.IDisposable): void {
 		this._doOrQueue(
 			(emitter) => emitter.unplugReceiver(index)
 		);
 	}
 
-	dirtyCurrentValue(): T {
+	dirtyCurrentValue(): Out {
 		if (this._emitter) {
 			return this._emitter.dirtyCurrentValue();
 		}
-		return undefined;
+		return this._initialValue;
 	}
 
 	stabilize(): void {
 		this._doOrQueue(
-			(emitter) => emitter.stabilize(index)
+			(emitter) => emitter.stabilize()
 		);
 	}
 
@@ -189,6 +201,6 @@ class Placeholder<Out>
 	}
 }
 
-export function placeholder() {
-	return new Placeholder();
+export function placeholder<T>(initialValue: T) {
+	return new Placeholder(initialValue);
 }

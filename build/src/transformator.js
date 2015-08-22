@@ -60,7 +60,9 @@ var Wire = (function () {
         this.receiverId = this.input.plugReceiver(this);
     }
     Wire.prototype.unplug = function () {
-        this.input.unplugReceiver(this.receiverId);
+        if (this.input) {
+            this.input.unplugReceiver(this.receiverId);
+        }
         this.input = undefined;
         this.output = undefined;
     };

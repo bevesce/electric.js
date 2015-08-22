@@ -10,8 +10,7 @@ var Transformable = (function () {
     return Transformable;
 })();
 exports.Transformable = Transformable;
-var Emitter = (function (_super) {
-    __extends(Emitter, _super);
+var Emitter = (function () {
     function Emitter(initialValue) {
         if (initialValue === void 0) { initialValue = undefined; }
         this._receivers = [];
@@ -89,7 +88,7 @@ var Emitter = (function (_super) {
         }
     };
     return Emitter;
-})(Transformable);
+})();
 exports.Emitter = Emitter;
 var ManualEmitter = (function (_super) {
     __extends(ManualEmitter, _super);
@@ -119,9 +118,10 @@ function constant(value) {
 exports.constant = constant;
 var Placeholder = (function (_super) {
     __extends(Placeholder, _super);
-    function Placeholder() {
-        _super.apply(this, arguments);
+    function Placeholder(initialValue) {
+        _super.call(this, initialValue);
         this._actions = [];
+        this._initialValue = initialValue;
     }
     Placeholder.prototype.is = function (emitter) {
         this._emitter = emitter;
@@ -130,16 +130,20 @@ var Placeholder = (function (_super) {
             action(this._emitter);
         }
     };
-    Placeholder.prototype._doOrQueue = function (action) {
+    Placeholder.prototype._doOrQueue = function (action, eventually) {
         if (this._emitter) {
             return action(this._emitter);
         }
         else {
             this._actions.push(action);
+            if (eventually) {
+                eventually();
+            }
         }
     };
     Placeholder.prototype.plugReceiver = function (receiver) {
-        return this._doOrQueue(function (emitter) { return emitter.plugReceiver(receiver); });
+        var _this = this;
+        return this._doOrQueue(function (emitter) { return emitter.plugReceiver(receiver); }, function () { return _this._dispatchToReceiver(_this._initialValue, receiver); });
     };
     ;
     Placeholder.prototype.unplugReceiver = function (index) {
@@ -149,17 +153,17 @@ var Placeholder = (function (_super) {
         if (this._emitter) {
             return this._emitter.dirtyCurrentValue();
         }
-        return undefined;
+        return this._initialValue;
     };
     Placeholder.prototype.stabilize = function () {
-        this._doOrQueue(function (emitter) { return emitter.stabilize(index); });
+        this._doOrQueue(function (emitter) { return emitter.stabilize(); });
     };
     Placeholder.prototype.setReleaseResources = function (releaseResources) {
         this._doOrQueue(function (emitter) { return emitter.setReleaseResources(releaseResources); });
     };
     return Placeholder;
 })(Emitter);
-function placeholder() {
-    return new Placeholder();
+function placeholder(initialValue) {
+    return new Placeholder(initialValue);
 }
 exports.placeholder = placeholder;

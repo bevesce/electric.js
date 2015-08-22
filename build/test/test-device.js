@@ -1,125 +1,100 @@
-var chai = require("chai");
-var electricKettle = require('./electric-kettle');
-electricKettle.pour(chai);
-var expect = chai.expect;
-var electric = require("../src/electric");
-describe('electric device', function () {
-    it('should run creating function', function () {
-        var haveRun = false;
-        electric.device.create(function () {
-            haveRun = true;
-        });
-        expect(haveRun).to.be.true;
-    });
-    it('should optionally name device', function () {
-        var name = 'some device';
-        var device = electric.device.create(name, function () {
-        });
-        expect(device.name).to.equal(name);
-    });
-    it('should provide ins and outs functions', function () {
-        electric.device.create(function (ins, outs) {
-            expect(ins).to.be.a('function');
-            expect(outs).to.be.a('function');
-        });
-    });
-    it('should have ins', function () {
-        var device = electric.device.create(function (ins, outs) {
-            ins({
-                in1: electric.receiver.hanging(),
-                in2: electric.receiver.hanging()
-            });
-        });
-        expect(device.ins['in1']).to.not.be.undefined;
-        expect(device.ins['in1'].plugEmitter).to.be.a('function');
-    });
-    it('should have outs', function () {
-        var device = electric.device.create(function (ins, outs) {
-            outs({
-                out1: electric.receiver.hanging(),
-                out2: electric.receiver.hanging()
-            });
-        });
-        expect(device.outs['out1']).to.not.be.undefined;
-        expect(device.outs['out1'].plugReceiver).to.be.a('function');
-    });
-    it('should work...', function () {
-        var device = electric.device.create(function (ins, outs) {
-            var inp = electric.receiver.hanging();
-            var out = inp.map(function (x) { return x * 2; });
-            ins({ inp: inp });
-            outs({ out: out });
-        });
-        var emitter = electric.emitter.manual(0);
-        device.ins['inp'].plugEmitter(emitter);
-        expect(device.outs['out']).to.emit
-            .values(0)
-            .then.after(function () {
-            emitter.emit(1);
-            emitter.emit(2);
-        })
-            .values(2, 4);
-    });
-    it('should work as a function', function () {
-        var device = electric.device.create(function (ins, outs) {
-            var inp = electric.receiver.hanging();
-            var out = inp.map(function (x) { return x * 2; });
-            ins({ inp: inp });
-            outs({ out: out });
-        });
-        var emitter = electric.emitter.manual(0);
-        var r = [];
-        var receiver = function (x) {
-            r.push(x);
-        };
-        device.plug({
-            ins: {
-                inp: emitter
-            },
-            outs: {
-                out: receiver
-            }
-        });
-        // device.outs.out.plugReceiver(receiver);
-        emitter.emit(1);
-        expect(r).to.deep.equal([0, 2]);
-    });
-});
-describe('list device', function () {
-    it('should work...', function () {
-        var listDevice = electric.device.list();
-        var newTodo = electric.emitter.manual(undefined);
-        var deleteTodo = electric.emitter.manual(undefined);
-        var editTodo = electric.emitter.manual(undefined);
-        listDevice.plug({
-            ins: {
-                inserts: newTodo,
-                deletes: deleteTodo
-            }
-        });
-        listDevice.ins['edits'].plugEmitter(editTodo);
-        expect(listDevice.outs['items']).to.emit
-            .values([])
-            .after(function () {
-            newTodo.impulse('item1');
-        })
-            .values(['item1'])
-            .after(function () {
-            newTodo.impulse('item2');
-        })
-            .values(['item1', 'item2'])
-            .after(function () {
-            deleteTodo.impulse(0);
-        })
-            .values(['item2'])
-            .after(function () {
-            editTodo.impulse({ index: 0, value: 'edited2' });
-        })
-            .values(['edited2'])
-            .after(function () {
-            newTodo.impulse('item3');
-            newTodo.impulse('item3');
-        })
-            .values(['edited2', 'item3'], ['edited2', 'item3', 'item3']);
-    });
-});
+// /// <reference path="../d/chai.d.ts" />
+// /// <reference path="../d/mocha.d.ts" />
+// import chai = require('chai');
+// import electricKettle = require('./electric-kettle');
+// electricKettle.pourAsync(chai);
+// var expect = chai.expect;
+// import electric = require('../src/electric');
+// import arrayDevice = require('../src/devices/array');
+// describe('create device api', function() {
+// 	it('should have inputs and outputs', function(done) {
+// 		var device = electric.device.create(function(input, output) {
+// 			output('out0', input('in0'));
+// 		});
+// 		var m = electric.emitter.manual(0);
+// 		device.plug({in0: m});
+// 		expect(device.out['out0'])
+// 			.to.emit(0)
+// 			.then.after(() => m.emit(1))
+// 			.to.emit(1)
+// 			.then.finish(done);
+// 	});
+// 	it('should have transformable inputs', function(done) {
+// 		var device = electric.device.create(function(input, output) {
+// 			var out = input('in').map((x: number) => x * 2);
+// 			output('out', out);
+// 		});
+// 		var m = electric.emitter.manual(0);
+// 		device.plug({ in: m });
+// 		expect(device.out['out'])
+// 			.to.emit(0)
+// 			.then.after(() => m.emit(2))
+// 			.to.emit(4)
+// 			.then.finish(done);
+// 	});
+// 	it('should have reusable inputs', function(done) {
+// 		var device = electric.device.create(function(input, output) {
+// 			var out1 = input('in').map((x: number) => x * 2);
+// 			var out2 = input('in').map((x: number) => x * 4);
+// 			output('out1', out1);
+// 			output('out2', out2);
+// 		});
+// 		var m = electric.emitter.manual(0);
+// 		device.plug({ in: m });
+// 		var joined = electric.transformator.map(
+// 			(x, y) => ({x: x, y: y}),
+// 			device.out['out1'], device.out['out2']
+// 		);
+// 		expect(joined)
+// 			.to.emit({ x: 0, y: 0 })
+// 			.then.after(() => m.emit(2))
+// 			.to.emit({ x: 4, y: 0 })
+// 			.to.emit({ x: 4, y: 8 })
+// 			.then.finish(done);
+// 	});
+// 	it('should have emit initial value of placeholder from inputs before plug', function(done) {
+// 		var device = electric.device.create(function(
+// 			input: electric.device.IInputFunction,
+// 			output: electric.device.IOutputFunction
+// 		) {
+// 			output('out', input('in', 0));
+// 		});
+// 		var e = electric.emitter.manual(1);
+// 		var r = electric.receiver.collect(device.out['out']);
+// 		expect(device.out['out'])
+// 			.to.emit(0)
+// 			.then.after(() => device.plug({ in: e }))
+// 			.to.emit(1)
+// 			.then.finish(done);
+// 	});
+// });
+// describe('array device', function() {
+// 	it('should work...', function(done) {
+// 		var device = arrayDevice();
+//         var newTodo = electric.emitter.manual(undefined);
+//         var deleteTodo = electric.emitter.manual(undefined);
+//         var editTodo = electric.emitter.manual(undefined);
+//         device.plug({
+//     		inserts: newTodo,
+//     		deletes: deleteTodo,
+//     		edits: editTodo
+//         });
+//         expect(device.out['items'])
+// 			.to.emit([])
+//             .after(() => newTodo.impulse('item1'))
+//             .to.emit(['item1'])
+//             .after(() => newTodo.impulse('item2'))
+//             .to.emit(['item1', 'item2'])
+//             .after(() => deleteTodo.impulse(0))
+//             .to.emit(['item2'])
+//             .after(() => {
+// 				editTodo.impulse({ index: 0, value: 'edited2' })
+//             })
+//             .to.emit(['edited2'])
+//             .after(() => {
+// 				newTodo.impulse('item3');
+//             })
+//             .to.emit(['edited2', 'item3'])
+//             .then.finish(done);
+//     });
+// });

@@ -1,8 +1,17 @@
-export interface Node {
-	appendChild(child: any): void;
+interface AddEventListenerFunction {
+	(type: string, listener: (event: any) => void, useCapture?: boolean): void
 }
 
-type NodeOrId = Node | string;
+export interface Node {
+	appendChild(child: any): void;
+	addEventListener: AddEventListenerFunction;
+	removeEventListener: AddEventListenerFunction;
+	value?: string | boolean;
+	id?: string;
+	checked?: boolean;
+}
+
+export type NodeOrId = Node | string;
 
 export function getNode(nodeOrId: NodeOrId): Node {
 	if (typeof nodeOrId === 'string'){
@@ -13,13 +22,13 @@ export function getNode(nodeOrId: NodeOrId): Node {
 	}
 }
 
-type NodesOrName = Node[]| string;
+export type NodesOrName = Node[]| string;
 
 export function getNodes(nodesOfName: NodesOrName): Node[] {
 	if (typeof nodesOfName === 'string') {
 		return Array.prototype.slice.call(document.getElementsByName(nodesOfName));
 	}
 	else {
-		return <Node[]>nodeOrId;
+		return <Node[]>nodesOfName;
 	}
 }

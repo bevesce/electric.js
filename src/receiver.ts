@@ -8,14 +8,14 @@ export function hanging() {
 
 export function htmlReceiverById(id: string) {
 		var element = document.getElementById(id);
-		return function(html: string) {
+		return function(html: any) {
 			element.innerHTML = html;
 		}
 	}
 
 export function logReceiver(message: string) {
 	if (!message) {
-		message = ''
+		message = '<<<'
 	}
 	return function(x: any) {
 		console.log(message, x);
@@ -23,5 +23,11 @@ export function logReceiver(message: string) {
 }
 
 export function log(emitter: inf.IEmitter<any>) {
-	emitter.plugReceiver(logReceiver(emitter.name));
+	emitter.plugReceiver(logReceiver(emitter.name + ' >>> '));
+}
+
+export function collect(emitter: inf.IEmitter<any>) {
+	var r: any[] = [];
+	emitter.plugReceiver((x: any) => r.push(x));
+	return r;
 }

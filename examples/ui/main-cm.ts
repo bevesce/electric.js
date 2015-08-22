@@ -2,14 +2,14 @@ import electric = require('../../src/electric');
 import ui = require('../../src/emitters/ui');
 
 
-function formatBoolean(value) {
+function formatBoolean(value: any) {
 	return value ? '☑ true' : '☐ false'
 }
 
 var clicks = ui.fromEvent(document.getElementById('clicker'), 'click');
-var deleyedClick = clicks.transformTime(undefined, function(t) { return t + 1000 });
+var deleyedClick = clicks.transformTime(undefined, function(t: number) { return t + 1000 });
 clicks.merge(deleyedClick)
-	.accumulate('not clicked', function (acc, x) {
+	.accumulate('not clicked', function (acc: string, x: string) {
 		if (x === undefined){
 			return acc;
 		}
@@ -30,12 +30,12 @@ ui.fromInputText('text')
 	.plugReceiver(electric.receiver.htmlReceiverById('typed'));
 
 ui.fromCheckbox('checkbox')
-	.map(function(checked) { return formatBoolean(checked)})
+	.map(function(checked: any) { return formatBoolean(checked)})
 	.plugReceiver(electric.receiver.htmlReceiverById('checked'));
 
 ui.fromCheckboxes(['checkbox0', 'checkbox1', 'checkbox2', 'checkbox3'])
-	.map(function(d) {
-		var result = [];
+	.map(function(d: any) {
+		var result: any[] = [];
 		for (var k in d){
 			result.push(k + ': ' + formatBoolean(d[k]));
 		}
@@ -47,23 +47,28 @@ ui.fromInputText('textarea')
 	.plugReceiver(electric.receiver.htmlReceiverById('written'));
 
 ui.fromRadioGroup('radio')
-	.filter('', function(x){return x !== undefined})
+	.filter('', function(x: any){return x !== undefined})
 	.plugReceiver(electric.receiver.htmlReceiverById('radioed'));
 
 ui.fromSelect('select')
 	.plugReceiver(electric.receiver.htmlReceiverById('selected'));
 
 ui.mouse('mouse').hold()
-	.map(function(o){
+	.map(function(o: any){
 		return o.type + '<br />' + 'x: ' + o.data.offsetX + '<br /> y: ' + o.data.offsetY;
 	})
 	.plugReceiver(electric.receiver.htmlReceiverById('moused'));
 
-var canvas = document.getElementById('canvas');
+var canvas = <any>document.getElementById('canvas');
 var ctx = canvas.getContext('2d');
 ctx.fillStyle = 'black';
 
-function paint(point) {
+interface IPoint {
+	x: number;
+	y: number;
+}
+
+function paint(point: IPoint) {
 	if (!point){
 		return;
 	}
@@ -74,7 +79,7 @@ function paint(point) {
 }
 
 var trackpadBox = document.getElementById('trackpad');
-var canvas = document.getElementById('canvas');
+var canvas = <any>document.getElementById('canvas');
 canvas.width = trackpadBox.offsetWidth;
 canvas.height = trackpadBox.offsetHeight
 
@@ -82,11 +87,11 @@ var trackpad = ui.mouse('trackpad');
 electric.receiver.log(trackpad);
 var xy = trackpad
     .hold({data: {}})
-	.map(function(o){
+	.map(function(o: any){
 		return { x: o.data.offsetX, y: o.data.offsetY };
 	});
-var downs = trackpad.filter(false, function(o){return !o || o.type === 'down'});
-var ups = trackpad.filter(false, function(o){return !o || o.type === 'up'});
+var downs = trackpad.filter(false, function(o: any){return !o || o.type === 'down'});
+var ups = trackpad.filter(false, function(o: any){return !o || o.type === 'up'});
 
 electric.emitter.constant(false).change(
     {to: xy, when: downs},

@@ -1,67 +1,36 @@
 var emitter = require('./emitter');
-var receiver = require('./receiver');
-function create(name, createDevice) {
-    function plug(inputsOutputs) {
-        for (var name in inputsOutputs.ins) {
-            if (!inputsOutputs.ins.hasOwnProperty(name)) {
-                return;
-            }
-            ins[name].plugEmitter(inputsOutputs.ins[name]);
-        }
-        for (var name in inputsOutputs.outs) {
-            if (!inputsOutputs.outs.hasOwnProperty(name)) {
-                return;
-            }
-            outs[name].plugReceiver(inputsOutputs.outs[name]);
-        }
+var Device = (function () {
+    function Device(createDevice, name) {
+        var _this = this;
+        this.name = name || 'device';
+        this._inputs = {};
+        this.out = {};
+        createDevice(function (name, initialValue) { return _this._getOrCreateInput(name, initialValue); }, function (name, emitter) { return _this._plugOutput(name, emitter); });
     }
+    Device.prototype._getOrCreateInput = function (name, initialValue) {
+        if (!this._inputs[name]) {
+            this._inputs[name] = emitter.placeholder(initialValue);
+        }
+        return this._inputs[name];
+    };
+    Device.prototype._plugOutput = function (name, emitter) {
+        this.out[name] = emitter;
+    };
+    Device.prototype.plug = function (inputs) {
+        for (var key in inputs) {
+            if (inputs.hasOwnProperty(key) && this._inputs[key]) {
+                this._inputs[key].is(inputs[key]);
+            }
+        }
+    };
+    return Device;
+})();
+function create(name, createDevice) {
     if (createDevice === undefined) {
         createDevice = name;
         name = undefined;
     }
-    var ins;
-    var outs;
-    createDevice(function (x) { ins = x; }, function (x) { outs = x; });
-    return {
-        name: name,
-        ins: ins,
-        outs: outs,
-        plug: plug,
-        toString: function () { return 'device<' + name + '>'; }
-    };
+    return new Device(createDevice, name);
 }
 exports.create = create;
-exports.list = function createListDevice() {
-    return create('list', function (ins, outs) {
-        var constant = emitter.constant;
-        function insert(items, value) {
-            var newItems = items.slice();
-            newItems.push(value);
-            return constant(newItems);
-        }
-        ;
-        function remove(items, index) {
-            var newItems = items.slice();
-            newItems.splice(index, 1);
-            return constant(newItems);
-        }
-        ;
-        function edit(items, index, value) {
-            var newItems = items.slice();
-            newItems[index] = value;
-            return constant(newItems);
-        }
-        var newItem = receiver.hanging();
-        var deleteItem = receiver.hanging();
-        var editItem = receiver.hanging();
-        var items = constant([]).change({ to: function (items, value) { return insert(items, value); }, when: newItem }, { to: function (items, index) { return remove(items, index); }, when: deleteItem }, { to: function (items, newObj) { return edit(items, newObj.index, newObj.value); }, when: editItem });
-        ins({
-            inserts: newItem,
-            deletes: deleteItem,
-            edits: editItem
-        });
-        outs({
-            items: items
-        });
-    });
-};
+;

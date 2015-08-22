@@ -1,6 +1,7 @@
+/// <reference path="../../d/viertual-dom.d.ts" />
 import electric = require('../../src/electric');
 import vdom = require('virtual-dom');
-import virtualDomReceiver = require('../../src/receivers/virtual-dom');
+import virtualDomReceiver = require('../../src/receivers/virtual-dom-receiver');
 
 
 var h = vdom.h;
@@ -9,11 +10,11 @@ var patch = vdom.patch
 var createElement = vdom.create;
 
 
-function renderTime(count) {
+function renderTime(count: number) {
     return h('h1', {className: 'test'}, [count]);
 }
 
-function renderList(list) {
+function renderList<T>(list: T[]) {
 	return h(
 		'ul', {},
 		list.map(function(item) {
@@ -22,23 +23,23 @@ function renderList(list) {
 	);
 }
 
-function renderApp(time, list) {
+function renderApp(time: any, list: any) {
 	return h(
 		'div', {},
 		[time, list]
 	)
 }
 
-function append(list, item) {
+function append<T>(list: T[], item: T) {
 	var list = list.slice();
 	list.push(item);
 	return list;
 }
 
-time = electric.clock.clock({intervalInMs: 1000})
+var time = electric.clock.clock({intervalInMs: 1000})
 	.map(renderTime);
 
-list = electric.clock.clock({intervalInMs: 1000})
+var list = electric.clock.clock({intervalInMs: 1000})
 	.accumulate([], append)
 	.map(renderList);
 

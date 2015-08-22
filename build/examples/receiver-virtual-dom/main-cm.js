@@ -1,6 +1,7 @@
+/// <reference path="../../d/viertual-dom.d.ts" />
 var electric = require('../../src/electric');
 var vdom = require('virtual-dom');
-var virtualDomReceiver = require('../../src/receivers/virtual-dom');
+var virtualDomReceiver = require('../../src/receivers/virtual-dom-receiver');
 var h = vdom.h;
 var diff = vdom.diff;
 var patch = vdom.patch;
@@ -21,9 +22,9 @@ function append(list, item) {
     list.push(item);
     return list;
 }
-time = electric.clock.clock({ intervalInMs: 1000 })
+var time = electric.clock.clock({ intervalInMs: 1000 })
     .map(renderTime);
-list = electric.clock.clock({ intervalInMs: 1000 })
+var list = electric.clock.clock({ intervalInMs: 1000 })
     .accumulate([], append)
     .map(renderList);
 electric.transformator

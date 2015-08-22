@@ -11,11 +11,11 @@ function bar(x, y, ys) {
 function a(time) {
     return 1;
 }
-aT = electric.clock.clock({ intervalInMs: 10 }).map(function (time) {
+var aT = electric.clock.clock({ intervalInMs: 10 }).map(function (time) {
     return { time: time, value: a(time) };
 });
-vT = electric.clock.integral(aT);
-sT = electric.clock.integral(vT);
+var vT = electric.clock.integral(aT);
+var sT = electric.clock.integral(vT);
 var x0 = 0;
 aT.plugReceiver(function (a) {
     bar(x0, a.value, 0);

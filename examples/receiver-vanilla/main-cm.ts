@@ -9,13 +9,13 @@ electric.clock.clock({intervalInMs: 1000}).plugReceiver(
 	electric.receiver.logReceiver('time:')
 );
 
-function append(list, item) {
+function append<T>(list: T[], item: T) {
 	var list = list.slice();
 	list.push(item);
 	return list;
 }
 
-function renderItems(list) {
+function renderItems<T>(list: T[]) {
 	return list.map(function(x) {
 		return '<li>' + x + '</li>'
 	}).join('');

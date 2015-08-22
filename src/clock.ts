@@ -64,7 +64,7 @@ export function integral(f: emitter.Emitter<ITimeValue>) {
 			dt: dt
 		}
 	}).map((v: ITimeValue) => ({ time: v.time, value: v.sum }));
-	function equalsWithTime(x, y) {
+	function equalsWithTime(x: ITimeValue, y: ITimeValue) {
 		return x.time === y.time && x.value === y.value;
 	}
 	result.setEquals(equalsWithTime);

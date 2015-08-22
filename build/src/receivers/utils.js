@@ -12,7 +12,7 @@ function getNodes(nodesOfName) {
         return Array.prototype.slice.call(document.getElementsByName(nodesOfName));
     }
     else {
-        return nodeOrId;
+        return nodesOfName;
     }
 }
 exports.getNodes = getNodes;

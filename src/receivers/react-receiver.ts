@@ -1,3 +1,4 @@
+/// <reference path="../../d/react.d.ts" />
 import React = require('react');
 import utils = require('./utils');
 import inf = require('../interfaces');
@@ -6,7 +7,7 @@ import inf = require('../interfaces');
 export function jsxReceiver(nodeOrId: utils.Node | string) {
 	var node = utils.getNode(nodeOrId);
 	return function(jsx: any) {
-		React.render(jsx, node)
+		React.render(jsx, <Element>node)
 	}
 };
 
@@ -31,4 +32,3 @@ export function electricStateComponent(
 
 	return React.createClass(objectSpecification);
 };
-

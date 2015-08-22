@@ -84,6 +84,12 @@ declare module Chai {
         satisfy(matcher: Function, message?: string): Assertion;
         closeTo(expected: number, delta: number, message?: string): Assertion;
         members: Members;
+        // electric-kettle extension
+        after(f: () => void): Assertion;
+        afterD(f: () => void): Assertion;
+        values(...values: any[]): Assertion;
+        finish: (done?: () => void) => Assertion
+        emit(v: any): Assertion;
     }
 
     interface LanguageChains {
@@ -100,6 +106,9 @@ declare module Chai {
         at: Assertion;
         of: Assertion;
         same: Assertion;
+        // electric-kettle extension
+        then: Assertion;
+        emitD: Assertion;
     }
 
     interface NumericComparison {

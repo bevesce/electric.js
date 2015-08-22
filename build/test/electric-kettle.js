@@ -45,7 +45,7 @@ function pour(chai) {
     //    .values(1, 2)
     chai.use(function (_chai, utils) {
         var assertion = _chai.Assertion;
-        assertion.addProperty('emit', function () {
+        assertion.addProperty('emitD', function () {
             var emitter = this._obj;
             var emitted = [];
             utils.flag(assertion, 'emitted', emitted);
@@ -55,9 +55,8 @@ function pour(chai) {
         assertion.addProperty('then', function () { });
         assertion.addProperty('_show', function () {
             var emitted = utils.flag(assertion, 'emitted');
-            console.log(emitted);
         });
-        assertion.addMethod('after', function (after) {
+        assertion.addMethod('afterD', function (after) {
             after();
         });
         assertion.addMethod('values', function () {
@@ -73,4 +72,77 @@ function pour(chai) {
     });
 }
 exports.pour = pour;
+;
+var Queue = (function () {
+    function Queue() {
+        this._isDone = false;
+        this.data = [];
+        this.index = 0;
+        this.done = function () { };
+    }
+    Queue.prototype.push = function (item) {
+        this.data.push(item);
+    };
+    Queue.prototype.pop = function () {
+        var result = this.data[this.index];
+        this.index += 1;
+        return result;
+    };
+    Queue.prototype.top = function () {
+        return this.data[this.index];
+    };
+    Queue.prototype.isDone = function (utils) {
+        if (this._isDone) {
+            return true;
+        }
+        if (this.index >= this.data.length) {
+            this._isDone = true;
+            this.done();
+            return true;
+        }
+        return false;
+    };
+    return Queue;
+})();
+function pourAsync(chai) {
+    // expect(emitter)
+    //   .to.emit(0)
+    //   .then.after(() => ...)
+    //   .to.emit(1)
+    //   .then.to.finish(done)
+    chai.use(function (_chai, utils) {
+        var assertion = _chai.Assertion;
+        assertion.addMethod('emit', function (value) {
+            var queue = this.queue || new Queue();
+            queue.push({ kind: 'value', value: value });
+            this.queue = queue;
+            ;
+        });
+        assertion.addProperty('then', function () { });
+        assertion.addMethod('after', function (after) {
+            var queue = this.queue || new Queue();
+            queue.push({ kind: 'after', value: after });
+            this.queue = queue;
+            ;
+        });
+        assertion.addMethod('finish', function (done) {
+            var queue = this.queue || new Queue();
+            queue.done = done || queue.done;
+            var assert = this.assert;
+            this._obj.plugReceiver(function (value) {
+                while (!queue.isDone(utils) && queue.top().kind === 'after') {
+                    queue.pop().value();
+                }
+                var item = queue.pop();
+                chai.expect(value).to.deep.equal(item.value); // )
+                var i = 0;
+                while (!queue.isDone(utils) && queue.top().kind === 'after') {
+                    i++;
+                    queue.pop().value();
+                }
+            });
+        });
+    });
+}
+exports.pourAsync = pourAsync;
 ;

@@ -21,6 +21,7 @@ export interface IWire<T> {
 export interface IEmitter<T>
 	extends ITransformable
 {
+	name: string;
 	plugReceiver(receiver: IReceiverFunction<T> | IReceiver<T> | IWire<T>): IDisposable;
 	unplugReceiver(index: IDisposable): void;
 	dirtyCurrentValue(): T;

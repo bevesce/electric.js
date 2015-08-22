@@ -1,4 +1,4 @@
-export import emitter = require('../emitter');
+import emitter = require('../emitter');
 
 
 interface Promise<Of, Err> {

@@ -12,7 +12,7 @@ function htmlReceiverById(id) {
 exports.htmlReceiverById = htmlReceiverById;
 function logReceiver(message) {
     if (!message) {
-        message = '';
+        message = '<<<';
     }
     return function (x) {
         console.log(message, x);
@@ -20,6 +20,12 @@ function logReceiver(message) {
 }
 exports.logReceiver = logReceiver;
 function log(emitter) {
-    emitter.plugReceiver(logReceiver(emitter.name));
+    emitter.plugReceiver(logReceiver(emitter.name + ' >>> '));
 }
 exports.log = log;
+function collect(emitter) {
+    var r = [];
+    emitter.plugReceiver(function (x) { return r.push(x); });
+    return r;
+}
+exports.collect = collect;

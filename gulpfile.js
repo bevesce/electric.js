@@ -19,6 +19,15 @@ gulp.task('build-test', function() {
 	return tsResult.js.pipe(gulp.dest('build/test/'));
 });
 
+gulp.task('build-test-in-browser', function() {
+	var tsResult = gulp.src('./test-in-browser/*.ts')
+		.pipe(typescript({
+			noImplicitAny: true,
+			module: 'commonjs'
+		}));
+	return tsResult.js.pipe(gulp.dest('build/test-in-browser/'));
+});
+
 gulp.task('build-src', function() {
 	var tsResult = gulp.src(['./src/*.ts', './src/**/*.ts'])
 		.pipe(typescript({
@@ -56,21 +65,18 @@ gulp.task('server', function() {
 	connect.server({
 		livereload: true
 	});
-	gulp.watch(
-		['./examples/*.*', './examples/**/*.*', './test/*.js', './test/**.html'],
-		['livereload']);
+	gulp.watch([
+		'./examples/*.*', './examples/**/*.*', './build/test-in-browser/*.*'
+	], [
+		'livereload'
+	]);
 });
 
 gulp.task('livereload', function(){
 	gulp.src([
-		'./examples/*.html',
-		'./examples/*.css',
-		'./examples/*.js',
-		'./examples/**/*.js',
-		'./examples/**/*.html',
-		'./examples/**/*.css',
-		'./test/*.js',
-		'./test/*.html'
+		'./examples/*.*',
+		'./examples/**/*.*',
+		'./build/test-in-browser/*.*',
 	])
 	    .pipe(connect.reload());
 });
@@ -81,4 +87,5 @@ gulp.task('watch', function(){
 	gulp.watch('./build/src/*.js', ['test']);
 	gulp.watch('./build/test/*.js', ['test']);
 	gulp.watch('./test/*.ts', ['build-test']);
+	gulp.watch('./test-in-browser/*.ts', ['build-test-in-browser']);
 });

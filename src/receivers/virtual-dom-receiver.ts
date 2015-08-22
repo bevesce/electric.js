@@ -1,5 +1,7 @@
+/// <reference path="../../d/viertual-dom.d.ts" />
 import vdom = require('virtual-dom');
 import utils = require('./utils');
+
 
 function virtualDomReceiver(nodeOrId: utils.Node | string) {
 	var node = utils.getNode(nodeOrId);

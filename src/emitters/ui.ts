@@ -1,19 +1,17 @@
-export import electric = require('../electric');
+import inf = require('../interfaces');
+import electric = require('../electric');
 import utils = require('../receivers/utils');
 
-
-interface AddEventListenerFunction {
-	(type: string, listener: (event: any) => void, useCapture?: boolean): void
-}
 
 function em(text: any): string {
 	return '*' + text + '*'
 }
 
 export function fromEvent(
-	target: { addEventListener: AddEventListenerFunction, removeEventListener: AddEventListenerFunction },
-	type: string, useCapture = false,
-	name = ''
+	target: utils.Node,
+	type: string,
+	name = '',
+	useCapture = false
 ) {
 	var e = electric.emitter.manual(undefined);
 	e.name = name || 'event: ' + type + ' on ' + em(target);
@@ -40,8 +38,13 @@ export function fromCheckbox(nodeOrId: utils.NodeOrId) {
 	return fromEvent(checkbox, 'checked of ' + em(nodeOrId)).map(() => checkbox.checked);
 };
 
-function joinObjects(objs) {
-	var o = {};
+interface IKeyValue {
+	key: string;
+	value: any;
+}
+
+function joinObjects(objs: IKeyValue[]) {
+	var o: {[key: string]: any} = {};
 	objs.forEach((e) => {
 		if (e === undefined) {
 			return;
@@ -52,7 +55,7 @@ function joinObjects(objs) {
 }
 
 export function fromCheckboxes(nodeOrIds: utils.NodeOrId[]) {
-	var emitters = nodeOrIds.map(function(nodeOrId: uitls.NodeOrId){
+	var emitters = <inf.IEmitter<IKeyValue>[]>nodeOrIds.map(function(nodeOrId: utils.NodeOrId) {
 		var checkbox = utils.getNode(nodeOrId);
 		return fromEvent(checkbox, 'click').map(
 			() => ({ key: checkbox.id, value: checkbox.checked })
@@ -70,7 +73,7 @@ export function fromCheckboxes(nodeOrIds: utils.NodeOrId[]) {
 export function fromRadioGroup(nodesOrName: utils.NodesOrName) {
 	var nodes = utils.getNodes(nodesOrName);
 	var emitters = nodes.map(
-		radio => fromEvent(radio, 'click').map((v) => v ? radio.id : v)
+		radio => fromEvent(radio, 'click').map((v: string) => v ? radio.id : v)
 	);
 	var e = electric.transformator.merge(...emitters).hold();
 	e.name = 'state of radio group ' + em(nodesOrName);
@@ -89,10 +92,10 @@ export function mouse(nodeOrId: utils.NodeOrId) {
 	var mouse = utils.getNode(nodeOrId);
 	var emitters = ['down', 'up', 'over', 'out', 'move'].map(
 		type => fromEvent(mouse, 'mouse' + type).map(
-			e => (e ? {type: type, data: e} : e)
+			(e: any) => (e ? {type: type, data: e} : e)
 		)
 	);
-	var e = electric.transformator.merge(...emitters).hold({data: {}});
-	e.name = 'mouse on ' + em(nodeOrId);
-	return e;
+	var emitter = electric.transformator.merge(...emitters).hold({data: {}});
+	emitter.name = 'mouse on ' + em(nodeOrId);
+	return emitter;
 };

@@ -1,12 +1,12 @@
-exports.electric = require('../electric');
+var electric = require('../electric');
 var utils = require('../receivers/utils');
 function em(text) {
     return '*' + text + '*';
 }
-function fromEvent(target, type, useCapture, name) {
-    if (useCapture === void 0) { useCapture = false; }
+function fromEvent(target, type, name, useCapture) {
     if (name === void 0) { name = ''; }
-    var e = exports.electric.emitter.manual(undefined);
+    if (useCapture === void 0) { useCapture = false; }
+    var e = electric.emitter.manual(undefined);
     e.name = name || 'event: ' + type + ' on ' + em(target);
     var impulse = function (event) {
         e.impulse(event);
@@ -48,7 +48,7 @@ function fromCheckboxes(nodeOrIds) {
         var checkbox = utils.getNode(nodeOrId);
         return fromEvent(checkbox, 'click').map(function () { return ({ key: checkbox.id, value: checkbox.checked }); });
     });
-    var e = (_a = exports.electric.transformator).map.apply(_a, [function () {
+    var e = (_a = electric.transformator).map.apply(_a, [function () {
         var args = [];
         for (var _i = 0; _i < arguments.length; _i++) {
             args[_i - 0] = arguments[_i];
@@ -64,7 +64,7 @@ exports.fromCheckboxes = fromCheckboxes;
 function fromRadioGroup(nodesOrName) {
     var nodes = utils.getNodes(nodesOrName);
     var emitters = nodes.map(function (radio) { return fromEvent(radio, 'click').map(function (v) { return v ? radio.id : v; }); });
-    var e = (_a = exports.electric.transformator).merge.apply(_a, emitters).hold();
+    var e = (_a = electric.transformator).merge.apply(_a, emitters).hold();
     e.name = 'state of radio group ' + em(nodesOrName);
     return e;
     var _a;
@@ -79,9 +79,9 @@ exports.fromSelect = fromSelect;
 function mouse(nodeOrId) {
     var mouse = utils.getNode(nodeOrId);
     var emitters = ['down', 'up', 'over', 'out', 'move'].map(function (type) { return fromEvent(mouse, 'mouse' + type).map(function (e) { return (e ? { type: type, data: e } : e); }); });
-    var e = (_a = exports.electric.transformator).merge.apply(_a, emitters).hold({ data: {} });
-    e.name = 'mouse on ' + em(nodeOrId);
-    return e;
+    var emitter = (_a = electric.transformator).merge.apply(_a, emitters).hold({ data: {} });
+    emitter.name = 'mouse on ' + em(nodeOrId);
+    return emitter;
     var _a;
 }
 exports.mouse = mouse;
