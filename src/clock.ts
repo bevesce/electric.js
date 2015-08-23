@@ -1,72 +1,119 @@
-// import inf = require('./interfaces');
+import inf = require('./interfaces');
 
-// export import scheduler = require('./scheduler');
-// export import emitter = require('./emitter');
-// export import transformator = require('./transformator');
-
-
-// type Identifier = number;
+export import scheduler = require('./scheduler');
+export import emitter = require('./emitter');
+export import transformator = require('./transformator');
 
 
-// export function clock(
-// 	args: { intervalInMs?: number, fps?: number }
-// ) {
-// 	var e = emitter.manual(scheduler.now());
-// 	var interval = args.intervalInMs || 1 / args.fps * 1000;
-// 	scheduler.scheduleInterval(
-// 		() => e.emit(scheduler.now()),
-// 		interval
-// 	);
-// 	return e;
-// }
+type Identifier = number;
 
-// export function fclock<T>(
-// 	f: (time: number) => T,
-// 	args: { intervalInMs?: number, fps?: number }
-// ) {
-// 	return clock(args).map((t: number) => ({ time: t, value: f(t) }));
-// }
+export interface ITimeValue<T> {
+	time: number;
+	value: T;
+}
 
-// export function eclock<T>(
-// 	emitter: inf.IEmitter<T>,
-// 	args: { intervalInMs?: number, fps?: number }
-// ) {
-// 	var time = clock(args);
-// 	function timeSampling(emit: inf.IEmitterFunction<{ time: number, value: T }>) {
-// 		var latestValue: T;
-// 		return function(v: (T | number)[], i: Identifier) {
-// 			if (i == 0) {
-// 				latestValue = <T>v[0];
-// 			}
-// 			else {
-// 				emit({ time: <number>v[1], value: latestValue })
-// 			}
-// 		}
-// 	}
-// 	return new transformator.Transformator([emitter, time], timeSampling);
-// }
+export class TimeValue<T>
+	implements ITimeValue<T>
+{
+	time: number;
+	value: T;
 
-// export interface ITimeValue {
-// 	time: number;
-// 	value: number;
-// 	sum?: number;
-// 	dt?: number;
-// }
+	constructor(time: number, value: T) {
+		this.time = time;
+		this.value = value;
+	}
 
-// export function integral(f: emitter.Emitter<ITimeValue>) {
-// 	var initialAcc = { time: scheduler.now(), value: 0, sum: 0 };
-// 	var result = f.accumulate(initialAcc, (acc: ITimeValue, v: ITimeValue) => {
-// 		var dt = (v.time - acc.time) / 1000;
-// 		return {
-// 			time: v.time,
-// 			value: v.value,
-// 			sum: acc.sum + (acc.value + v.value) / 2 * dt,
-// 			dt: dt
-// 		}
-// 	}).map((v: ITimeValue) => ({ time: v.time, value: v.sum }));
-// 	function equalsWithTime(x: ITimeValue, y: ITimeValue) {
-// 		return x.time === y.time && x.value === y.value;
-// 	}
-// 	result.setEquals(equalsWithTime);
-// 	return result;
-// }
+	map<NewT>(f: (value: T) => NewT) {
+		return TimeValue.of(this.time, f(this.value))
+	}
+
+	static of<K>(time: number, value: K = undefined) {
+		return new TimeValue(time, value);
+	}
+
+	static lift<In1, Out>(f: (value: In1) => Out):
+	(value: TimeValue<In1>) => TimeValue<Out> {
+		return function(tv: TimeValue<In1>) {
+			return tv.map(f);
+		}
+	};
+}
+
+function _time<T>(
+	args: { intervalInMs?: number, fps?: number },
+	transform: (t: number) => T
+) {
+	var e = emitter.manual(transform(scheduler.now()));
+	var interval = args.intervalInMs || 1 / args.fps * 1000;
+	scheduler.scheduleInterval(
+		() => e.emit(transform(scheduler.now())),
+		interval
+	);
+	return e;
+}
+
+export function time(
+	args: { intervalInMs?: number, fps?: number }
+): inf.IEmitter<TimeValue<void>> {
+	return _time(args, t => TimeValue.of(t, undefined));
+}
+
+export function timeFunction<T>(
+	f: (time: number) => T,
+	args: { intervalInMs?: number, fps?: number }
+) {
+	return _time(args, t => (TimeValue.of(t, f(t))));
+}
+
+type IIntegrable = TimeValue<number>;
+interface IIntegrating {
+	time: number;
+	value: number;
+	integral: number;
+}
+
+function equalsWithTime(x: IIntegrable, y: IIntegrable) {
+	return x.time === y.time && x.value === y.value;
+}
+
+export function integral(f: inf.IEmitter<IIntegrable>) {
+	var initialAcc = { time: scheduler.now(), value: 0, integral: 0 };
+	var result = f.accumulate(
+		initialAcc,
+		(acc: IIntegrating, v: TimeValue<number>): IIntegrating => {
+			var dt = (v.time - acc.time) / 1000;
+			return {
+				time: v.time,
+				value: v.value,
+				integral: acc.integral + (acc.value + v.value) / 2 * dt
+			}
+		}
+	).map((v: IIntegrating): IIntegrable => TimeValue.of(v.time, v.integral));
+	result.setEquals(equalsWithTime);
+	return result;
+}
+
+interface IDerivating {
+	time: number;
+	value: number;
+	derivative: number;
+}
+
+export function derivative(f: emitter.Emitter<IIntegrable>) {
+	var initialAcc = <IDerivating>{ time: scheduler.now(), value: undefined, derivative: 0 };
+	var result = f.accumulate(
+		initialAcc,
+		(acc, v): IDerivating => {
+			var dt = (v.time - acc.time) / 1000;
+			var diff = acc.value !== undefined ? (v.value - acc.value) : v.value
+			return {
+				time: v.time,
+				value: v.value,
+				derivative: diff / dt
+			}
+		}
+	).map((v: IDerivating) => ({time: v.time, value: v.derivative}));
+	result.setEquals(equalsWithTime);
+	return result;
+
+}
