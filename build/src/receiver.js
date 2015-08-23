@@ -1,15 +1,13 @@
-var transformator = require('./transformator');
-function hanging() {
-    return new transformator.Transformator([]);
-}
-exports.hanging = hanging;
-function htmlReceiverById(id) {
-    var element = document.getElementById(id);
-    return function (html) {
-        element.innerHTML = html;
-    };
-}
-exports.htmlReceiverById = htmlReceiverById;
+// import transformator = require('./transformator')
+// export function hanging() {
+// 	return new transformator.Transformator([]);
+// }
+// export function htmlReceiverById(id: string) {
+// 		var element = document.getElementById(id);
+// 		return function(html: any) {
+// 			element.innerHTML = html;
+// 		}
+// 	}
 function logReceiver(message) {
     if (!message) {
         message = '<<<';
@@ -25,7 +23,9 @@ function log(emitter) {
 exports.log = log;
 function collect(emitter) {
     var r = [];
-    emitter.plugReceiver(function (x) { return r.push(x); });
+    emitter.plugReceiver(function (x) {
+        r.push(x);
+    });
     return r;
 }
 exports.collect = collect;

@@ -7,6 +7,10 @@ function stop() {
     return stopTime;
 }
 exports.stop = stop;
+function resume() {
+    stopped = false;
+}
+exports.resume = resume;
 function advance(timeShiftInMiliseconds) {
     if (timeShiftInMiliseconds === void 0) { timeShiftInMiliseconds = 1; }
     if (!stopped) {

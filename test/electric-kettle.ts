@@ -126,6 +126,9 @@ export function pourAsync(chai: any) {
             this.queue = queue;;
         });
         assertion.addProperty('then', function() { });
+        assertion.addProperty('_show', function() {
+            this.__show_1 = true;
+        });
         assertion.addMethod('after', function(after: any) {
             var queue = this.queue || new Queue();
             queue.push({ kind: 'after', value: after });
@@ -135,12 +138,16 @@ export function pourAsync(chai: any) {
             var queue = this.queue || new Queue();
             queue.done = done || queue.done;
             var assert = this.assert;
+            var show = this.__show_1;
             this._obj.plugReceiver(function(value: any) {
                 while (!queue.isDone(utils) && queue.top().kind === 'after') {
                     queue.pop().value();
                 }
                 var item: any = queue.pop();
-                chai.expect(value).to.deep.equal(item.value);                // )
+                if (show) {
+                    console.log('EM:', value, item);
+                }
+                chai.expect(value).to.deep.equal(item.value);
                 var i = 0;
                 while (!queue.isDone(utils) && queue.top().kind === 'after') {
                     i++;

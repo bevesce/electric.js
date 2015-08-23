@@ -12,6 +12,10 @@ export function stop(): number{
 	return stopTime;
 }
 
+export function resume() {
+	stopped = false;
+}
+
 export function advance(timeShiftInMiliseconds: number = 1): number {
 	if (!stopped){
 		return;
