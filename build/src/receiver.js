@@ -18,7 +18,9 @@ function logReceiver(message) {
 }
 exports.logReceiver = logReceiver;
 function log(emitter) {
-    emitter.plugReceiver(logReceiver(emitter.name + ' >>> '));
+    emitter.plugReceiver(function (x) {
+        console.log(emitter.name + ' >>> ' + x);
+    });
 }
 exports.log = log;
 function collect(emitter) {

@@ -128,28 +128,33 @@ function pourAsync(chai) {
             this.queue = queue;
             ;
         });
-        assertion.addMethod('finish', function (done) {
-            var queue = this.queue || new Queue();
-            queue.done = done || queue.done;
-            var assert = this.assert;
-            var show = this.__show_1;
-            this._obj.plugReceiver(function (value) {
-                while (!queue.isDone(utils) && queue.top().kind === 'after') {
-                    queue.pop().value();
-                }
-                var item = queue.pop();
-                if (show) {
-                    console.log('EM:', value, item);
-                }
-                chai.expect(value).to.deep.equal(item.value);
-                var i = 0;
-                while (!queue.isDone(utils) && queue.top().kind === 'after') {
-                    i++;
-                    queue.pop().value();
-                }
-            });
-        });
+        assertion.addMethod('finish', finish(chai, utils));
+        assertion.addMethod('andBe', finish(chai, utils));
+        assertion.addMethod('finished', finish(chai, utils));
     });
 }
 exports.pourAsync = pourAsync;
 ;
+var finish = function (chai, utils) {
+    return function (done) {
+        var queue = this.queue || new Queue();
+        queue.done = done || queue.done;
+        var assert = this.assert;
+        var show = this.__show_1;
+        this._obj.plugReceiver(function (value) {
+            while (!queue.isDone(utils) && queue.top().kind === 'after') {
+                queue.pop().value();
+            }
+            var item = queue.pop();
+            if (show) {
+                console.log('EM:', value, item);
+            }
+            chai.expect(value).to.deep.equal(item.value);
+            var i = 0;
+            while (!queue.isDone(utils) && queue.top().kind === 'after') {
+                i++;
+                queue.pop().value();
+            }
+        });
+    };
+};

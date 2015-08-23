@@ -5,14 +5,34 @@ class Wire<InOut>
 {
 	input: inf.IEmitter<InOut>;
 	output: inf.IReceiver<InOut>;
-	receive: (x: InOut) => void;
+	// receive: (x: InOut) => void;
+	private _futureReceive: (x: InOut) => void;
+	private _set: (x: InOut) => void;
 	private receiverId: number;
 
-	constructor(input: inf.IEmitter<InOut>, output: inf.IReceiver<InOut>, receive: (x: InOut) => void) {
+	constructor(
+		input: inf.IEmitter<InOut>,
+		output: inf.IReceiver<InOut>,
+		receive: (x: InOut) => void,
+		set?: (x: InOut) => void
+	) {
 		this.input = input;
 		this.output = output;
-		this.receive = receive;
+		if (set) {
+			this._set = set
+			this._futureReceive = receive;
+		}
+		else {
+			this.receive = receive;
+		}
 		this.receiverId = this.input.plugReceiver(this);
+	}
+
+	receive(x: InOut) {
+		this._set(x);
+		this._set = undefined;
+		this.receive = this._futureReceive;
+		this._futureReceive = undefined;
 	}
 
 	unplug() {

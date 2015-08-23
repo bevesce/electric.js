@@ -23,7 +23,9 @@ export function logReceiver(message: string) {
 }
 
 export function log(emitter: inf.IEmitter<any>) {
-	emitter.plugReceiver(logReceiver(emitter.name + ' >>> '));
+	emitter.plugReceiver((x: any) => {
+		console.log(emitter.name + ' >>> ' + x);
+	});
 }
 
 export function collect(emitter: inf.IEmitter<any>) {

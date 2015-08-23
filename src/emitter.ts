@@ -3,9 +3,9 @@ import scheduler = require('./scheduler');
 import transformators = require('./transformator-helpers');
 import eevent = require('./electric-event');
 import Wire = require('./wire');
+export import placeholder = require('./placeholder');
 
-
-class Emitter<T>
+export class Emitter<T>
 	implements inf.IEmitter<T>
 {
 	name: string;
@@ -26,6 +26,15 @@ class Emitter<T>
 		}
 		this._receivers.push(receiver);
 		this._ayncDispatchToReceiver(receiver, this._currentValue);
+		return this._receivers.length - 1;
+	}
+
+	_dirtyPlugReceiver(receiver: inf.IReceiverFunction<T> | inf.IReceiver<T> | inf.IWire<T>): number {
+		if (typeof receiver !== 'function' && (<inf.IReceiver<T>>receiver).wire) {
+			receiver = (<inf.IReceiver<T>>receiver).wire(this);
+		}
+		this._receivers.push(receiver);
+		// this._ayncDispatchToReceiver(receiver, this._currentValue);
 		return this._receivers.length - 1;
 	}
 
@@ -62,7 +71,7 @@ class Emitter<T>
 	}
 
 	private _releaseResources() {
-
+		// should be overwritten in more specific emitters
 	}
 
 	private _throwStabilized(value: T) {
@@ -100,7 +109,7 @@ class Emitter<T>
 	}
 
 	private _dispatchToReceivers(value: T) {
-		var currentReceivers = this._receivers.slice()
+		var currentReceivers = this._receivers.slice();
 		for (var receiver of currentReceivers) {
 			this._dispatchToReceiver(receiver, value);
 		}
@@ -128,7 +137,7 @@ class Emitter<T>
 			'map' + this._enclosedName(),
 			[this],
 			transformators.map(mapping, 1),
-			this._currentValue
+			mapping(this._currentValue)
 		);
 	}
 
@@ -151,21 +160,57 @@ class Emitter<T>
 	}
 
 	transformTime(initialValue: T, timeShift: (t: number) => number, t0 = 0): inf.IEmitter<T> {
-		return namedTransformator(
+		var t = namedTransformator(
 			'transform time' + this._enclosedName(),
 			[this],
 			transformators.transformTime(timeShift, t0),
 			initialValue
 		);
+		this._dispatchToReceiver(
+			t._dirtyGetWireTo(this), this.dirtyCurrentValue()
+		);
+		return t;
+	}
+
+	accumulate<NewT>(initialValue: NewT, accumulator: (acc: NewT, value: T) => NewT): inf.IEmitter<NewT> {
+		var acc = accumulator(initialValue, this.dirtyCurrentValue())
+		return namedTransformator(
+			'accumulate' + this._enclosedName(),
+			[this],
+			transformators.accumulate(acc, accumulator),
+			acc
+		);
+	}
+
+	merge(...emitters: inf.IEmitter<T>[]): inf.IEmitter<T> {
+		return namedTransformator(
+			'merge' + this._enclosedName() + ' with ' + emitters.map(e => e.name).join(', '),
+			[<inf.IEmitter<T>>this].concat(emitters),
+			transformators.merge(),
+			this.dirtyCurrentValue()
+		);
+	}
+
+	when<NewT>(switcher: {
+		happens: (value: T) => boolean,
+		then: (value: T) => NewT
+	}): inf.IEmitter<eevent<NewT>> {
+		return namedTransformator(
+			'when' + this._enclosedName(),
+			[this],
+			transformators.when(switcher.happens, switcher.then),
+			eevent.notHappend
+		);
 	}
 
 	sample(initialValue: T, samplingEvent: inf.IEmitter<eevent<any>>): inf.IEmitter<T> {
-		return namedTransformator(
+		var t = namedTransformator(
 			'sample' + this._enclosedName() + ' on ' + this._enclosedName(samplingEvent),
 			[this, samplingEvent],
 			transformators.sample(),
 			initialValue
 		);
+		return t;
 	}
 
 	change<S1>(
@@ -263,18 +308,21 @@ type Identifier = number;
 
 
 interface ITransformGeneratorFunction<In> {
-	(emit: inf.IEmitterFunction<any>): ITransformFunction<In>
+	(
+		emit: inf.IEmitterFunction<any>,
+		impulse: inf.IEmitterFunction<any>
+	): ITransformFunction<In>
 }
 
 interface ITransformFunction<In> {
 	(values: Array<In>, index: Identifier): void;
 }
 
-class Transformator<In>
+export class Transformator<In>
 	extends Emitter<any>
 	implements inf.IReceiver<In>
 {
-	private _wires: Array<Wire<In>>;
+	protected _wires: Array<Wire<In>>;
 	private _values: Array<In>;
 
 	constructor(
@@ -292,7 +340,10 @@ class Transformator<In>
 	}
 
 	setTransform(transform: ITransformGeneratorFunction<In>) {
-		this._transform = transform((x: any) => this.emit(x));
+		this._transform = transform(
+			(x: any) => this.emit(x),
+			(x: any) => this.impulse(x)
+		);
 	}
 
 	private _transform(values: Array<In>, index: Identifier) {
@@ -302,7 +353,6 @@ class Transformator<In>
 	}
 
 	private plugEmitters(emitters: Array<inf.IEmitter<In>>) {
-
 		for (var emitter of emitters) {
 			this.wire(emitter);
 		}
@@ -318,14 +368,23 @@ class Transformator<In>
 		this._wires[index] = new Wire(
 			emitter,
 			this,
-			((index: number) => (x: In) => this.receiveOn(x, index))(index)
+			((index: number) => (x: In) => this.receiveOn(x, index))(index),
+			((index: number) => (x: In) => this.setOn(x, index))(index)
 		);
 		return this._wires[index];
+	}
+
+	_dirtyGetWireTo(emitter: inf.IEmitter<any>) {
+		return this._wires.filter(w => w.input === emitter)[0];
 	}
 
 	protected receiveOn(x: In, index: number) {
 		this._values[index] = x;
 		this._transform(this._values, index);
+	}
+
+	protected setOn(x: In, index: number) {
+		this._values[index] = x;
 	}
 }
 
@@ -335,7 +394,7 @@ export function namedTransformator<In>(
 	emitters: Array<inf.IEmitter<In>>,
 	transform: ITransformGeneratorFunction<In> = undefined,
 	initialValue?: any
-	) {
+) {
 	var t = new Transformator(emitters, transform, initialValue);
 	t.name = name;
 	return t;

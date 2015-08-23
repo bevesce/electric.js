@@ -89,6 +89,8 @@ declare module Chai {
         afterD(f: () => void): Assertion;
         values(...values: any[]): Assertion;
         finish: (done?: () => void) => Assertion
+        andBe: (done?: () => void) => Assertion
+        finished: (done?: () => void) => Assertion
         emit(v: any): Assertion;
     }
 

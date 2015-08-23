@@ -1,14 +1,10 @@
 var utils = require('./utils');
 var Wire = require('./wire');
 var scheduler = require('./scheduler');
+var eevent = require('./electric-event');
 function map(f, noOfEmitters) {
     return function mapTransform(emit) {
-        var eaten = 0;
         return function mapTransform(v, i) {
-            if (eaten < noOfEmitters) {
-                eaten += 1;
-                return;
-            }
             emit(f.apply(null, v));
         };
     };
@@ -19,10 +15,6 @@ function filter(predicate, noOfEmitters) {
     return function transform(emit) {
         var eaten = 0;
         return function filterTransform(v, i) {
-            if (eaten < noOfEmitters) {
-                eaten += 1;
-                return;
-            }
             if (predicate.apply(null, v)) {
                 emit(v[i]);
             }
@@ -36,10 +28,6 @@ function filterMap(mapping, noOfEmitters) {
     return function transform(emit) {
         var eaten = 0;
         return function filterMapTransform(v, i) {
-            if (eaten < noOfEmitters) {
-                eaten += 1;
-                return;
-            }
             var result = mapping.apply(null, v);
             if (result !== undefined) {
                 emit(result);
@@ -65,7 +53,7 @@ function accumulate(initialValue, accumulator) {
     var accumulated = initialValue;
     return function transform(emit) {
         return function accumulateTransform(v, i) {
-            accumulated = accumulator(accumulated, v[i]);
+            accumulated = accumulator.apply(void 0, [accumulated].concat(v));
             emit(accumulated);
         };
     };
@@ -113,3 +101,35 @@ function change(switchers) {
     };
 }
 exports.change = change;
+function when(happend, then) {
+    return function transform(emit, impulse) {
+        return function whenTransform(v, i) {
+            if (happend(v[i])) {
+                impulse(eevent.of(then(v[i])));
+            }
+        };
+    };
+}
+exports.when = when;
+function cumulateOverTime(delayInMiliseconds) {
+    return function transform(emit, impulse) {
+        var accumulated = [];
+        var accumulating = false;
+        return function throttleTransform(v, i) {
+            if (!v[i].happend) {
+                return;
+            }
+            accumulated.push(v[i].value);
+            if (!accumulating) {
+                accumulating = true;
+                scheduler.scheduleTimeout(function () {
+                    impulse(eevent.of(accumulated));
+                    accumulating = false;
+                    accumulated = [];
+                }, delayInMiliseconds);
+            }
+        };
+    };
+}
+exports.cumulateOverTime = cumulateOverTime;
+;

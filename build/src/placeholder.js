@@ -1,62 +1,97 @@
-// class Placeholder<Out>
-// 	extends Emitter<Out>
-// 	implements inf.IEmitter<Out>
-// {
-// 	private _emitter: inf.IEmitter<Out>;
-// 	private _actions: Array<((emitter: inf.IEmitter<Out>) => any)> = [];
-// 	private _initialValue: Out;
-// 	constructor(initialValue: Out) {
-// 		super(initialValue);
-// 		this._initialValue = initialValue;
-// 	}
-// 	is(emitter: inf.IEmitter<Out>) {
-// 		this._emitter = emitter;
-// 		for (var action of this._actions) {
-// 			action(this._emitter);
-// 		}
-// 	}
-// 	private _doOrQueue(
-// 		action: (emitter: inf.IEmitter<Out>) => any,
-// 		eventually?: () => void
-// 	): any {
-// 		if (this._emitter) {
-// 			return action(this._emitter);
-// 		}
-// 		else {
-// 			this._actions.push(action);
-// 			if (eventually) {
-// 				eventually();
-// 			}
-// 		}
-// 	}
-// 	plugReceiver(receiver: inf.IReceiverFunction<Out> | inf.IReceiver<Out> | inf.IWire<Out>): inf.IDisposable {
-// 		return this._doOrQueue(
-// 			(emitter) => emitter.plugReceiver(receiver),
-// 			() => this._dispatchToReceiver(this._initialValue, receiver)
-// 		);
-// 	};
-// 	unplugReceiver(index: inf.IDisposable): void {
-// 		this._doOrQueue(
-// 			(emitter) => emitter.unplugReceiver(index)
-// 		);
-// 	}
-// 	dirtyCurrentValue(): Out {
-// 		if (this._emitter) {
-// 			return this._emitter.dirtyCurrentValue();
-// 		}
-// 		return this._initialValue;
-// 	}
-// 	stabilize(): void {
-// 		this._doOrQueue(
-// 			(emitter) => emitter.stabilize()
-// 		);
-// 	}
-// 	setReleaseResources(releaseResources: () => void): void {
-// 		this._doOrQueue(
-// 			(emitter) => emitter.setReleaseResources(releaseResources)
-// 		)
-// 	}
-// }
-// export function placeholder<T>(initialValue: T) {
-// 	return new Placeholder(initialValue);
-// }
+// functions that can be simply queued
+var functionsToVoid = [
+    'plugReceiver',
+    'unplugReceiver',
+    'stabilize',
+    'setReleaseResources',
+    'setEquals'
+];
+// functions that should return another placeholder
+var functionsToEmitter = [
+    'plugReceiver',
+    'unplugReceiver',
+    'stabilize',
+    'setReleaseResources',
+    'setEquals',
+    'map',
+    'filter',
+    'filterMap',
+    'transformTime',
+    'accumulate',
+    'sample',
+    'change'
+];
+// function to throw if called before is()
+var functionsToSomething = [
+    'dirtyCurrentValue'
+];
+var Placeholder = (function () {
+    function Placeholder() {
+        this._actions = [];
+        // super(undefined);
+        this.name = 'placeholder';
+    }
+    Placeholder.prototype.is = function (emitter) {
+        this._emitter = emitter;
+        for (var _i = 0, _a = this._actions; _i < _a.length; _i++) {
+            var action = _a[_i];
+            action(this._emitter);
+        }
+        this._actions = undefined;
+        if (this._emitter._dispatchToReceivers) {
+            this._emitter._dispatchToReceivers(this._emitter.dirtyCurrentValue());
+        }
+        this.name = emitter.name;
+    };
+    return Placeholder;
+})();
+function doOrQueue(name) {
+    return function placeholding() {
+        var args = arguments;
+        if (this._emitter) {
+            this._emitter[name].apply(this._emitter, arguments);
+        }
+        else {
+            this._actions.push(function (emitter) {
+                emitter[name].apply(emitter, args);
+            });
+        }
+    };
+}
+functionsToVoid.forEach(function (name) {
+    Placeholder.prototype[name] = doOrQueue(name);
+});
+function doOrQueueAndReturnPlaceholder(name) {
+    return function placeholding() {
+        var args = arguments;
+        if (this._emitter) {
+            return this._emitter[name].apply(this._emitter, args);
+        }
+        else {
+            var p = placeholder();
+            this._actions.push(function (emitter) {
+                p.is(emitter[name].apply(emitter, args));
+            });
+            return p;
+        }
+    };
+}
+functionsToEmitter.forEach(function (name) {
+    Placeholder.prototype[name] = doOrQueueAndReturnPlaceholder(name);
+});
+function doOrThrow(name) {
+    return function placeholding() {
+        var args = arguments;
+        if (this._emitter) {
+            return this._emitter[name].apply(this._emitter, args);
+        }
+        throw Error('called <' + name + '> on empty placeholder');
+    };
+}
+functionsToSomething.forEach(function (name) {
+    Placeholder.prototype[name] = doOrThrow(name);
+});
+function placeholder() {
+    return (new Placeholder());
+}
+module.exports = placeholder;

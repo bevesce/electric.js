@@ -39,6 +39,7 @@ export interface IEmitter<T>
 	filter(initialValue: T, predicate: (v: T) => boolean): IEmitter<T>;
 	filterMap<NewT>(initialValue: T, mapping: (v: T) => NewT | void): IEmitter<NewT>;
 	transformTime(initialValue: T, timeShift: (t: number) => number, t0?: number): IEmitter<T>;
+	accumulate<NewT>(initialValue: NewT, accumulator: (acc: NewT, value: T) => NewT): IEmitter<NewT>;
 	sample(initialValue: T, samplingEvent: IEmitter<IElectricEvent<any>>): IEmitter<T>;
 	change<S1>(
 	    switcher1: { when: IEmitter<IElectricEvent<S1>>, to: IEmitter<T> | ((t: T, k: S1) => IEmitter<T>) }
@@ -82,10 +83,6 @@ export interface IEmitter<T>
 	    switcher6: { when: IEmitter<IElectricEvent<S6>>, to: IEmitter<T> | ((t: T, k: S6) => IEmitter<T>) },
 	    switcher7: { when: IEmitter<IElectricEvent<S7>>, to: IEmitter<T> | ((t: T, k: S7) => IEmitter<T>) }
 	): IEmitter<T>;
-	change(...switchers: {
-		when: IEmitter<IElectricEvent<any>>,
-		to: IEmitter<T> | ((t: T, k: any) => IEmitter<T>)
-	}[]): IEmitter<T>;
 }
 
 export interface IEmitterFunction<T> {

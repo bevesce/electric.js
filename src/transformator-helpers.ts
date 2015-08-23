@@ -2,17 +2,13 @@ import inf = require('./interfaces');
 import utils = require('./utils');
 import Wire = require('./wire');
 import scheduler = require('./scheduler');
+import eevent = require('./electric-event');
 
 type Index = number;
 
-export function map<In, Out>(f: (v: In) => Out, noOfEmitters: number) {
+export function map<In, Out>(f: (...vs: any[]) => Out, noOfEmitters: number) {
 	return function mapTransform(emit: inf.IEmitterFunction<Out>) {
-		var eaten = 0;
 		return function mapTransform(v: In[], i: Index) {
-			if (eaten < noOfEmitters) {
-				eaten += 1;
-				return;
-			}
 			emit(f.apply(null, v));
 		}
 	}
@@ -25,10 +21,6 @@ export function filter<InOut>(
 	return function transform(emit: inf.IEmitterFunction<InOut>) {
 		var eaten = 0;
 		return function filterTransform(v: InOut[], i: Index) {
-			if (eaten < noOfEmitters) {
-				eaten += 1;
-				return;
-			}
 			if (predicate.apply(null, v)) {
 				emit(v[i]);
 			}
@@ -36,17 +28,13 @@ export function filter<InOut>(
 	}
 };
 
-export function filterMap<In, Out>(
-	mapping: (...args: In[]) => Out | void,
+export function filterMap<Out>(
+	mapping: (...args: any[]) => Out | void,
 	noOfEmitters = 1
 ) {
 	return function transform(emit: inf.IEmitterFunction<Out>) {
 		var eaten = 0;
-		return function filterMapTransform(v: In[], i: Index) {
-			if (eaten < noOfEmitters) {
-				eaten += 1;
-				return;
-			}
+		return function filterMapTransform(v: any[], i: Index) {
 			var result = mapping.apply(null, v);
 			if (result !== undefined) {
 				emit(<Out>result);
@@ -67,14 +55,14 @@ export function merge<InOut>() {
 	}
 }
 
-export function accumulate<In, Out>(
+export function accumulate<Out>(
 	initialValue: Out,
-	accumulator: (accumulated: Out, value: In) => Out
+	accumulator: (accumulated: Out, ...vs: any[]) => Out
 ) {
 	var accumulated = initialValue;
 	return function transform(emit: inf.IEmitterFunction<Out>) {
-		return function accumulateTransform(v: In[], i: Index) {
-			accumulated = accumulator(accumulated, v[i]);
+		return function accumulateTransform(v: any[], i: Index) {
+			accumulated = accumulator(accumulated, ...v);
 			emit(accumulated)
 		}
 	}
@@ -132,3 +120,40 @@ export function change<Out>(
 		}
 	}
 }
+
+export function when<In, Out>(happend: (value: In) => boolean, then: (value: In) => Out) {
+	return function transform(emit: inf.IEmitterFunction<eevent<Out>>, impulse: inf.IEmitterFunction<eevent<Out>>) {
+		return function whenTransform(v: any[], i: Index) {
+			if (happend(v[i])) {
+				impulse(eevent.of(then(v[i])));
+			}
+		}
+	}
+}
+
+export function cumulateOverTime<InOut>(
+	delayInMiliseconds: number
+) {
+	return function transform(emit: inf.IEmitterFunction<eevent<InOut[]>>, impulse: inf.IEmitterFunction<eevent<InOut[]>>) {
+		var accumulated: InOut[] = [];
+		var accumulating = false;
+		return function throttleTransform(v: eevent<InOut>[], i: Index) {
+			if (!v[i].happend){
+				return;
+			}
+			accumulated.push(v[i].value);
+			if (!accumulating) {
+				accumulating = true;
+				scheduler.scheduleTimeout(
+					() => {
+						impulse(eevent.of(accumulated));
+						accumulating = false;
+						accumulated = [];
+					},
+					delayInMiliseconds
+				);
+			}
+		};
+	};
+};
+
