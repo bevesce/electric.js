@@ -8,6 +8,9 @@ var electric = require('../src/electric');
 var clock = require('../src/clock');
 var tv = clock.TimeValue;
 describe('clock', function () {
+    afterEach(function () {
+        electric.scheduler.resume();
+    });
     it('should measure time', function () {
         var time = electric.scheduler.stop();
         var timer = clock.time({ intervalInMs: 1 });
@@ -39,6 +42,9 @@ describe('clock', function () {
     });
 });
 describe('integral transformator', function () {
+    afterEach(function () {
+        electric.scheduler.resume();
+    });
     it('should calculate integral over constant', function () {
         var time = electric.scheduler.stop();
         function v(t) {
