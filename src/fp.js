@@ -1,6 +1,6 @@
 ;
 function curry(f, arity) {
-    if (arity === void 0) { arity = 2; }
+    arity = arity || 2;
     function partial(prevArgs) {
         return function () {
             var args = [];

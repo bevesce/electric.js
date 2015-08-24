@@ -3,10 +3,8 @@ interface AnyFunction {
 };
 
 export function curry<T>(
-	f: AnyFunction, arity: number
+	f: AnyFunction, arity = 2
 ): AnyFunction {
-	arity = arity || 2;
-
 	function partial(prevArgs: any[]): AnyFunction {
 		return function(...args: any[]): (AnyFunction | T) {
 			var nextArgs: any[] = prevArgs.slice();

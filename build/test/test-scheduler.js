@@ -53,5 +53,15 @@ describe('electric test scheduler', function () {
         electric.scheduler.advance(2);
         expect(r).to.equal(2);
     });
-    after(electric.scheduler.resume);
+    it('shuld release intervals', function () {
+        electric.scheduler.stop();
+        var calls = 0;
+        var intervalId = electric.scheduler.scheduleInterval(function () { return calls++; }, 1);
+        electric.scheduler.advance(2);
+        expect(calls).to.equal(1);
+        electric.scheduler.unscheduleInterval(intervalId);
+        electric.scheduler.advance(1);
+        expect(calls).to.equal(1);
+    });
+    afterEach(electric.scheduler.resume);
 });

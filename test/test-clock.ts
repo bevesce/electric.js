@@ -2,13 +2,25 @@
 /// <reference path="../d/mocha.d.ts" />
 import chai = require('chai');
 import electricKettle = require('./electric-kettle');
-electricKettle.pour(chai);
 var expect = chai.expect;
 import electric = require('../src/electric');
 import clock = require('../src/clock');
 
 
 var tv = clock.TimeValue;
+
+
+function constant(x: number) {
+	return function(t: number) {
+		return x;
+	}
+}
+
+function times(x: number) {
+	return function(t: number) {
+		return x * t;
+	}
+}
 
 describe('clock', function() {
 	afterEach(function() {
@@ -30,9 +42,7 @@ describe('clock', function() {
 	});
 
 	it('should sample function', function() {
-		function f(t: number) {
-			return 2 * t;
-		}
+		var f = constant(2);
 		var time = electric.scheduler.stop();
 		var timer = clock.timeFunction(f, {intervalInMs: 1});
 		var r: clock.TimeValue<void>[] = [];
@@ -45,6 +55,17 @@ describe('clock', function() {
 			tv.of(time + 3, f(time + 3))
 		]);
 	});
+
+	it('should stop measuring time on stabilization', function() {
+		var time = electric.scheduler.stop();
+		var timer = clock.time({ intervalInMs: 1 });
+		var collected = electric.receiver.collect(timer);
+		electric.scheduler.advance(10);
+		var previousCollected = collected.slice();
+		timer.stabilize();
+		electric.scheduler.advance(20);
+		expect(collected).to.be.eql(previousCollected);
+	});
 });
 
 describe('integral transformator', function() {
@@ -52,11 +73,9 @@ describe('integral transformator', function() {
 		electric.scheduler.resume();
 	});
 
-	it('should calculate integral over constant', function() {
+	it('should calculate integral of f(t) = 2', function() {
 		var time = electric.scheduler.stop();
-		function v(t: number) {
-			return 2;
-		}
+		var v = constant(2);
 		var vT = clock.timeFunction(v, { intervalInMs: 1 });
 		var sT = clock.integral(vT);
 		var r: clock.TimeValue<number>[] = [];
@@ -70,12 +89,28 @@ describe('integral transformator', function() {
 			tv.of(time + 3, 0.006),
 		]);
 	});
+
+	it('should calculate integral of f(t) = 2 * t', function() {
+		var time = electric.scheduler.stop();
+		// value in v is expressed in [unit/s]
+		var v = times(2);
+		var vT = clock.timeFunction(v, { intervalInMs: 1 }, time);
+		var sT = clock.integral(vT);
+		var r: clock.TimeValue<number>[] = [];
+		sT.plugReceiver(x => r.push(x));
+		electric.scheduler.advance(4);
+		expect(r).to.deep.equal([
+			tv.of(time + 0, 0.000),
+			tv.of(time + 1, 0.001),
+			tv.of(time + 2, 0.004),
+			tv.of(time + 3, 0.009000000000000001),
+		]);
+	});
+
 	it('should be composable', function() {
 		var time = electric.scheduler.stop();
 		// value in a is expressed in [unit/s]
-		function a(t: number) {
-			return 2;
-		}
+		var a = constant(2);
 		var aT = clock.timeFunction(a, { intervalInMs: 1 });
 		var vT = clock.integral(aT);
 		var sT = clock.integral(vT);
@@ -93,6 +128,111 @@ describe('integral transformator', function() {
 });
 
 describe('derivative transformator', function() {
-	it('should calculate derivative');
-	it('should be composable');
+	afterEach(function() {
+		electric.scheduler.resume();
+	});
+
+	it('should calculate derivative of f(t) = 2 function', function() {
+		var time = electric.scheduler.stop();
+		var s = constant(2);
+		var sT = clock.timeFunction(s, { intervalInMs: 1 });
+		var vT = clock.derivative(sT);
+		var aT = clock.derivative(vT);
+		var vTc = electric.receiver.collect(vT);
+		var aTc = electric.receiver.collect(aT);
+		electric.scheduler.advance(6);
+
+		expect(vTc).to.eql([
+			tv.of(time + 0, 0),
+			tv.of(time + 1, 0),
+			tv.of(time + 2, 0),
+			tv.of(time + 3, 0),
+			tv.of(time + 4, 0),
+			tv.of(time + 5, 0)
+		]);
+
+		expect(aTc).to.eql([
+			tv.of(time + 0, 0),
+			tv.of(time + 1, 0),
+			tv.of(time + 2, 0),
+			tv.of(time + 3, 0),
+			tv.of(time + 4, 0),
+			tv.of(time + 5, 0)
+		]);
+	});
+
+	it('should calculate derivative of f(t) = 2 * t^2 function', function() {
+		var time = electric.scheduler.stop();
+		function s(t: number) {
+			return 2 * t * t;
+		}
+		var sT = clock.timeFunction(s, { intervalInMs: 1 }, time);
+		var vT = clock.derivative(sT);
+		var aT = clock.derivative(vT);
+		var vTc = electric.receiver.collect(vT);
+		var aTc = electric.receiver.collect(aT);
+		electric.scheduler.advance(6);
+
+		expect(vTc).to.eql([
+			tv.of(time + 0, 0),
+			tv.of(time + 1, 2),
+			tv.of(time + 2, 6),
+			tv.of(time + 3, 10),
+			tv.of(time + 4, 14),
+			tv.of(time + 5, 18)
+		]);
+
+		expect(aTc).to.eql([
+			tv.of(time + 0, 0),
+			tv.of(time + 1, 2),
+			tv.of(time + 2, 4),
+			tv.of(time + 3, 4),
+			tv.of(time + 4, 4),
+			tv.of(time + 5, 4)
+		]);
+	});
+
+});
+
+describe('time value', function() {
+	function double(x: number) {
+		return 2 * x;
+	}
+
+	function sum4(v1: number, v2: number, v3: number, v4: number) {
+		return v1 + v2 + v3 + v4;
+	}
+
+	it('should be createable', function() {
+		var t = tv.of(1, 2);
+		expect(t.time).to.equal(1);
+		expect(t.value).to.equal(2);
+	});
+
+	it('should be mappable', function() {
+		var t = tv.of(1, 2);
+		expect(t.map(double))
+			.to.eql(tv.of(1, double(2)));
+	});
+
+	it('should lift functions with arity 1', function() {
+		var ldouble = tv.lift(double);
+		expect(ldouble(tv.of(1, 2)))
+			.to.eql(tv.of(1, double(2)));
+	});
+
+	// should lift function with arity 2-3
+
+	it('should lift functions with arity 4', function() {
+		var lsum4 = tv.lift(sum4);
+		expect(lsum4(
+			tv.of(1, 1),
+			tv.of(2, 2),
+			tv.of(3, 3),
+			tv.of(4, 4)
+		)).to.eql(tv.of(4, sum4(1, 2, 3, 4)));
+	})
+
+	// should lift function with arity 5-7
+
 });

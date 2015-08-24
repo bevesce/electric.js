@@ -1,7 +1,11 @@
 var stopTime: number = Date.now();
 
+interface ICallback {
+	(): void;
+}
+
 interface TimeMap {
-	[time: number]: Array<() => void>;
+	[time: number]: ICallback[];
 }
 var callbacks: TimeMap = {};
 var stopped = false;
@@ -14,6 +18,7 @@ export function stop(): number{
 
 export function resume() {
 	stopped = false;
+	callbacks = {};
 }
 
 export function advance(timeShiftInMiliseconds: number = 1): number {
@@ -38,15 +43,18 @@ export function currentTime(){
 	return stopTime;
 }
 
+interface IScheduleDisposable {
+
+}
+
 export function scheduleTimeout(
 	callback: () => void, delayInMs: number = 0
-) {
+): IScheduleDisposable {
 	if (!stopped) {
-		setTimeout(callback, delayInMs);
-		return
+		return <any>setTimeout(callback, delayInMs);
 	}
 	var whenToExecute = stopTime + delayInMs;
-	if (delayInMs <= 0){
+	if (delayInMs <= 0) {
 		callback();
 	}
 	else if (callbacks[whenToExecute]) {
@@ -55,20 +63,26 @@ export function scheduleTimeout(
 	else {
 		callbacks[whenToExecute] = [callback];
 	}
+	return <any>callback;
 }
 
 
 export function scheduleInterval(
 	callback: () => void, intervalInMs: number = 0
-) {
+): IScheduleDisposable {
 	if (!stopped) {
-		setInterval(callback, intervalInMs);
-		return;
+		return <any>setInterval(callback, intervalInMs);
 	}
-	scheduleTimeout(() => {
+	var cancelable: IScheduleDisposable[] = [];
+	function intervalCallback() {
 		callback();
-		scheduleInterval(callback, intervalInMs);
-	}, intervalInMs);
+		cancelable.push(
+			scheduleTimeout(intervalCallback, intervalInMs)
+		);
+	}
+	var id = scheduleTimeout(intervalCallback, intervalInMs);
+	cancelable.push(id);
+	return <any>cancelable;
 }
 
 export function now(): number {
@@ -76,4 +90,28 @@ export function now(): number {
 		return Date.now();
 	}
 	return stopTime;
+}
+
+export function unscheduleInterval(id: IScheduleDisposable) {
+	if (!stopped) {
+		return clearInterval(<number>id);
+	}
+
+	(<IScheduleDisposable[]>id).forEach(removeFromCallbacks);
+}
+
+function removeFromCallbacks(callback: ICallback) {
+	for (var k in callbacks) {
+		removeFromCallbacksAtTime(callbacks[k], callback);
+	}
+}
+
+function removeFromCallbacksAtTime(
+	callbacksAtTime: ICallback[], callback: ICallback
+) {
+	var i = callbacksAtTime.indexOf(callback);
+	while (i !== -1) {
+		callbacksAtTime.splice(i, 1);
+		i = callbacksAtTime.indexOf(callback);
+	}
 }

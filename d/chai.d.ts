@@ -88,10 +88,11 @@ declare module Chai {
         after(f: () => void): Assertion;
         afterD(f: () => void): Assertion;
         values(...values: any[]): Assertion;
-        finish: (done?: () => void) => Assertion
-        andBe: (done?: () => void) => Assertion
-        finished: (done?: () => void) => Assertion
-        emit(v: any): Assertion;
+        finish: (done: () => void) => Assertion
+        andBe: (done: () => void) => Assertion
+        finished: (done: () => void) => Assertion
+        waitFor: (forWhat: () => void, howLong?: number) => Assertion;
+        emit(...values: any[]): Assertion;
     }
 
     interface LanguageChains {

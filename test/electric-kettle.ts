@@ -120,9 +120,9 @@ export function pourAsync(chai: any) {
     //   .then.to.finish(done)
     chai.use(function(_chai: any, utils: any) {
         var assertion = _chai.Assertion;
-        assertion.addMethod('emit', function(value: any) {
+        assertion.addMethod('emit', function(...values: any[]) {
             var queue = this.queue || new Queue();
-            queue.push({ kind: 'value', value: value });
+            values.forEach(value => queue.push({ kind: 'value', value: value }));
             this.queue = queue;;
         });
         assertion.addProperty('then', function() { });
@@ -132,35 +132,59 @@ export function pourAsync(chai: any) {
         assertion.addMethod('after', function(after: any) {
             var queue = this.queue || new Queue();
             queue.push({ kind: 'after', value: after });
-            this.queue = queue;;
+            this.queue = queue;
         });
         assertion.addMethod('finish', finish(chai, utils));
         assertion.addMethod('andBe', finish(chai, utils));
         assertion.addMethod('finished', finish(chai, utils));
+        assertion.addMethod('waitFor', function(forWhat: () => void, howLongInMs = 10) {
+            this.waitFor = forWhat;
+            this.howLongToWait = howLongInMs;
+        });
     });
 };
 
 
 var finish = function(chai: any, utils: any) {
-    return function(done?: any) {
+    return function(done: any) {
         var queue = this.queue || new Queue();
-        queue.done = done || queue.done;
+        queue.done = doneIfWaiting(done, this.waitFor, this.howLongToWait);
         var assert = this.assert;
         var show = this.__show_1;
-        this._obj.plugReceiver(function(value: any) {
-            while (!queue.isDone(utils) && queue.top().kind === 'after') {
-                queue.pop().value();
-            }
-            var item: any = queue.pop();
-            if (show) {
-                console.log('EM:', value, item);
-            }
-            chai.expect(value).to.deep.equal(item.value);
-            var i = 0;
-            while (!queue.isDone(utils) && queue.top().kind === 'after') {
-                i++;
-                queue.pop().value();
-            }
-        });
+        this._obj.plugReceiver(
+            pullFromQueueExecuteAndCheck(chai, utils, queue, show)
+        );
+    }
+}
+
+function doneIfWaiting(
+    done: () => void, waitFor :() => void, howLongToWait: number
+) {
+    if (waitFor) {
+        return () => {
+            setTimeout(() => {
+                waitFor();
+                done();
+            }, howLongToWait)
+        }
+    }
+    return done;
+}
+
+function pullFromQueueExecuteAndCheck(chai: any, utils: any, queue: any, show: any) {
+    return function(value: any) {
+        while (!queue.isDone(utils) && queue.top().kind === 'after') {
+            queue.pop().value();
+        }
+        var item: any = queue.pop();
+        if (show) {
+            console.log('EM:', value, item);
+        }
+        chai.expect(value).to.deep.equal(item.value);
+        var i = 0;
+        while (!queue.isDone(utils) && queue.top().kind === 'after') {
+            i++;
+            queue.pop().value();
+        }
     }
 }
