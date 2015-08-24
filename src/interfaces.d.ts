@@ -6,9 +6,6 @@ export interface IElectricEvent<T> {
 	map<Out>(f: (v: T) => Out): IElectricEvent<Out>
 }
 
-export interface ITransformable {
-
-}
 
 
 export interface IReceiver<T> {
@@ -24,9 +21,7 @@ export interface IWire<T> {
 	receive(value: T): void;
 }
 
-export interface IEmitter<T>
-	extends ITransformable
-{
+export interface IEmitter<T> {
 	name: string;
 	plugReceiver(receiver: IReceiverFunction<T> | IReceiver<T> | IWire<T>): IDisposable;
 	unplugReceiver(index: IDisposable): void;
@@ -99,4 +94,9 @@ export interface IManualEmitter<T>
 export interface ITransformator<In, Out>
 	extends IReceiver<In>, IEmitter<Out> {
 
+}
+
+export interface IPlaceholder<Out>
+	extends IEmitter<Out> {
+	is(emitter: IEmitter<Out>): void;
 }

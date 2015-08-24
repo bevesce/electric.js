@@ -1,11 +1,12 @@
 import electric = require('../../src/electric');
+import ui = require('../../src/receivers/ui');
 
 
-electric.clock.clock({intervalInMs: 1000}).plugReceiver(
-	electric.receiver.htmlReceiverById('time')
+electric.clock.time({intervalInMs: 1000}).plugReceiver(
+	ui.htmlReceiverById('time')
 );
 
-electric.clock.clock({intervalInMs: 1000}).plugReceiver(
+electric.clock.time({intervalInMs: 1000}).plugReceiver(
 	electric.receiver.logReceiver('time:')
 );
 
@@ -21,9 +22,9 @@ function renderItems<T>(list: T[]) {
 	}).join('');
 }
 
-electric.clock.clock({intervalInMs: 1000})
+electric.clock.time({intervalInMs: 1000})
 	.accumulate([], append)
 	.map(renderItems)
 	.plugReceiver(
-		electric.receiver.htmlReceiverById('list')
+		ui.htmlReceiverById('list')
 	);

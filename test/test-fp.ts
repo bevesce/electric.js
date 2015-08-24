@@ -8,7 +8,7 @@ var expect = chai.expect;
 import electric = require('../src/electric');
 import fp = require('../src/fp');
 
-describe.only('fp', function() {
+describe('fp', function() {
 	describe('curry', function() {
 		var curry = fp.curry;
 
@@ -192,9 +192,8 @@ describe.only('fp', function() {
 			var result = right(3).map(f).flatten();
 			expect(result).to.equal('3!');
 		});
-		it('left should be a functor', function() {
-			var result = left(3).map(f).flatten();
-			expect(result.value).to.equal(3);
+		it("left shouldn't be a functor", function() {
+			expect(() => left(3).map(f).flatten()).to.throw(Error);
 		});
 		it('should be chainable as functor', function() {
 			expect(
@@ -216,7 +215,7 @@ describe.only('fp', function() {
 		});
 		it('left should meet functor law: map id = id', function() {
 			expect(
-				left(1).map(id).value
+				(<any>left(1).map(id)).lvalue
 			).to.equal(1);
 		});
 		it('left should meet functor law: map f.g = map f . map g', function() {
@@ -232,12 +231,12 @@ describe.only('fp', function() {
 				right(1).chain(h).flatten()
 			).to.equal(2);
 			expect(
-				right(1).chain((x: number) => left)
-			).to.equal(left);
+				right(1).chain((x: number) => left('err'))
+			).to.eql(left('err'));
 		});
 		it('left should be a monad', function() {
 			expect(
-				left(1).chain((x: number) => right(3)).value
+				(<any>left(1).chain((x: number) => right(3))).lvalue
 			).to.equal(1);
 		});
 		it('right should meet monad law: return x >>= f = f x', function() {

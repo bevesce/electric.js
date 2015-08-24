@@ -5,6 +5,7 @@ import eevent = require('./electric-event');
 import Wire = require('./wire');
 export import placeholder = require('./placeholder');
 
+
 export class Emitter<T>
 	implements inf.IEmitter<T>
 {
@@ -302,6 +303,28 @@ export function constant<T>(value: T): inf.IEmitter<T> {
 	var e = new Emitter(value);
 	e.name = 'constant(' + value + ')';
 	return e;
+}
+
+
+export interface EventEmitter<T>
+	extends inf.IEmitter<eevent<T>> {
+	impulse(value: T): void;
+}
+
+export function manualEvent<T>(): EventEmitter<T> {
+	// manual event emitter should
+	// pack impulsed values into event
+	// and not allow to emit values
+	// it's done by monkey patching ManualEmitter
+	var e = manual(eevent.notHappend);
+	e.name = 'manual event emitter';
+	var oldImpulse = e.impulse;
+	(<any>e).impulse = (v: T) => oldImpulse.apply(e, [eevent.of(v)]);
+	(<any>e).emit = (v: T) => {
+		throw Error("can't emit from event emitter, only impulse");
+	};
+	// monkey patching requires ugly casting...
+	return <any>e;
 }
 
 type Identifier = number;

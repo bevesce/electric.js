@@ -68,7 +68,7 @@ var maybe;
             return maybe.nothing;
         };
         Nothing.prototype.flatten = function () {
-            return maybe.nothing;
+            throw Error("can't flatten Nothing");
         };
         Nothing.prototype.chain = function (f) {
             return maybe.nothing;
@@ -107,16 +107,16 @@ var either;
     either.right = right;
     var Left = (function () {
         function Left(value) {
-            this.value = value;
+            this.lvalue = value;
         }
         Left.prototype.map = function (f) {
-            return left(this.value);
+            return left(this.lvalue);
         };
         Left.prototype.flatten = function () {
-            return left(this.value);
+            throw Error("can't flatten Left");
         };
         Left.prototype.chain = function (f) {
-            return left(this.value);
+            return left(this.lvalue);
         };
         Left.prototype.isRight = function () {
             return false;

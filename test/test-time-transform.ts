@@ -3,7 +3,6 @@
 
 import chai = require("chai");
 import electricKettle = require('./electric-kettle');
-electricKettle.pour(chai);
 var expect = chai.expect;
 import electric = require("../src/electric");
 

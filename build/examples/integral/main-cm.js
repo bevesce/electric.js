@@ -11,9 +11,7 @@ function bar(x, y, ys) {
 function a(time) {
     return 1;
 }
-var aT = electric.clock.clock({ intervalInMs: 10 }).map(function (time) {
-    return { time: time, value: a(time) };
-});
+var aT = electric.clock.timeFunction(a, { intervalInMs: 10 });
 var vT = electric.clock.integral(aT);
 var sT = electric.clock.integral(vT);
 var x0 = 0;

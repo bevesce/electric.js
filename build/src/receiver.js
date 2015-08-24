@@ -1,13 +1,3 @@
-// import transformator = require('./transformator')
-// export function hanging() {
-// 	return new transformator.Transformator([]);
-// }
-// export function htmlReceiverById(id: string) {
-// 		var element = document.getElementById(id);
-// 		return function(html: any) {
-// 			element.innerHTML = html;
-// 		}
-// 	}
 function logReceiver(message) {
     if (!message) {
         message = '<<<';

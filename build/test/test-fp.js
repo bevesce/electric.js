@@ -4,7 +4,7 @@ var chai = require('chai');
 // electricKettle.pour(chai);
 var expect = chai.expect;
 var fp = require('../src/fp');
-describe.only('fp', function () {
+describe('fp', function () {
     describe('curry', function () {
         var curry = fp.curry;
         it('should be exported', function () {
@@ -151,9 +151,8 @@ describe.only('fp', function () {
             var result = right(3).map(f).flatten();
             expect(result).to.equal('3!');
         });
-        it('left should be a functor', function () {
-            var result = left(3).map(f).flatten();
-            expect(result.value).to.equal(3);
+        it("left shouldn't be a functor", function () {
+            expect(function () { return left(3).map(f).flatten(); }).to.throw(Error);
         });
         it('should be chainable as functor', function () {
             expect(right(1).map(g).map(f).flatten()).to.equal('2!');
@@ -166,7 +165,7 @@ describe.only('fp', function () {
             expect(v.map(compose(f, g)).flatten()).to.equal(v.map(g).map(f).flatten());
         });
         it('left should meet functor law: map id = id', function () {
-            expect(left(1).map(id).value).to.equal(1);
+            expect(left(1).map(id).lvalue).to.equal(1);
         });
         it('left should meet functor law: map f.g = map f . map g', function () {
             var v = left(1);
@@ -174,10 +173,10 @@ describe.only('fp', function () {
         });
         it('right should be a monad', function () {
             expect(right(1).chain(h).flatten()).to.equal(2);
-            expect(right(1).chain(function (x) { return left; })).to.equal(left);
+            expect(right(1).chain(function (x) { return left('err'); })).to.eql(left('err'));
         });
         it('left should be a monad', function () {
-            expect(left(1).chain(function (x) { return right(3); }).value).to.equal(1);
+            expect(left(1).chain(function (x) { return right(3); }).lvalue).to.equal(1);
         });
         it('right should meet monad law: return x >>= f = f x', function () {
             expect(right(1).chain(h).flatten()).to.equal(h(1).flatten());

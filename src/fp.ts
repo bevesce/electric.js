@@ -33,13 +33,14 @@ export function compose(f: AnyFunction, g: AnyFunction) {
 
 
 interface Functor<In> {
-	// static a(value: In): Functor<In>;
 	map<Out>(f: (value: In) => Out): Functor<Out>;
 }
 
 interface Monad<In> extends Functor<In> {
-	flatten(): In | Monad<In>;
-	chain<Out>(f: (value: In) => Monad<Out>): Out | Monad<Out>
+	map<Out>(f: (value: In) => Out): Monad<Out>;
+	flatten(): In;
+	chain<Out>(f: (value: In) => Monad<Out>): Monad<Out>;
+	value?: In
 }
 
 
@@ -49,7 +50,7 @@ export module maybe {
 	}
 
 	class Just<T> implements Maybe<T>{
-		private value: T;
+		value: T;
 
 		constructor(value: T) {
 			this.value = value;
@@ -82,8 +83,8 @@ export module maybe {
 			return nothing;
 		}
 
-		flatten() {
-			return nothing;
+		flatten(): T {
+			throw Error("can't flatten Nothing")
 		}
 
 		chain<Out>(f: (value: T) => Maybe<Out>) {
@@ -102,7 +103,7 @@ export module either {
 	}
 
 	class Right<L, R> implements Either<L, R>{
-		private value: R;
+		value: R;
 
 		constructor(value: R) {
 			this.value = value;
@@ -113,7 +114,7 @@ export module either {
 			return right(result);
 		}
 
-		flatten(): R | Either<L, R> {
+		flatten(): R {
 			return this.value;
 		}
 
@@ -135,22 +136,22 @@ export module either {
 	}
 
 	class Left<L, R> implements Either<L, R> {
-		private value: L;
+		lvalue: L;
 
 		constructor(value: L) {
-			this.value = value;
+			this.lvalue = value;
 		}
 
 		map<Out>(f: (value: R) => Out): Either<L, Out> {
-			return <Either<L, Out>>left(this.value);
+			return <Either<L, Out>>left(this.lvalue);
 		}
 
-		flatten(): R | Either<L, R> {
-			return <Either<L, R>>left(this.value);
+		flatten(): R {
+			throw Error("can't flatten Left");
 		}
 
 		chain<Out>(f: (value: R) => Either<L, Out>) {
-			return left(this.value);
+			return left(this.lvalue);
 		}
 
 		isRight() {

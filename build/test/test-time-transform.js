@@ -1,8 +1,6 @@
 /// <reference path="../d/chai.d.ts" />
 /// <reference path="../d/mocha.d.ts" />
 var chai = require("chai");
-var electricKettle = require('./electric-kettle');
-electricKettle.pour(chai);
 var expect = chai.expect;
 var electric = require("../src/electric");
 describe('time transform', function () {

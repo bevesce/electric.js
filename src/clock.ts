@@ -12,6 +12,10 @@ export interface ITimeValue<T> {
 	value: T;
 }
 
+export type IIntegrable = TimeValue<number>;
+export type IDerivable = TimeValue<number>;
+
+
 export class TimeValue<T>
 	implements ITimeValue<T>
 {
@@ -115,7 +119,6 @@ export function timeFunction<T>(
 	return _time(args, t => (TimeValue.of(t, f(t - t0))));
 }
 
-type IIntegrable = TimeValue<number>;
 interface IIntegrating {
 	time: number;
 	value: number;

@@ -192,6 +192,22 @@ function constant(value) {
     return e;
 }
 exports.constant = constant;
+function manualEvent() {
+    // manual event emitter should
+    // pack impulsed values into event
+    // and not allow to emit values
+    // it's done by monkey patching ManualEmitter
+    var e = manual(eevent.notHappend);
+    e.name = 'manual event emitter';
+    var oldImpulse = e.impulse;
+    e.impulse = function (v) { return oldImpulse.apply(e, [eevent.of(v)]); };
+    e.emit = function (v) {
+        throw Error("can't emit from event emitter, only impulse");
+    };
+    // monkey patching requires ugly casting...
+    return e;
+}
+exports.manualEvent = manualEvent;
 var Transformator = (function (_super) {
     __extends(Transformator, _super);
     function Transformator(emitters, transform, initialValue) {

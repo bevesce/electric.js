@@ -22,9 +22,9 @@ function append(list, item) {
     list.push(item);
     return list;
 }
-var time = electric.clock.clock({ intervalInMs: 1000 })
+var time = electric.clock.time({ intervalInMs: 1000 })
     .map(renderTime);
-var list = electric.clock.clock({ intervalInMs: 1000 })
+var list = electric.clock.time({ intervalInMs: 1000 })
     .accumulate([], append)
     .map(renderList);
 electric.transformator

@@ -26,23 +26,18 @@ var functionsToEmitter = [
 	'change'
 ];
 // function to throw if called before is()
-var functionsToSomething = [
-	'dirtyCurrentValue'
+var functionsToSomething: string[] = [
+	// 'dirtyCurrentValue'
 ]
-
-interface IPlaceholder<Out>
-	extends inf.IEmitter<Out>
-{
-	is(emitter: inf.IEmitter<Out>): void;
-}
 
 class Placeholder<Out> {
 	private _emitter: inf.IEmitter<Out>;
 	private _actions: Array<((emitter: inf.IEmitter<Out>) => any)> = [];
+	private _initialValue: Out;
 	name: string;
 
-	constructor() {
-		// super(undefined);
+	constructor(initialValue?: Out) {
+		this._initialValue = initialValue;
 		this.name = 'placeholder';
 	}
 
@@ -56,6 +51,16 @@ class Placeholder<Out> {
 			(<any>this._emitter)._dispatchToReceivers(this._emitter.dirtyCurrentValue());
 		}
 		this.name = emitter.name;
+	}
+
+	dirtyCurrentValue() {
+		if (this._emitter) {
+			return this._emitter.dirtyCurrentValue();
+		}
+		else if (this._initialValue !== undefined) {
+			return this._initialValue
+		}
+		throw Error('called dirtyCurrentValue() on placeholder without initial value');
 	}
 }
 
@@ -111,8 +116,8 @@ functionsToSomething.forEach((name: string) => {
 	(<any>Placeholder.prototype)[name] = doOrThrow(name)
 })
 
-function placeholder<T>() {
-	return <IPlaceholder<T>>(<any>(new Placeholder()));
+function placeholder<T>(initialValue?: T) {
+	return <inf.IPlaceholder<T>>(<any>(new Placeholder(initialValue)));
 }
 
 export = placeholder;

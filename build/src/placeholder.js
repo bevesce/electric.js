@@ -22,13 +22,11 @@ var functionsToEmitter = [
     'change'
 ];
 // function to throw if called before is()
-var functionsToSomething = [
-    'dirtyCurrentValue'
-];
+var functionsToSomething = [];
 var Placeholder = (function () {
-    function Placeholder() {
+    function Placeholder(initialValue) {
         this._actions = [];
-        // super(undefined);
+        this._initialValue = initialValue;
         this.name = 'placeholder';
     }
     Placeholder.prototype.is = function (emitter) {
@@ -42,6 +40,15 @@ var Placeholder = (function () {
             this._emitter._dispatchToReceivers(this._emitter.dirtyCurrentValue());
         }
         this.name = emitter.name;
+    };
+    Placeholder.prototype.dirtyCurrentValue = function () {
+        if (this._emitter) {
+            return this._emitter.dirtyCurrentValue();
+        }
+        else if (this._initialValue !== undefined) {
+            return this._initialValue;
+        }
+        throw Error('called dirtyCurrentValue() on placeholder without initial value');
     };
     return Placeholder;
 })();
@@ -91,7 +98,7 @@ function doOrThrow(name) {
 functionsToSomething.forEach(function (name) {
     Placeholder.prototype[name] = doOrThrow(name);
 });
-function placeholder() {
-    return (new Placeholder());
+function placeholder(initialValue) {
+    return (new Placeholder(initialValue));
 }
 module.exports = placeholder;
