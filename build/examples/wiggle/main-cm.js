@@ -1,7 +1,7 @@
 var electric = require('../../src/electric');
 function sinBall(fps, ball) {
-    electric.clock.clock({ intervalInMs: fps }).map(function (v) {
-        return Math.sin(v / 1000);
+    electric.clock.time({ intervalInMs: fps }).map(function (v) {
+        return Math.sin(v.time / 1000);
     }).plugReceiver(function (v) {
         var amp = 200;
         ball.style.left = (amp + (v * amp)) + 'px';

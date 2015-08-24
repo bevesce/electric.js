@@ -10,15 +10,15 @@ var patch = vdom.patch
 var createElement = vdom.create;
 
 
-function renderTime(count: number) {
-    return h('h1', {className: 'test'}, [count]);
+function renderTime(count: any) {
+    return h('h1', { className: 'test' }, [count.time]);
 }
 
-function renderList<T>(list: T[]) {
+function renderList(list: any[]) {
 	return h(
 		'ul', {},
 		list.map(function(item) {
-			return h('li', {key: item}, [item])
+			return h('li', {key: item.time}, [item.time])
 		})
 	);
 }

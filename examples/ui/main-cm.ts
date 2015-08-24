@@ -1,19 +1,21 @@
 import electric = require('../../src/electric');
 import ui = require('../../src/emitters/ui');
 import rui = require('../../src/receivers/ui');
+import eevent = require('../../src/electric-event');
+
 
 function formatBoolean(value: any) {
 	return value ? '☑ true' : '☐ false'
 }
 
 var clicks = ui.fromEvent(document.getElementById('clicker'), 'click');
-var deleyedClick = clicks.transformTime(undefined, function(t: number) { return t + 1000 });
+var deleyedClick = clicks.transformTime(eevent.notHappend, function(t: number) { return t + 1000 });
 clicks.merge(deleyedClick)
-	.accumulate('not clicked', function (acc: string, x: string) {
-		if (x === undefined){
+	.accumulate('not clicked', function (acc, x) {
+		if (x.happend){
 			return acc;
 		}
-		return acc === 'clicked'? 'not clicked': 'clicked';
+		return acc === 'clicked' ? 'not clicked': 'clicked';
 	})
 	.plugReceiver(rui.htmlReceiverById('clicked'));
 
@@ -30,7 +32,7 @@ ui.fromInputText('text')
 	.plugReceiver(rui.htmlReceiverById('typed'));
 
 ui.fromCheckbox('checkbox')
-	.map(function(checked: any) { return formatBoolean(checked)})
+	.map(b => formatBoolean(b))
 	.plugReceiver(rui.htmlReceiverById('checked'));
 
 ui.fromCheckboxes(['checkbox0', 'checkbox1', 'checkbox2', 'checkbox3'])
@@ -53,7 +55,7 @@ ui.fromRadioGroup('radio')
 ui.fromSelect('select')
 	.plugReceiver(rui.htmlReceiverById('selected'));
 
-ui.mouse('mouse').hold()
+electric.transformator.hold({ data: {}, type: '' }, ui.mouse('mouse'))
 	.map(function(o: any){
 		return o.type + '<br />' + 'x: ' + o.data.offsetX + '<br /> y: ' + o.data.offsetY;
 	})
@@ -84,17 +86,26 @@ canvas.width = trackpadBox.offsetWidth;
 canvas.height = trackpadBox.offsetHeight
 
 var trackpad = ui.mouse('trackpad');
-electric.receiver.log(trackpad);
-var xy = trackpad
-    .hold({data: {}})
-	.map(function(o: any){
+var xy = electric.transformator.hold({type: '', data: {}}, trackpad)
+	.map(function(o: any) {
 		return { x: o.data.offsetX, y: o.data.offsetY };
 	});
-var downs = trackpad.filter(false, function(o: any){return !o || o.type === 'down'});
-var ups = trackpad.filter(false, function(o: any){return !o || o.type === 'up'});
 
-electric.emitter.constant(false).change(
-    {to: xy, when: downs},
-    {to: electric.emitter.constant(undefined), when: ups}
+var downs = trackpad.map(e => {
+	if (e.happend && e.value.type === 'down') {
+		return eevent.of(true);
+	}
+	return eevent.notHappend;
+});
+var ups = trackpad.map(e => {
+	if (e.happend && e.value.type === 'up') {
+		return eevent.of(true);
+	}
+	return eevent.notHappend;
+});
+
+electric.emitter.constant(undefined).change(
+    { to: xy, when: downs },
+    { to: electric.emitter.constant(undefined), when: ups }
 )
 	.plugReceiver(paint);

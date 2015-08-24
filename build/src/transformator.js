@@ -8,6 +8,14 @@ function map(mapping, emitter1, emitter2, emitter3, emitter4, emitter5, emitter6
 }
 exports.map = map;
 ;
+function mapMany(mapping) {
+    var emitters = [];
+    for (var _i = 1; _i < arguments.length; _i++) {
+        emitters[_i - 1] = arguments[_i];
+    }
+    return namedTransformator('map many<' + emitters.map(function (e) { return e.name; }).join(', ') + '>', emitters, transformators.map(mapping, emitters.length), mapping.apply(null, emitters.map(function (e) { return e.dirtyCurrentValue(); })));
+}
+exports.mapMany = mapMany;
 function filter(initialValue, predicate, emitter1, emitter2, emitter3, emitter4, emitter5, emitter6, emitter7) {
     var emitters = Array.prototype.slice.apply(arguments, [2]);
     return namedTransformator('filter<' + emitters.map(function (e) { return e.name; }).join(', ') + '>', emitters, transformators.filter(predicate, emitters.length), initialValue);

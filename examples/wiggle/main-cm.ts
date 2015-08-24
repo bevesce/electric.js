@@ -1,8 +1,8 @@
 import electric = require('../../src/electric');
 
 function sinBall(fps: number, ball: HTMLElement){
-    electric.clock.clock({intervalInMs: fps}).map(function(v: number){
-    	return Math.sin(v / 1000);
+    electric.clock.time({intervalInMs: fps}).map(function(v){
+    	return Math.sin(v.time / 1000);
     }).plugReceiver(function(v: number){
         var amp = 200;
     	ball.style.left = (amp + (v * amp)) + 'px';

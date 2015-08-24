@@ -12,7 +12,7 @@ export function logReceiver(message: string) {
 
 export function log(emitter: inf.IEmitter<any>) {
 	emitter.plugReceiver((x: any) => {
-		console.log(emitter.name + ' >>> ' + x);
+		console.log(emitter.name + ' >>> ', x);
 	});
 }
 

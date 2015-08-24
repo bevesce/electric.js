@@ -2,6 +2,7 @@ import inf = require('../interfaces');
 import electric = require('../electric');
 import utils = require('../receivers/utils');
 import transformator = require('../transformator');
+import eevent = require('../electric-event');
 
 
 function em(text: any): string {
@@ -14,7 +15,7 @@ export function fromEvent(
 	name = '',
 	useCapture = false
 ) {
-	var e = electric.emitter.manual(undefined);
+	var e = electric.emitter.manualEvent();
 	e.name = name || 'event: ' + type + ' on ' + em(target);
 	var impulse = function(event: any) {
 		e.impulse(event);
@@ -36,7 +37,9 @@ export function fromInputText(nodeOrId: utils.NodeOrId, type = 'keyup') {
 
 export function fromCheckbox(nodeOrId: utils.NodeOrId) {
 	var checkbox = utils.getNode(nodeOrId);
-	return fromEvent(checkbox, 'checked of ' + em(nodeOrId)).map(() => checkbox.checked);
+	var e = fromEvent(checkbox, 'click', 'checked of ' + em(nodeOrId));
+	electric.receiver.collect(e);
+	return e.map(() => checkbox.checked);
 };
 
 interface IKeyValue {
@@ -62,8 +65,8 @@ export function fromCheckboxes(nodeOrIds: utils.NodeOrId[]) {
 			() => ({ key: checkbox.id, value: checkbox.checked })
 		);
 	});
-	var e = transformator.map(
-		function(...args) { return joinObjects(args) },
+	var e = transformator.mapMany(
+		function(...args: any[]) { return joinObjects(args) },
 		...emitters
 	);
 	e.name = 'state of checkboxes ' + em(nodeOrIds)
@@ -74,9 +77,9 @@ export function fromCheckboxes(nodeOrIds: utils.NodeOrId[]) {
 export function fromRadioGroup(nodesOrName: utils.NodesOrName) {
 	var nodes = utils.getNodes(nodesOrName);
 	var emitters = nodes.map(
-		radio => fromEvent(radio, 'click').map((v: string) => v ? radio.id : v)
+		radio => fromEvent(radio, 'click').map((v) => v.happend ? eevent.of(radio.id) : eevent.notHappend)
 	);
-	var e = transformator.hold(transformator.merge(...emitters));
+	var e = transformator.hold('', transformator.merge(...emitters));
 	e.name = 'state of radio group ' + em(nodesOrName);
 	return e;
 }
@@ -89,14 +92,14 @@ export function fromSelect(nodeOrId: utils.NodeOrId) {
 };
 
 
-export function mouse(nodeOrId: utils.NodeOrId) {
+export function mouse(nodeOrId: utils.NodeOrId): inf.IEmitter<eevent<{type: string, data: any}>> {
 	var mouse = utils.getNode(nodeOrId);
 	var emitters = ['down', 'up', 'over', 'out', 'move'].map(
 		type => fromEvent(mouse, 'mouse' + type).map(
-			(e: any) => (e ? {type: type, data: e} : e)
+			(e: any) => (e.happend ? eevent.of({type: type, data: e.value}) : eevent.notHappend)
 		)
 	);
-	var emitter = transformator.merge(...emitters).hold({data: {}});
+	var emitter = transformator.merge(...emitters);
 	emitter.name = 'mouse on ' + em(nodeOrId);
 	return emitter;
 };

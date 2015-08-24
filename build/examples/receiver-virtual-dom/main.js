@@ -1,17 +1,18 @@
 (function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);var f=new Error("Cannot find module '"+o+"'");throw f.code="MODULE_NOT_FOUND",f}var l=n[o]={exports:{}};t[o][0].call(l.exports,function(e){var n=t[o][1][e];return s(n?n:e)},l,l.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(require,module,exports){
+/// <reference path="../../d/viertual-dom.d.ts" />
 var electric = require('../../src/electric');
 var vdom = require('virtual-dom');
-var virtualDomReceiver = require('../../src/receivers/virtual-dom');
+var virtualDomReceiver = require('../../src/receivers/virtual-dom-receiver');
 var h = vdom.h;
 var diff = vdom.diff;
 var patch = vdom.patch;
 var createElement = vdom.create;
 function renderTime(count) {
-    return h('h1', { className: 'test' }, [count]);
+    return h('h1', { className: 'test' }, [count.time]);
 }
 function renderList(list) {
     return h('ul', {}, list.map(function (item) {
-        return h('li', { key: item }, [item]);
+        return h('li', { key: item.time }, [item.time]);
     }));
 }
 function renderApp(time, list) {
@@ -22,179 +23,204 @@ function append(list, item) {
     list.push(item);
     return list;
 }
-time = electric.clock.clock({ intervalInMs: 1000 })
+var time = electric.clock.time({ intervalInMs: 1000 })
     .map(renderTime);
-list = electric.clock.clock({ intervalInMs: 1000 })
+var list = electric.clock.time({ intervalInMs: 1000 })
     .accumulate([], append)
     .map(renderList);
 electric.transformator
     .map(renderApp, time, list)
     .plugReceiver(virtualDomReceiver(document.body));
 
-},{"../../src/electric":4,"../../src/receivers/virtual-dom":9,"virtual-dom":15}],2:[function(require,module,exports){
+},{"../../src/electric":4,"../../src/receivers/virtual-dom-receiver":9,"virtual-dom":18}],2:[function(require,module,exports){
 exports.scheduler = require('./scheduler');
 exports.emitter = require('./emitter');
 exports.transformator = require('./transformator');
-function clock(args) {
-    var e = exports.emitter.manual(exports.scheduler.now());
-    var interval = args.intervalInMs || 1 / args.fps * 1000;
-    exports.scheduler.scheduleInterval(function () { return e.emit(exports.scheduler.now()); }, interval);
+var TimeValue = (function () {
+    function TimeValue(time, value) {
+        this.time = time;
+        this.value = value;
+    }
+    TimeValue.of = function (time, value) {
+        if (value === void 0) { value = undefined; }
+        return new TimeValue(time, value);
+    };
+    TimeValue.lift = function (f) {
+        return function () {
+            var vs = [];
+            for (var _i = 0; _i < arguments.length; _i++) {
+                vs[_i - 0] = arguments[_i];
+            }
+            return TimeValue.of(Math.max.apply(Math, vs.map(function (v) { return v.time; })), f.apply(null, vs.map(function (v) { return v.value; })));
+        };
+    };
+    TimeValue.prototype.map = function (f) {
+        return TimeValue.of(this.time, f(this.value));
+    };
+    return TimeValue;
+})();
+exports.TimeValue = TimeValue;
+function _time(args, transform) {
+    var e = exports.emitter.manual(transform(exports.scheduler.now()));
+    var subname;
+    var interval;
+    if (args.intervalInMs === undefined) {
+        subname = 'fps: ' + args.fps;
+        interval = 1 / args.fps * 1000;
+    }
+    else {
+        subname = 'interval: ' + args.intervalInMs + 'ms';
+        interval = args.intervalInMs;
+    }
+    var id = exports.scheduler.scheduleInterval(function () { return e.emit(transform(exports.scheduler.now())); }, interval);
+    e.name = 'clock<' + subname + '>';
+    function releaseResoueces() {
+        console.log('STAABB');
+        exports.scheduler.unscheduleInterval(id);
+    }
+    e.setReleaseResources(releaseResoueces);
     return e;
 }
-exports.clock = clock;
-function fclock(f, args) {
-    return clock(args).map(function (t) { return ({ time: t, value: f(t) }); });
+function time(args) {
+    return _time(args, function (t) { return TimeValue.of(t, undefined); });
 }
-exports.fclock = fclock;
-function eclock(emitter, args) {
-    var time = clock(args);
-    function timeSampling(emit) {
-        var latestValue;
-        return function (v, i) {
-            if (i == 0) {
-                latestValue = v[0];
-            }
-            else {
-                emit({ time: v[1], value: latestValue });
-            }
-        };
-    }
-    return new exports.transformator.Transformator([emitter, time], timeSampling);
+exports.time = time;
+function timeFunction(f, args, t0) {
+    if (t0 === void 0) { t0 = 0; }
+    return _time(args, function (t) { return (TimeValue.of(t, f(t - t0))); });
 }
-exports.eclock = eclock;
+exports.timeFunction = timeFunction;
+function equalsWithTime(x, y) {
+    return x.time === y.time && x.value === y.value;
+}
 function integral(f) {
-    var initialAcc = { time: exports.scheduler.now(), value: 0, sum: 0 };
+    var initialAcc = { time: exports.scheduler.now(), value: 0, integral: 0 };
     var result = f.accumulate(initialAcc, function (acc, v) {
         var dt = (v.time - acc.time) / 1000;
         return {
             time: v.time,
             value: v.value,
-            sum: acc.sum + (acc.value + v.value) / 2 * dt,
-            dt: dt
+            integral: acc.integral + (acc.value + v.value) / 2 * dt
         };
-    }).map(function (v) { return ({ time: v.time, value: v.sum }); });
-    function equalsWithTime(x, y) {
-        return x.time === y.time && x.value === y.value;
-    }
+    }).map(function (v) { return TimeValue.of(v.time, v.integral); });
     result.setEquals(equalsWithTime);
     return result;
 }
 exports.integral = integral;
-
-},{"./emitter":5,"./scheduler":10,"./transformator":11}],3:[function(require,module,exports){
-var emitter = require('./emitter');
-var receiver = require('./receiver');
-function create(name, createDevice) {
-    function plug(inputsOutputs) {
-        for (var name in inputsOutputs.ins) {
-            if (!inputsOutputs.ins.hasOwnProperty(name)) {
-                return;
-            }
-            ins[name].plugEmitter(inputsOutputs.ins[name]);
+function derivative(f) {
+    var initialAcc = { time: exports.scheduler.now(), value: undefined, derivative: 0 };
+    var result = f.accumulate(initialAcc, function (acc, v) {
+        var dt = (v.time - acc.time) / 1000;
+        var diff = 0;
+        if (dt !== 0) {
+            diff = (v.value - acc.value) / dt / 1000;
         }
-        for (var name in inputsOutputs.outs) {
-            if (!inputsOutputs.outs.hasOwnProperty(name)) {
-                return;
-            }
-            outs[name].plugReceiver(inputsOutputs.outs[name]);
-        }
-    }
-    if (createDevice === undefined) {
-        createDevice = name;
-        name = undefined;
-    }
-    var ins;
-    var outs;
-    createDevice(function (x) { ins = x; }, function (x) { outs = x; });
-    return {
-        name: name,
-        ins: ins,
-        outs: outs,
-        plug: plug,
-        toString: function () { return 'device<' + name + '>'; }
-    };
+        return {
+            time: v.time,
+            value: v.value,
+            derivative: diff
+        };
+    }).map(function (v) { return TimeValue.of(v.time, v.derivative); });
+    result.setEquals(equalsWithTime);
+    return result;
 }
-exports.create = create;
-exports.list = function createListDevice() {
-    return create('list', function (ins, outs) {
-        var constant = emitter.constant;
-        function insert(items, value) {
-            var newItems = items.slice();
-            newItems.push(value);
-            return constant(newItems);
-        }
-        ;
-        function remove(items, index) {
-            var newItems = items.slice();
-            newItems.splice(index, 1);
-            return constant(newItems);
-        }
-        ;
-        function edit(items, index, value) {
-            var newItems = items.slice();
-            newItems[index] = value;
-            return constant(newItems);
-        }
-        var newItem = receiver.hanging();
-        var deleteItem = receiver.hanging();
-        var editItem = receiver.hanging();
-        var items = constant([]).change({ to: function (items, value) { return insert(items, value); }, when: newItem }, { to: function (items, index) { return remove(items, index); }, when: deleteItem }, { to: function (items, newObj) { return edit(items, newObj.index, newObj.value); }, when: editItem });
-        ins({
-            inserts: newItem,
-            deletes: deleteItem,
-            edits: editItem
-        });
-        outs({
-            items: items
-        });
-    });
-};
+exports.derivative = derivative;
 
-},{"./emitter":5,"./receiver":7}],4:[function(require,module,exports){
+},{"./emitter":5,"./scheduler":10,"./transformator":12}],3:[function(require,module,exports){
+var utils = require('./utils');
+var ElectricEvent = (function () {
+    function ElectricEvent() {
+    }
+    ElectricEvent.of = function (value) {
+        return new Happend(value);
+    };
+    ElectricEvent.lift = function (f) {
+        return function () {
+            var vs = [];
+            for (var _i = 0; _i < arguments.length; _i++) {
+                vs[_i - 0] = arguments[_i];
+            }
+            if (utils.all(vs.map(function (v) { return v.happend; }))) {
+                return ElectricEvent.of(f.apply(null, vs.map(function (v) { return v.value; })));
+            }
+            else {
+                return ElectricEvent.notHappend;
+            }
+        };
+    };
+    ElectricEvent.prototype.map = function (f) {
+        throw Error('ElectricEvent is abstract class, use Happend and NotHappend');
+    };
+    ;
+    return ElectricEvent;
+})();
+var Happend = (function () {
+    function Happend(value) {
+        this.happend = true;
+        this.value = value;
+    }
+    Happend.prototype.map = function (f) {
+        return ElectricEvent.of(f(this.value));
+    };
+    return Happend;
+})();
+var NotHappend = (function () {
+    function NotHappend() {
+        this.happend = false;
+        this.value = undefined;
+    }
+    NotHappend.prototype.map = function (f) {
+        return ElectricEvent.notHappend;
+    };
+    return NotHappend;
+})();
+ElectricEvent.notHappend = new NotHappend();
+module.exports = ElectricEvent;
+
+},{"./utils":13}],4:[function(require,module,exports){
 exports.scheduler = require('./scheduler');
-exports.device = require('./device');
 exports.emitter = require('./emitter');
 exports.transformator = require('./transformator');
 exports.receiver = require('./receiver');
 exports.clock = require('./clock');
-exports.fp = require('./fp');
-function lift(f) {
-    return function () {
-        var emitters = [];
-        for (var _i = 0; _i < arguments.length; _i++) {
-            emitters[_i - 0] = arguments[_i];
-        }
-        return exports.transformator.map.apply(exports.transformator, [f].concat(emitters));
-    };
-}
-exports.lift = lift;
+// export import device = require('./device');
+// export import fp = require('./fp');
 
-},{"./clock":2,"./device":3,"./emitter":5,"./fp":6,"./receiver":7,"./scheduler":10,"./transformator":11}],5:[function(require,module,exports){
+},{"./clock":2,"./emitter":5,"./receiver":7,"./scheduler":10,"./transformator":12}],5:[function(require,module,exports){
 var __extends = (this && this.__extends) || function (d, b) {
     for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p];
     function __() { this.constructor = d; }
     __.prototype = b.prototype;
     d.prototype = new __();
 };
-var Transformable = (function () {
-    function Transformable() {
-    }
-    return Transformable;
-})();
-exports.Transformable = Transformable;
-var Emitter = (function (_super) {
-    __extends(Emitter, _super);
+var scheduler = require('./scheduler');
+var transformators = require('./transformator-helpers');
+var eevent = require('./electric-event');
+var Wire = require('./wire');
+exports.placeholder = require('./placeholder');
+var Emitter = (function () {
     function Emitter(initialValue) {
         if (initialValue === void 0) { initialValue = undefined; }
         this._receivers = [];
         this._currentValue = initialValue;
+        this.name = 'emitter';
     }
+    // when reveiver is plugged current value is not emitted to him
+    // instantaneously, but instead it's done asynchronously
     Emitter.prototype.plugReceiver = function (receiver) {
         if (typeof receiver !== 'function' && receiver.wire) {
             receiver = receiver.wire(this);
         }
         this._receivers.push(receiver);
-        this._dispatchToReceiver(this._currentValue, receiver);
+        this._ayncDispatchToReceiver(receiver, this._currentValue);
+        return this._receivers.length - 1;
+    };
+    Emitter.prototype._dirtyPlugReceiver = function (receiver) {
+        if (typeof receiver !== 'function' && receiver.wire) {
+            receiver = receiver.wire(this);
+        }
+        this._receivers.push(receiver);
+        // this._ayncDispatchToReceiver(receiver, this._currentValue);
         return this._receivers.length - 1;
     };
     Emitter.prototype.unplugReceiver = function (receiverOrId) {
@@ -213,24 +239,38 @@ var Emitter = (function (_super) {
         return this._currentValue;
     };
     Emitter.prototype.stabilize = function () {
-        this._emit = this._throwStabilized;
-        this._impulse = this._throwStabilized;
+        this.emit = this._throwStabilized;
+        this.impulse = this._throwStabilized;
         this._releaseResources();
     };
     Emitter.prototype.setReleaseResources = function (releaseResources) {
         this._releaseResources = releaseResources;
     };
     Emitter.prototype._releaseResources = function () {
+        // should be overwritten in more specific emitters
     };
     Emitter.prototype._throwStabilized = function (value) {
         throw Error("can't emit <" + value + "> from " + this.name + ", it's stabilized");
     };
-    Emitter.prototype._emit = function (value) {
+    // semantics:
+    // let's say that f = constant(y).emit(x) is called at t_e
+    // then f(t) = x for t >= t_e, and f(t) = y for t < t_e
+    Emitter.prototype.emit = function (value) {
         if (this._equals(this._currentValue, value)) {
             return;
         }
         this._dispatchToReceivers(value);
         this._currentValue = value;
+    };
+    // semantics:
+    // let's say that f constant(y).impulse(x) is called at t_i
+    // then f(t_i) = x and f(t) = y when t != t_i
+    Emitter.prototype.impulse = function (value) {
+        if (this._equals(this._currentValue, value)) {
+            return;
+        }
+        this._dispatchToReceivers(value);
+        this._dispatchToReceivers(this._currentValue);
     };
     Emitter.prototype._equals = function (x, y) {
         return x === y;
@@ -238,21 +278,14 @@ var Emitter = (function (_super) {
     Emitter.prototype.setEquals = function (equals) {
         this._equals = equals;
     };
-    Emitter.prototype._impulse = function (value) {
-        if (this._currentValue === value) {
-            return;
-        }
-        this._dispatchToReceivers(value);
-        this._dispatchToReceivers(this._currentValue);
-    };
     Emitter.prototype._dispatchToReceivers = function (value) {
         var currentReceivers = this._receivers.slice();
         for (var _i = 0; _i < currentReceivers.length; _i++) {
             var receiver = currentReceivers[_i];
-            this._dispatchToReceiver(value, receiver);
+            this._dispatchToReceiver(receiver, value);
         }
     };
-    Emitter.prototype._dispatchToReceiver = function (value, receiver) {
+    Emitter.prototype._dispatchToReceiver = function (receiver, value) {
         if (typeof receiver === 'function') {
             receiver(value);
         }
@@ -260,20 +293,79 @@ var Emitter = (function (_super) {
             receiver.receive(value);
         }
     };
+    Emitter.prototype._ayncDispatchToReceiver = function (receiver, value) {
+        var _this = this;
+        scheduler.scheduleTimeout(function () { return _this._dispatchToReceiver(receiver, value); }, 0);
+    };
+    // transformators
+    Emitter.prototype.map = function (mapping) {
+        return namedTransformator('map' + this._enclosedName(), [this], transformators.map(mapping, 1), mapping(this._currentValue));
+    };
+    Emitter.prototype.filter = function (initialValue, predicate) {
+        return namedTransformator('filter' + this._enclosedName(), [this], transformators.filter(predicate), initialValue);
+    };
+    Emitter.prototype.filterMap = function (initialValue, mapping) {
+        return namedTransformator('filter' + this._enclosedName(), [this], transformators.filterMap(mapping), initialValue);
+    };
+    Emitter.prototype.transformTime = function (initialValue, timeShift, t0) {
+        if (t0 === void 0) { t0 = 0; }
+        var t = namedTransformator('transform time' + this._enclosedName(), [this], transformators.transformTime(timeShift, t0), initialValue);
+        this._dispatchToReceiver(t._dirtyGetWireTo(this), this.dirtyCurrentValue());
+        return t;
+    };
+    Emitter.prototype.accumulate = function (initialValue, accumulator) {
+        var acc = accumulator(initialValue, this.dirtyCurrentValue());
+        return namedTransformator('accumulate' + this._enclosedName(), [this], transformators.accumulate(acc, accumulator), acc);
+    };
+    Emitter.prototype.merge = function () {
+        var emitters = [];
+        for (var _i = 0; _i < arguments.length; _i++) {
+            emitters[_i - 0] = arguments[_i];
+        }
+        return namedTransformator('merge' + this._enclosedName() + ' with ' + emitters.map(function (e) { return e.name; }).join(', '), [this].concat(emitters), transformators.merge(), this.dirtyCurrentValue());
+    };
+    Emitter.prototype.when = function (switcher) {
+        return namedTransformator('when' + this._enclosedName(), [this], transformators.when(switcher.happens, switcher.then), eevent.notHappend);
+    };
+    Emitter.prototype.sample = function (initialValue, samplingEvent) {
+        var t = namedTransformator('sample' + this._enclosedName() + ' on ' + this._enclosedName(samplingEvent), [this, samplingEvent], transformators.sample(), initialValue);
+        return t;
+    };
+    Emitter.prototype.change = function () {
+        var switchers = [];
+        for (var _i = 0; _i < arguments.length; _i++) {
+            switchers[_i - 0] = arguments[_i];
+        }
+        return namedTransformator('change' + this._enclosedName(), [this].concat(switchers.map(function (s) { return s.when; })), transformators.change(switchers), this._currentValue);
+    };
+    Emitter.prototype._enclosedName = function (emitter) {
+        if (emitter === void 0) { emitter = null; }
+        return '<' + (emitter ? emitter.name : this.name) + '>';
+    };
     return Emitter;
-})(Transformable);
+})();
 exports.Emitter = Emitter;
+function emitter(initialValue) {
+    return new Emitter(initialValue);
+}
+exports.emitter = emitter;
 var ManualEmitter = (function (_super) {
     __extends(ManualEmitter, _super);
     function ManualEmitter() {
         _super.apply(this, arguments);
-        this.emit = this._emit;
-        this.impulse = this._impulse;
     }
+    ManualEmitter.prototype.emit = function (v) {
+        var _this = this;
+        scheduler.scheduleTimeout(function () { return _super.prototype.emit.call(_this, v); }, 0);
+    };
+    ManualEmitter.prototype.impulse = function (v) {
+        var _this = this;
+        scheduler.scheduleTimeout(function () { return _super.prototype.impulse.call(_this, v); }, 0);
+    };
     ManualEmitter.prototype.stabilize = function () {
         _super.prototype.stabilize.call(this);
-        this.emit = this._emit;
-        this.impulse = this._impulse;
+        this.emit = this.emit;
+        this.impulse = this.impulse;
     };
     return ManualEmitter;
 })(Emitter);
@@ -289,11 +381,113 @@ function constant(value) {
     return e;
 }
 exports.constant = constant;
-var Placeholder = (function (_super) {
-    __extends(Placeholder, _super);
-    function Placeholder() {
-        _super.apply(this, arguments);
+function manualEvent() {
+    // manual event emitter should
+    // pack impulsed values into event
+    // and not allow to emit values
+    // it's done by monkey patching ManualEmitter
+    var e = manual(eevent.notHappend);
+    e.name = 'manual event emitter';
+    var oldImpulse = e.impulse;
+    e.impulse = function (v) { return oldImpulse.apply(e, [eevent.of(v)]); };
+    e.emit = function (v) {
+        throw Error("can't emit from event emitter, only impulse");
+    };
+    // monkey patching requires ugly casting...
+    return e;
+}
+exports.manualEvent = manualEvent;
+var Transformator = (function (_super) {
+    __extends(Transformator, _super);
+    function Transformator(emitters, transform, initialValue) {
+        if (transform === void 0) { transform = undefined; }
+        if (initialValue === void 0) { initialValue = undefined; }
+        _super.call(this, initialValue);
+        this._values = Array(emitters.length);
+        ;
+        if (transform) {
+            this.setTransform(transform);
+        }
+        this._wires = [];
+        this.plugEmitters(emitters);
+    }
+    Transformator.prototype.setTransform = function (transform) {
+        var _this = this;
+        this._transform = transform(function (x) { return _this.emit(x); }, function (x) { return _this.impulse(x); });
+    };
+    Transformator.prototype._transform = function (values, index) {
+        // Default implementation that just passes values
+        // Should be overwritten in functions that create Transformators
+        this.emit(values[index]);
+    };
+    Transformator.prototype.plugEmitters = function (emitters) {
+        for (var _i = 0; _i < emitters.length; _i++) {
+            var emitter = emitters[_i];
+            this.wire(emitter);
+        }
+    };
+    Transformator.prototype.plugEmitter = function (emitter) {
+        this.wire(emitter);
+        return this._wires.length - 1;
+    };
+    Transformator.prototype.wire = function (emitter) {
+        var _this = this;
+        var index = this._wires.length;
+        this._wires[index] = new Wire(emitter, this, (function (index) { return function (x) { return _this.receiveOn(x, index); }; })(index), (function (index) { return function (x) { return _this.setOn(x, index); }; })(index));
+        return this._wires[index];
+    };
+    Transformator.prototype._dirtyGetWireTo = function (emitter) {
+        return this._wires.filter(function (w) { return w.input === emitter; })[0];
+    };
+    Transformator.prototype.receiveOn = function (x, index) {
+        this._values[index] = x;
+        this._transform(this._values, index);
+    };
+    Transformator.prototype.setOn = function (x, index) {
+        this._values[index] = x;
+    };
+    return Transformator;
+})(Emitter);
+exports.Transformator = Transformator;
+function namedTransformator(name, emitters, transform, initialValue) {
+    if (transform === void 0) { transform = undefined; }
+    var t = new Transformator(emitters, transform, initialValue);
+    t.name = name;
+    return t;
+}
+exports.namedTransformator = namedTransformator;
+
+},{"./electric-event":3,"./placeholder":6,"./scheduler":10,"./transformator-helpers":11,"./wire":14}],6:[function(require,module,exports){
+// functions that can be simply queued
+var functionsToVoid = [
+    'plugReceiver',
+    'unplugReceiver',
+    'stabilize',
+    'setReleaseResources',
+    'setEquals'
+];
+// functions that should return another placeholder
+var functionsToEmitter = [
+    'plugReceiver',
+    'unplugReceiver',
+    'stabilize',
+    'setReleaseResources',
+    'setEquals',
+    'map',
+    'filter',
+    'filterMap',
+    'transformTime',
+    'accumulate',
+    'sample',
+    'change'
+];
+// function to throw if called before is()
+var functionsToSomething = [];
+var Placeholder = (function () {
+    function Placeholder(initialValue) {
         this._actions = [];
+        this._initialValue = initialValue;
+        this.name = 'placeholder';
     }
     Placeholder.prototype.is = function (emitter) {
         this._emitter = emitter;
@@ -301,200 +495,78 @@ var Placeholder = (function (_super) {
             var action = _a[_i];
             action(this._emitter);
         }
-    };
-    Placeholder.prototype._doOrQueue = function (action) {
-        if (this._emitter) {
-            return action(this._emitter);
+        this._actions = undefined;
+        if (this._emitter._dispatchToReceivers) {
+            this._emitter._dispatchToReceivers(this._emitter.dirtyCurrentValue());
         }
-        else {
-            this._actions.push(action);
-        }
-    };
-    Placeholder.prototype.plugReceiver = function (receiver) {
-        return this._doOrQueue(function (emitter) { return emitter.plugReceiver(receiver); });
-    };
-    ;
-    Placeholder.prototype.unplugReceiver = function (index) {
-        this._doOrQueue(function (emitter) { return emitter.unplugReceiver(index); });
+        this.name = emitter.name;
     };
     Placeholder.prototype.dirtyCurrentValue = function () {
         if (this._emitter) {
             return this._emitter.dirtyCurrentValue();
         }
-        return undefined;
-    };
-    Placeholder.prototype.stabilize = function () {
-        this._doOrQueue(function (emitter) { return emitter.stabilize(index); });
-    };
-    Placeholder.prototype.setReleaseResources = function (releaseResources) {
-        this._doOrQueue(function (emitter) { return emitter.setReleaseResources(releaseResources); });
+        else if (this._initialValue !== undefined) {
+            return this._initialValue;
+        }
+        throw Error('called dirtyCurrentValue() on placeholder without initial value');
     };
     return Placeholder;
-})(Emitter);
-function placeholder() {
-    return new Placeholder();
-}
-exports.placeholder = placeholder;
-
-},{}],6:[function(require,module,exports){
-;
-function curry(f, arity) {
-    arity = arity || 2;
-    function partial(prevArgs) {
-        return function () {
-            var args = [];
-            for (var _i = 0; _i < arguments.length; _i++) {
-                args[_i - 0] = arguments[_i];
-            }
-            var nextArgs = prevArgs.slice();
-            nextArgs.splice.apply(nextArgs, [nextArgs.length, 0].concat(args));
-            if (nextArgs.length >= arity) {
-                return f.apply(void 0, nextArgs);
-            }
-            return partial(nextArgs);
-        };
-    }
-    return partial([]);
-}
-exports.curry = curry;
-;
-function property(name) {
-    return function (obj) {
-        return obj[name];
+})();
+function doOrQueue(name) {
+    return function placeholding() {
+        var args = arguments;
+        if (this._emitter) {
+            this._emitter[name].apply(this._emitter, arguments);
+        }
+        else {
+            this._actions.push(function (emitter) {
+                emitter[name].apply(emitter, args);
+            });
+        }
     };
 }
-exports.property = property;
-;
-function compose(f, g) {
-    return function () {
-        var args = [];
-        for (var _i = 0; _i < arguments.length; _i++) {
-            args[_i - 0] = arguments[_i];
+functionsToVoid.forEach(function (name) {
+    Placeholder.prototype[name] = doOrQueue(name);
+});
+function doOrQueueAndReturnPlaceholder(name) {
+    return function placeholding() {
+        var args = arguments;
+        if (this._emitter) {
+            return this._emitter[name].apply(this._emitter, args);
         }
-        return f(g.apply(void 0, args));
+        else {
+            var p = placeholder();
+            this._actions.push(function (emitter) {
+                p.is(emitter[name].apply(emitter, args));
+            });
+            return p;
+        }
     };
 }
-exports.compose = compose;
-var maybe;
-(function (maybe) {
-    var Just = (function () {
-        function Just(value) {
-            this.value = value;
+functionsToEmitter.forEach(function (name) {
+    Placeholder.prototype[name] = doOrQueueAndReturnPlaceholder(name);
+});
+function doOrThrow(name) {
+    return function placeholding() {
+        var args = arguments;
+        if (this._emitter) {
+            return this._emitter[name].apply(this._emitter, args);
         }
-        Just.prototype.map = function (f) {
-            var result = f(this.flatten());
-            return just(result);
-        };
-        Just.prototype.flatten = function () {
-            return this.value;
-        };
-        Just.prototype.chain = function (f) {
-            return this.map(f).flatten();
-        };
-        return Just;
-    })();
-    function just(value) {
-        return new Just(value);
-    }
-    maybe.just = just;
-    var Nothing = (function () {
-        function Nothing() {
-        }
-        Nothing.prototype.map = function (f) {
-            return maybe.nothing;
-        };
-        Nothing.prototype.bind = function (f) {
-            return maybe.nothing;
-        };
-        Nothing.prototype.flatten = function () {
-            return maybe.nothing;
-        };
-        Nothing.prototype.chain = function (f) {
-            return maybe.nothing;
-        };
-        return Nothing;
-    })();
-    maybe.nothing = new Nothing();
-})(maybe = exports.maybe || (exports.maybe = {}));
-var either;
-(function (either) {
-    var Right = (function () {
-        function Right(value) {
-            this.value = value;
-        }
-        Right.prototype.map = function (f) {
-            var result = f(this.flatten());
-            return right(result);
-        };
-        Right.prototype.flatten = function () {
-            return this.value;
-        };
-        Right.prototype.chain = function (f) {
-            return this.map(f).flatten();
-        };
-        Right.prototype.isRight = function () {
-            return true;
-        };
-        Right.prototype.isLeft = function () {
-            return false;
-        };
-        return Right;
-    })();
-    function right(value) {
-        return new Right(value);
-    }
-    either.right = right;
-    var Left = (function () {
-        function Left(value) {
-            this.value = value;
-        }
-        Left.prototype.map = function (f) {
-            return left(this.value);
-        };
-        Left.prototype.flatten = function () {
-            return left(this.value);
-        };
-        Left.prototype.chain = function (f) {
-            return left(this.value);
-        };
-        Left.prototype.isRight = function () {
-            return false;
-        };
-        Left.prototype.isLeft = function () {
-            return true;
-        };
-        return Left;
-    })();
-    function left(value) {
-        return (new Left(value));
-        // when remove <any> casting:
-        // Neither type 'Left<L, {}>' nor type 'Either<L, R>' is assignable to the other.
-        // Types of property 'flatten' are incompatible.
-        // Type '() => {} | Either<L, {}>' is not assignable to type '() => R | Monad<R>'.
-        // Type '{} | Either<L, {}>' is not assignable to type 'R | Monad<R>'.
-        // Type '{}' is not assignable to type 'R | Monad<R>'.
-        // Type '{}' is not assignable to type 'Monad<R>'.
-        // Property 'flatten' is missing in type '{}'.
-    }
-    either.left = left;
-})(either = exports.either || (exports.either = {}));
+        throw Error('called <' + name + '> on empty placeholder');
+    };
+}
+functionsToSomething.forEach(function (name) {
+    Placeholder.prototype[name] = doOrThrow(name);
+});
+function placeholder(initialValue) {
+    return (new Placeholder(initialValue));
+}
+module.exports = placeholder;
 
 },{}],7:[function(require,module,exports){
-var transformator = require('./transformator');
-function hanging() {
-    return new transformator.Transformator([]);
-}
-exports.hanging = hanging;
-function htmlReceiverById(id) {
-    var element = document.getElementById(id);
-    return function (html) {
-        element.innerHTML = html;
-    };
-}
-exports.htmlReceiverById = htmlReceiverById;
 function logReceiver(message) {
     if (!message) {
-        message = '';
+        message = '<<<';
     }
     return function (x) {
         console.log(message, x);
@@ -502,11 +574,21 @@ function logReceiver(message) {
 }
 exports.logReceiver = logReceiver;
 function log(emitter) {
-    emitter.plugReceiver(logReceiver(emitter.name));
+    emitter.plugReceiver(function (x) {
+        console.log(emitter.name + ' >>> ' + x);
+    });
 }
 exports.log = log;
+function collect(emitter) {
+    var r = [];
+    emitter.plugReceiver(function (x) {
+        r.push(x);
+    });
+    return r;
+}
+exports.collect = collect;
 
-},{"./transformator":11}],8:[function(require,module,exports){
+},{}],8:[function(require,module,exports){
 function getNode(nodeOrId) {
     if (typeof nodeOrId === 'string') {
         return document.getElementById(nodeOrId);
@@ -521,12 +603,13 @@ function getNodes(nodesOfName) {
         return Array.prototype.slice.call(document.getElementsByName(nodesOfName));
     }
     else {
-        return nodeOrId;
+        return nodesOfName;
     }
 }
 exports.getNodes = getNodes;
 
 },{}],9:[function(require,module,exports){
+/// <reference path="../../d/viertual-dom.d.ts" />
 var vdom = require('virtual-dom');
 var utils = require('./utils');
 function virtualDomReceiver(nodeOrId) {
@@ -542,7 +625,7 @@ function virtualDomReceiver(nodeOrId) {
 }
 module.exports = virtualDomReceiver;
 
-},{"./utils":8,"virtual-dom":15}],10:[function(require,module,exports){
+},{"./utils":8,"virtual-dom":18}],10:[function(require,module,exports){
 var stopTime = Date.now();
 var callbacks = {};
 var stopped = false;
@@ -552,6 +635,11 @@ function stop() {
     return stopTime;
 }
 exports.stop = stop;
+function resume() {
+    stopped = false;
+    callbacks = {};
+}
+exports.resume = resume;
 function advance(timeShiftInMiliseconds) {
     if (timeShiftInMiliseconds === void 0) { timeShiftInMiliseconds = 1; }
     if (!stopped) {
@@ -577,8 +665,7 @@ exports.currentTime = currentTime;
 function scheduleTimeout(callback, delayInMs) {
     if (delayInMs === void 0) { delayInMs = 0; }
     if (!stopped) {
-        setTimeout(callback, delayInMs);
-        return;
+        return setTimeout(callback, delayInMs);
     }
     var whenToExecute = stopTime + delayInMs;
     if (delayInMs <= 0) {
@@ -590,18 +677,22 @@ function scheduleTimeout(callback, delayInMs) {
     else {
         callbacks[whenToExecute] = [callback];
     }
+    return callback;
 }
 exports.scheduleTimeout = scheduleTimeout;
 function scheduleInterval(callback, intervalInMs) {
     if (intervalInMs === void 0) { intervalInMs = 0; }
     if (!stopped) {
-        setInterval(callback, intervalInMs);
-        return;
+        return setInterval(callback, intervalInMs);
     }
-    scheduleTimeout(function () {
+    var cancelable = [];
+    function intervalCallback() {
         callback();
-        scheduleInterval(callback, intervalInMs);
-    }, intervalInMs);
+        cancelable.push(scheduleTimeout(intervalCallback, intervalInMs));
+    }
+    var id = scheduleTimeout(intervalCallback, intervalInMs);
+    cancelable.push(id);
+    return cancelable;
 }
 exports.scheduleInterval = scheduleInterval;
 function now() {
@@ -611,372 +702,317 @@ function now() {
     return stopTime;
 }
 exports.now = now;
+function unscheduleInterval(id) {
+    if (!stopped) {
+        return clearInterval(id);
+    }
+    id.forEach(removeFromCallbacks);
+}
+exports.unscheduleInterval = unscheduleInterval;
+function removeFromCallbacks(callback) {
+    for (var k in callbacks) {
+        removeFromCallbacksAtTime(callbacks[k], callback);
+    }
+}
+function removeFromCallbacksAtTime(callbacksAtTime, callback) {
+    var i = callbacksAtTime.indexOf(callback);
+    while (i !== -1) {
+        callbacksAtTime.splice(i, 1);
+        i = callbacksAtTime.indexOf(callback);
+    }
+}
 
 },{}],11:[function(require,module,exports){
-var __extends = (this && this.__extends) || function (d, b) {
-    for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p];
-    function __() { this.constructor = d; }
-    __.prototype = b.prototype;
-    d.prototype = new __();
-};
-var emitter = require('./emitter');
+var utils = require('./utils');
+var Wire = require('./wire');
 var scheduler = require('./scheduler');
-var Transformator = (function (_super) {
-    __extends(Transformator, _super);
-    function Transformator(emitters, transform, initialValue) {
-        if (transform === void 0) { transform = undefined; }
-        if (initialValue === void 0) { initialValue = undefined; }
-        _super.call(this, initialValue);
-        this._values = Array(emitters.length);
-        ;
-        if (transform) {
-            this.setTransform(transform);
-        }
-        this._wires = [];
-        this.plugEmitters(emitters);
-    }
-    Transformator.prototype.wire = function (emitter) {
-        var _this = this;
-        var index = this._wires.length;
-        this._wires[index] = new Wire(emitter, this, (function (index) { return function (x) { return _this.receiveOn(x, index); }; })(index));
-        return this._wires[index];
-    };
-    Transformator.prototype.setTransform = function (transform) {
-        var _this = this;
-        this._transform = transform(function (x) { return _this._emit(x); });
-    };
-    Transformator.prototype._transform = function (values, index) {
-        // Default implementation that just passes values
-        // Should be overwritten in functions that create Transformators
-        this._emit(values[index]);
-    };
-    Transformator.prototype.plugEmitters = function (emitters) {
-        for (var _i = 0; _i < emitters.length; _i++) {
-            var emitter = emitters[_i];
-            this.wire(emitter);
-        }
-    };
-    Transformator.prototype.plugEmitter = function (emitter) {
-        this.wire(emitter);
-        return this._wires.length - 1;
-    };
-    Transformator.prototype.receiveOn = function (x, index) {
-        this._values[index] = x;
-        this._transform(this._values, index);
-    };
-    return Transformator;
-})(emitter.Emitter);
-exports.Transformator = Transformator;
-var Wire = (function () {
-    function Wire(input, output, receive) {
-        this.input = input;
-        this.output = output;
-        this.receive = receive;
-        this.receiverId = this.input.plugReceiver(this);
-    }
-    Wire.prototype.unplug = function () {
-        this.input.unplugReceiver(this.receiverId);
-        this.input = undefined;
-        this.output = undefined;
-    };
-    return Wire;
-})();
-function generic(emitters, transform) {
-    if (transform === void 0) { transform = undefined; }
-    return new Transformator(emitters, transform);
-}
-exports.generic = generic;
-;
-function namedTransformator(name, emitters, transform, initialValue) {
-    if (transform === void 0) { transform = undefined; }
-    var t = new Transformator(emitters, transform, initialValue);
-    t.name = name;
-    return t;
-}
-function map(mapping) {
-    var emitters = [];
-    for (var _i = 1; _i < arguments.length; _i++) {
-        emitters[_i - 1] = arguments[_i];
-    }
-    function transform(emit) {
+var eevent = require('./electric-event');
+function map(f, noOfEmitters) {
+    return function mapTransform(emit) {
         return function mapTransform(v, i) {
-            emit(mapping.apply(null, v));
+            emit(f.apply(null, v));
         };
-    }
-    return namedTransformator('map', emitters, transform);
+    };
 }
 exports.map = map;
-;
-emitter.Emitter.prototype.map = function mapWith(mapping) {
-    return map(mapping, this);
-};
-function filter(initialValue, predicate) {
-    var emitters = [];
-    for (var _i = 2; _i < arguments.length; _i++) {
-        emitters[_i - 2] = arguments[_i];
-    }
-    function transform(emit) {
+function filter(predicate, noOfEmitters) {
+    if (noOfEmitters === void 0) { noOfEmitters = 1; }
+    return function transform(emit) {
+        var eaten = 0;
         return function filterTransform(v, i) {
-            if (predicate(v[i])) {
+            if (predicate.apply(null, v)) {
                 emit(v[i]);
             }
         };
-    }
-    return namedTransformator('filter', emitters, transform, initialValue);
+    };
 }
 exports.filter = filter;
 ;
-emitter.Emitter.prototype.filter = function filterBy(initialValue, predicate) {
-    return filter(initialValue, predicate, this);
-};
+function filterMap(mapping, noOfEmitters) {
+    if (noOfEmitters === void 0) { noOfEmitters = 1; }
+    return function transform(emit) {
+        var eaten = 0;
+        return function filterMapTransform(v, i) {
+            var result = mapping.apply(null, v);
+            if (result !== undefined) {
+                emit(result);
+            }
+        };
+    };
+}
+exports.filterMap = filterMap;
+;
 function merge() {
-    var emitters = [];
-    for (var _i = 0; _i < arguments.length; _i++) {
-        emitters[_i - 0] = arguments[_i];
-    }
-    return namedTransformator('merge', emitters, undefined);
+    return function mergeTransform(emit) {
+        var prev;
+        return function mergeTransform(v, i) {
+            if (prev !== v[i]) {
+                emit(v[i]);
+            }
+            prev = v[i];
+        };
+    };
 }
 exports.merge = merge;
-;
-emitter.Emitter.prototype.merge = function mergeWith() {
-    var emitters = [];
-    for (var _i = 0; _i < arguments.length; _i++) {
-        emitters[_i - 0] = arguments[_i];
-    }
-    return merge.apply(void 0, [this].concat(emitters));
-};
-function accumulate(initValue, accumulator) {
-    var emitters = [];
-    for (var _i = 2; _i < arguments.length; _i++) {
-        emitters[_i - 2] = arguments[_i];
-    }
-    var accumulated = initValue;
-    function transform(emit) {
+function accumulate(initialValue, accumulator) {
+    var accumulated = initialValue;
+    return function transform(emit) {
         return function accumulateTransform(v, i) {
-            accumulated = accumulator(accumulated, v[i]);
+            accumulated = accumulator.apply(void 0, [accumulated].concat(v));
             emit(accumulated);
         };
-    }
-    return namedTransformator('accumulate', emitters, transform);
+    };
 }
 exports.accumulate = accumulate;
 ;
-emitter.Emitter.prototype.accumulate = function accumulateWith(initValue, accumulator) {
-    return accumulate(initValue, accumulator, this);
-};
-function flatten() {
-    var emitters = [];
-    for (var _i = 0; _i < arguments.length; _i++) {
-        emitters[_i - 0] = arguments[_i];
-    }
-    var transformator = new Transformator([]);
-    function transform(emit) {
-        return function flattenTransform(v, i) {
-            transformator.plugEmitter(v[i]);
+function transformTime(timeTransformation, t0) {
+    // var firstEmitted = false;
+    return function transform(emit) {
+        return function timeTransform(v, i) {
+            var delay = timeTransformation(scheduler.now() - t0) + t0 - scheduler.now();
+            var toEmit = v[i];
+            scheduler.scheduleTimeout(function () {
+                emit(toEmit);
+            }, delay);
         };
-    }
-    ;
-    new Transformator(emitters, transform);
-    transformator.name = 'flatten';
-    return transformator;
+    };
 }
-exports.flatten = flatten;
-;
-emitter.Emitter.prototype.flatten = function () {
-    return flatten(this);
-};
-function sample(sampled) {
-    var samplers = [];
-    for (var _i = 1; _i < arguments.length; _i++) {
-        samplers[_i - 1] = arguments[_i];
-    }
-    function transform(emit) {
+exports.transformTime = transformTime;
+function sample() {
+    return function transform(emit) {
         return function sampleTransform(v, i) {
-            if (i > 0) {
+            if (i > 0 && v[i].happend) {
                 emit(v[0]);
             }
         };
-    }
-    ;
-    var emitters = samplers.slice();
-    emitters.splice(0, 0, sampled);
-    return namedTransformator('sample', emitters, transform);
+    };
 }
 exports.sample = sample;
 ;
-emitter.Emitter.prototype.sampleBy = function () {
-    var emitters = [];
-    for (var _i = 0; _i < arguments.length; _i++) {
-        emitters[_i - 0] = arguments[_i];
-    }
-    return sample.apply(void 0, [this].concat(emitters));
-};
-function throttle(deylayInMiliseconds) {
-    var emitters = [];
-    for (var _i = 1; _i < arguments.length; _i++) {
-        emitters[_i - 1] = arguments[_i];
-    }
-    function transform(emit) {
-        var accumulated = [];
-        var accumulating = false;
-        return function throttleTransform(v, i) {
-            accumulated.push(v[i]);
-            if (!accumulating) {
-                accumulating = true;
-                scheduler.scheduleTimeout(function () {
-                    emit(accumulated);
-                    accumulating = false;
-                    accumulated = [];
-                }, deylayInMiliseconds);
-            }
-        };
-    }
-    ;
-    return namedTransformator('throttle', emitters, transform, []);
-}
-exports.throttle = throttle;
-;
-emitter.Emitter.prototype.throttle = function (deylayInMiliseconds) {
-    return throttle(deylayInMiliseconds, this);
-};
-// export function dropRepeats<InOut>(
-// 	...emitters: inf.IEmitter<InOut>[]
-// ) {
-// 	var lastValue: InOut;
-// 	function transform(emit: inf.IEmitterFunction<InOut>) {
-// 		return function dropRepeatsTransform(v: InOut[], i: Identifier) {
-// 			if (v[i] !== lastValue) {
-// 				emit(v[i]);
-// 				lastValue = v[i];
-// 			}
-// 		};
-// 	};
-// 	return namedTransformator('drop repeats', emitters, transform);
-// };
-// (<any>emitter.Emitter.prototype).dropRepeats = function() {
-// 	return dropRepeats(this);
-// };
-function callIfFunction(obj, arg1, arg2) {
-    if (typeof obj === 'function') {
-        return obj(arg1, arg2);
-    }
-    else {
-        return obj;
-    }
-}
-function change(switchers, emitter) {
-    function transform(emit) {
+function change(switchers) {
+    return function transform(emit) {
         return function changeTransform(v, i) {
             var _this = this;
             if (i == 0) {
                 emit(v[0]);
             }
-            else if (v[i] !== undefined) {
+            else if (v[i].happend) {
                 var to = switchers[i - 1].to;
-                var e = callIfFunction(to, v[0], v[i]);
+                var e = utils.callIfFunction(to, v[0], v[i].value);
                 this._wires[0].unplug();
                 this._wires[0] = new Wire(e, this, function (x) { return _this.receiveOn(x, 0); });
             }
         };
-    }
-    var allEmitters = switchers.map(function (s) { return s.when; });
-    allEmitters.splice(0, 0, emitter);
-    return namedTransformator('change', allEmitters, transform);
+    };
 }
 exports.change = change;
-emitter.Emitter.prototype.change = function changeToWhen() {
-    var switchers = [];
-    for (var _i = 0; _i < arguments.length; _i++) {
-        switchers[_i - 0] = arguments[_i];
-    }
-    return change(switchers, this);
-};
-function changes() {
+function when(happend, then) {
+    return function transform(emit, impulse) {
+        return function whenTransform(v, i) {
+            if (happend(v[i])) {
+                impulse(eevent.of(then(v[i])));
+            }
+        };
+    };
+}
+exports.when = when;
+function cumulateOverTime(delayInMiliseconds) {
+    return function transform(emit, impulse) {
+        var accumulated = [];
+        var accumulating = false;
+        return function throttleTransform(v, i) {
+            if (!v[i].happend) {
+                return;
+            }
+            accumulated.push(v[i].value);
+            if (!accumulating) {
+                accumulating = true;
+                scheduler.scheduleTimeout(function () {
+                    impulse(eevent.of(accumulated));
+                    accumulating = false;
+                    accumulated = [];
+                }, delayInMiliseconds);
+            }
+        };
+    };
+}
+exports.cumulateOverTime = cumulateOverTime;
+;
+
+},{"./electric-event":3,"./scheduler":10,"./utils":13,"./wire":14}],12:[function(require,module,exports){
+var emitter = require('./emitter');
+var namedTransformator = emitter.namedTransformator;
+var transformators = require('./transformator-helpers');
+var eevent = require('../src/electric-event');
+function map(mapping, emitter1, emitter2, emitter3, emitter4, emitter5, emitter6, emitter7) {
+    var emitters = Array.prototype.slice.apply(arguments, [1]);
+    return namedTransformator('map<' + emitters.map(function (e) { return e.name; }).join(', ') + '>', emitters, transformators.map(mapping, emitters.length), mapping.apply(null, emitters.map(function (e) { return e.dirtyCurrentValue(); })));
+}
+exports.map = map;
+;
+function filter(initialValue, predicate, emitter1, emitter2, emitter3, emitter4, emitter5, emitter6, emitter7) {
+    var emitters = Array.prototype.slice.apply(arguments, [2]);
+    return namedTransformator('filter<' + emitters.map(function (e) { return e.name; }).join(', ') + '>', emitters, transformators.filter(predicate, emitters.length), initialValue);
+}
+exports.filter = filter;
+;
+function filterMap(initialValue, filterMapping, emitter1, emitter2, emitter3, emitter4, emitter5, emitter6, emitter7) {
+    var emitters = Array.prototype.slice.apply(arguments, [2]);
+    return namedTransformator('filterMap<' + emitters.map(function (e) { return e.name; }).join(', ') + '>', emitters, transformators.filterMap(filterMapping, emitters.length), initialValue);
+}
+exports.filterMap = filterMap;
+;
+function accumulate(initialValue, accumulator, emitter1, emitter2, emitter3, emitter4, emitter5, emitter6, emitter7) {
+    var emitters = Array.prototype.slice.apply(arguments, [2]);
+    var acc = accumulator.apply([], [initialValue].concat(emitters.map(function (e) { return e.dirtyCurrentValue(); })));
+    return namedTransformator('accumulate<' + emitters.map(function (e) { return e.name; }).join(', ') + '>', emitters, transformators.accumulate(acc, accumulator), acc);
+}
+exports.accumulate = accumulate;
+function merge() {
     var emitters = [];
     for (var _i = 0; _i < arguments.length; _i++) {
         emitters[_i - 0] = arguments[_i];
     }
-    var previousValue;
-    function transform(emit) {
-        return function changesTransform(v, i) {
-            if (previousValue !== v[i]) {
-                emit({
-                    previous: previousValue,
-                    current: v[i]
-                });
-                previousValue = v[i];
-            }
-        };
-    }
-    return namedTransformator('change', emitters, transform);
+    return namedTransformator('merge<' + emitters.map(function (e) { return e.name; }).join(', ') + '>', emitters, transformators.merge(), emitters[0].dirtyCurrentValue());
 }
-exports.changes = changes;
-;
-emitter.Emitter.prototype.changes = function onlyChanges() {
-    return changes(this);
-};
-function transformTime(initialValue, timeTransformation, t0) {
-    var emitters = [];
-    for (var _i = 3; _i < arguments.length; _i++) {
-        emitters[_i - 3] = arguments[_i];
-    }
-    var firstEmitted = false;
+exports.merge = merge;
+function cumulateOverTime(emitter, overInMs) {
+    return namedTransformator('cumulate<' + emitter + '> over ' + overInMs + 'ms', [emitter], transformators.cumulateOverTime(overInMs), eevent.notHappend);
+}
+exports.cumulateOverTime = cumulateOverTime;
+// what are semantics of flatten!?
+function flatten(emitter) {
+    var transformator = namedTransformator('flatten<' + emitter.name + '>', [emitter, emitter.dirtyCurrentValue()], transform, emitter.dirtyCurrentValue().dirtyCurrentValue());
+    // var transformator = new Transformator([]);
     function transform(emit) {
-        return function timeTransform(v, i) {
-            if (firstEmitted) {
-                var delay = timeTransformation(scheduler.now() - t0) + t0 - scheduler.now();
-                var toEmit = v[i];
-                scheduler.scheduleTimeout(function () { return emit(toEmit); }, delay);
+        return function flattenTransform(v, i) {
+            if (i == 0) {
+                transformator.plugEmitter(v[i]);
+                emit(v[i].dirtyCurrentValue());
             }
             else {
                 emit(v[i]);
-                firstEmitted = true;
             }
         };
     }
-    return namedTransformator('transform time', emitters, transform, initialValue);
+    ;
+    return transformator;
 }
-exports.transformTime = transformTime;
-emitter.Emitter.prototype.transformTime = function transformTimeWith(initialValue, timeTransformation, t0) {
-    var t0 = t0 || 0;
-    return transformTime(initialValue, timeTransformation, t0, this);
-};
-function hold(initialValue) {
-    var emitters = [];
-    for (var _i = 1; _i < arguments.length; _i++) {
-        emitters[_i - 1] = arguments[_i];
-    }
+exports.flatten = flatten;
+;
+function hold(initialValue, emitter) {
     function transform(emit) {
         return function holdTransform(v, i) {
-            if (v[i] !== undefined) {
-                emit(v[i]);
+            if (v[i].happend) {
+                emit(v[i].value);
             }
         };
     }
-    return namedTransformator('filter', emitters, transform, initialValue);
+    return namedTransformator('hold<' + emitter.name + '>', [emitter], transform, initialValue);
 }
 exports.hold = hold;
 ;
-emitter.Emitter.prototype.hold = function holdValueOf(initialValue) {
-    return hold(initialValue, this);
-};
 
-},{"./emitter":5,"./scheduler":10}],12:[function(require,module,exports){
+},{"../src/electric-event":3,"./emitter":5,"./transformator-helpers":11}],13:[function(require,module,exports){
+function callIfFunction(obj) {
+    var args = [];
+    for (var _i = 1; _i < arguments.length; _i++) {
+        args[_i - 1] = arguments[_i];
+    }
+    if (typeof obj === 'function') {
+        return obj.apply(null, args);
+    }
+    else {
+        return obj;
+    }
+}
+exports.callIfFunction = callIfFunction;
+function any(list) {
+    for (var i = 0; i < list.length; i++) {
+        if (list[i]) {
+            return true;
+        }
+    }
+    return false;
+}
+exports.any = any;
+function all(list) {
+    for (var i = 0; i < list.length; i++) {
+        if (!list[i]) {
+            return false;
+        }
+    }
+    return true;
+}
+exports.all = all;
+
+},{}],14:[function(require,module,exports){
+var Wire = (function () {
+    function Wire(input, output, receive, set) {
+        this.input = input;
+        this.output = output;
+        if (set) {
+            this._set = set;
+            this._futureReceive = receive;
+        }
+        else {
+            this.receive = receive;
+        }
+        this.receiverId = this.input.plugReceiver(this);
+    }
+    Wire.prototype.receive = function (x) {
+        this._set(x);
+        this._set = undefined;
+        this.receive = this._futureReceive;
+        this._futureReceive = undefined;
+    };
+    Wire.prototype.unplug = function () {
+        if (this.input) {
+            this.input.unplugReceiver(this.receiverId);
+        }
+        this.input = undefined;
+        this.output = undefined;
+    };
+    return Wire;
+})();
+module.exports = Wire;
+
+},{}],15:[function(require,module,exports){
 var createElement = require("./vdom/create-element.js")
 
 module.exports = createElement
 
-},{"./vdom/create-element.js":25}],13:[function(require,module,exports){
+},{"./vdom/create-element.js":28}],16:[function(require,module,exports){
 var diff = require("./vtree/diff.js")
 
 module.exports = diff
 
-},{"./vtree/diff.js":45}],14:[function(require,module,exports){
+},{"./vtree/diff.js":48}],17:[function(require,module,exports){
 var h = require("./virtual-hyperscript/index.js")
 
 module.exports = h
 
-},{"./virtual-hyperscript/index.js":32}],15:[function(require,module,exports){
+},{"./virtual-hyperscript/index.js":35}],18:[function(require,module,exports){
 var diff = require("./diff.js")
 var patch = require("./patch.js")
 var h = require("./h.js")
@@ -993,7 +1029,7 @@ module.exports = {
     VText: VText
 }
 
-},{"./create-element.js":12,"./diff.js":13,"./h.js":14,"./patch.js":23,"./vnode/vnode.js":41,"./vnode/vtext.js":43}],16:[function(require,module,exports){
+},{"./create-element.js":15,"./diff.js":16,"./h.js":17,"./patch.js":26,"./vnode/vnode.js":44,"./vnode/vtext.js":46}],19:[function(require,module,exports){
 /*!
  * Cross-Browser Split 1.1.1
  * Copyright 2007-2012 Steven Levithan <stevenlevithan.com>
@@ -1101,7 +1137,7 @@ module.exports = (function split(undef) {
   return self;
 })();
 
-},{}],17:[function(require,module,exports){
+},{}],20:[function(require,module,exports){
 'use strict';
 
 var OneVersionConstraint = require('individual/one-version');
@@ -1123,7 +1159,7 @@ function EvStore(elem) {
     return hash;
 }
 
-},{"individual/one-version":19}],18:[function(require,module,exports){
+},{"individual/one-version":22}],21:[function(require,module,exports){
 (function (global){
 'use strict';
 
@@ -1146,7 +1182,7 @@ function Individual(key, value) {
 }
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{}],19:[function(require,module,exports){
+},{}],22:[function(require,module,exports){
 'use strict';
 
 var Individual = require('./index.js');
@@ -1170,7 +1206,7 @@ function OneVersion(moduleName, version, defaultValue) {
     return Individual(key, defaultValue);
 }
 
-},{"./index.js":18}],20:[function(require,module,exports){
+},{"./index.js":21}],23:[function(require,module,exports){
 (function (global){
 var topLevel = typeof global !== 'undefined' ? global :
     typeof window !== 'undefined' ? window : {}
@@ -1189,14 +1225,14 @@ if (typeof document !== 'undefined') {
 }
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"min-document":46}],21:[function(require,module,exports){
+},{"min-document":49}],24:[function(require,module,exports){
 "use strict";
 
 module.exports = function isObject(x) {
 	return typeof x === "object" && x !== null;
 };
 
-},{}],22:[function(require,module,exports){
+},{}],25:[function(require,module,exports){
 var nativeIsArray = Array.isArray
 var toString = Object.prototype.toString
 
@@ -1206,12 +1242,12 @@ function isArray(obj) {
     return toString.call(obj) === "[object Array]"
 }
 
-},{}],23:[function(require,module,exports){
+},{}],26:[function(require,module,exports){
 var patch = require("./vdom/patch.js")
 
 module.exports = patch
 
-},{"./vdom/patch.js":28}],24:[function(require,module,exports){
+},{"./vdom/patch.js":31}],27:[function(require,module,exports){
 var isObject = require("is-object")
 var isHook = require("../vnode/is-vhook.js")
 
@@ -1310,7 +1346,7 @@ function getPrototype(value) {
     }
 }
 
-},{"../vnode/is-vhook.js":36,"is-object":21}],25:[function(require,module,exports){
+},{"../vnode/is-vhook.js":39,"is-object":24}],28:[function(require,module,exports){
 var document = require("global/document")
 
 var applyProperties = require("./apply-properties")
@@ -1358,7 +1394,7 @@ function createElement(vnode, opts) {
     return node
 }
 
-},{"../vnode/handle-thunk.js":34,"../vnode/is-vnode.js":37,"../vnode/is-vtext.js":38,"../vnode/is-widget.js":39,"./apply-properties":24,"global/document":20}],26:[function(require,module,exports){
+},{"../vnode/handle-thunk.js":37,"../vnode/is-vnode.js":40,"../vnode/is-vtext.js":41,"../vnode/is-widget.js":42,"./apply-properties":27,"global/document":23}],29:[function(require,module,exports){
 // Maps a virtual DOM tree onto a real DOM tree in an efficient manner.
 // We don't want to read all of the DOM nodes in the tree so we use
 // the in-order tree indexing to eliminate recursion down certain branches.
@@ -1445,7 +1481,7 @@ function ascending(a, b) {
     return a > b ? 1 : -1
 }
 
-},{}],27:[function(require,module,exports){
+},{}],30:[function(require,module,exports){
 var applyProperties = require("./apply-properties")
 
 var isWidget = require("../vnode/is-widget.js")
@@ -1598,7 +1634,7 @@ function replaceRoot(oldRoot, newRoot) {
     return newRoot;
 }
 
-},{"../vnode/is-widget.js":39,"../vnode/vpatch.js":42,"./apply-properties":24,"./update-widget":29}],28:[function(require,module,exports){
+},{"../vnode/is-widget.js":42,"../vnode/vpatch.js":45,"./apply-properties":27,"./update-widget":32}],31:[function(require,module,exports){
 var document = require("global/document")
 var isArray = require("x-is-array")
 
@@ -1680,7 +1716,7 @@ function patchIndices(patches) {
     return indices
 }
 
-},{"./create-element":25,"./dom-index":26,"./patch-op":27,"global/document":20,"x-is-array":22}],29:[function(require,module,exports){
+},{"./create-element":28,"./dom-index":29,"./patch-op":30,"global/document":23,"x-is-array":25}],32:[function(require,module,exports){
 var isWidget = require("../vnode/is-widget.js")
 
 module.exports = updateWidget
@@ -1697,7 +1733,7 @@ function updateWidget(a, b) {
     return false
 }
 
-},{"../vnode/is-widget.js":39}],30:[function(require,module,exports){
+},{"../vnode/is-widget.js":42}],33:[function(require,module,exports){
 'use strict';
 
 var EvStore = require('ev-store');
@@ -1726,7 +1762,7 @@ EvHook.prototype.unhook = function(node, propertyName) {
     es[propName] = undefined;
 };
 
-},{"ev-store":17}],31:[function(require,module,exports){
+},{"ev-store":20}],34:[function(require,module,exports){
 'use strict';
 
 module.exports = SoftSetHook;
@@ -1745,7 +1781,7 @@ SoftSetHook.prototype.hook = function (node, propertyName) {
     }
 };
 
-},{}],32:[function(require,module,exports){
+},{}],35:[function(require,module,exports){
 'use strict';
 
 var isArray = require('x-is-array');
@@ -1884,7 +1920,7 @@ function errorString(obj) {
     }
 }
 
-},{"../vnode/is-thunk":35,"../vnode/is-vhook":36,"../vnode/is-vnode":37,"../vnode/is-vtext":38,"../vnode/is-widget":39,"../vnode/vnode.js":41,"../vnode/vtext.js":43,"./hooks/ev-hook.js":30,"./hooks/soft-set-hook.js":31,"./parse-tag.js":33,"x-is-array":22}],33:[function(require,module,exports){
+},{"../vnode/is-thunk":38,"../vnode/is-vhook":39,"../vnode/is-vnode":40,"../vnode/is-vtext":41,"../vnode/is-widget":42,"../vnode/vnode.js":44,"../vnode/vtext.js":46,"./hooks/ev-hook.js":33,"./hooks/soft-set-hook.js":34,"./parse-tag.js":36,"x-is-array":25}],36:[function(require,module,exports){
 'use strict';
 
 var split = require('browser-split');
@@ -1940,7 +1976,7 @@ function parseTag(tag, props) {
     return props.namespace ? tagName : tagName.toUpperCase();
 }
 
-},{"browser-split":16}],34:[function(require,module,exports){
+},{"browser-split":19}],37:[function(require,module,exports){
 var isVNode = require("./is-vnode")
 var isVText = require("./is-vtext")
 var isWidget = require("./is-widget")
@@ -1982,14 +2018,14 @@ function renderThunk(thunk, previous) {
     return renderedThunk
 }
 
-},{"./is-thunk":35,"./is-vnode":37,"./is-vtext":38,"./is-widget":39}],35:[function(require,module,exports){
+},{"./is-thunk":38,"./is-vnode":40,"./is-vtext":41,"./is-widget":42}],38:[function(require,module,exports){
 module.exports = isThunk
 
 function isThunk(t) {
     return t && t.type === "Thunk"
 }
 
-},{}],36:[function(require,module,exports){
+},{}],39:[function(require,module,exports){
 module.exports = isHook
 
 function isHook(hook) {
@@ -1998,7 +2034,7 @@ function isHook(hook) {
        typeof hook.unhook === "function" && !hook.hasOwnProperty("unhook"))
 }
 
-},{}],37:[function(require,module,exports){
+},{}],40:[function(require,module,exports){
 var version = require("./version")
 
 module.exports = isVirtualNode
@@ -2007,7 +2043,7 @@ function isVirtualNode(x) {
     return x && x.type === "VirtualNode" && x.version === version
 }
 
-},{"./version":40}],38:[function(require,module,exports){
+},{"./version":43}],41:[function(require,module,exports){
 var version = require("./version")
 
 module.exports = isVirtualText
@@ -2016,17 +2052,17 @@ function isVirtualText(x) {
     return x && x.type === "VirtualText" && x.version === version
 }
 
-},{"./version":40}],39:[function(require,module,exports){
+},{"./version":43}],42:[function(require,module,exports){
 module.exports = isWidget
 
 function isWidget(w) {
     return w && w.type === "Widget"
 }
 
-},{}],40:[function(require,module,exports){
+},{}],43:[function(require,module,exports){
 module.exports = "2"
 
-},{}],41:[function(require,module,exports){
+},{}],44:[function(require,module,exports){
 var version = require("./version")
 var isVNode = require("./is-vnode")
 var isWidget = require("./is-widget")
@@ -2100,7 +2136,7 @@ function VirtualNode(tagName, properties, children, key, namespace) {
 VirtualNode.prototype.version = version
 VirtualNode.prototype.type = "VirtualNode"
 
-},{"./is-thunk":35,"./is-vhook":36,"./is-vnode":37,"./is-widget":39,"./version":40}],42:[function(require,module,exports){
+},{"./is-thunk":38,"./is-vhook":39,"./is-vnode":40,"./is-widget":42,"./version":43}],45:[function(require,module,exports){
 var version = require("./version")
 
 VirtualPatch.NONE = 0
@@ -2124,7 +2160,7 @@ function VirtualPatch(type, vNode, patch) {
 VirtualPatch.prototype.version = version
 VirtualPatch.prototype.type = "VirtualPatch"
 
-},{"./version":40}],43:[function(require,module,exports){
+},{"./version":43}],46:[function(require,module,exports){
 var version = require("./version")
 
 module.exports = VirtualText
@@ -2136,7 +2172,7 @@ function VirtualText(text) {
 VirtualText.prototype.version = version
 VirtualText.prototype.type = "VirtualText"
 
-},{"./version":40}],44:[function(require,module,exports){
+},{"./version":43}],47:[function(require,module,exports){
 var isObject = require("is-object")
 var isHook = require("../vnode/is-vhook")
 
@@ -2196,7 +2232,7 @@ function getPrototype(value) {
   }
 }
 
-},{"../vnode/is-vhook":36,"is-object":21}],45:[function(require,module,exports){
+},{"../vnode/is-vhook":39,"is-object":24}],48:[function(require,module,exports){
 var isArray = require("x-is-array")
 
 var VPatch = require("../vnode/vpatch")
@@ -2625,6 +2661,6 @@ function appendPatch(apply, patch) {
     }
 }
 
-},{"../vnode/handle-thunk":34,"../vnode/is-thunk":35,"../vnode/is-vnode":37,"../vnode/is-vtext":38,"../vnode/is-widget":39,"../vnode/vpatch":42,"./diff-props":44,"x-is-array":22}],46:[function(require,module,exports){
+},{"../vnode/handle-thunk":37,"../vnode/is-thunk":38,"../vnode/is-vnode":40,"../vnode/is-vtext":41,"../vnode/is-widget":42,"../vnode/vpatch":45,"./diff-props":47,"x-is-array":25}],49:[function(require,module,exports){
 
 },{}]},{},[1]);

@@ -30,11 +30,12 @@ export interface IEmitter<T> {
 	setReleaseResources(releaseResources: () => void): void;
 	setEquals(equals: (x: T, y: T) => boolean): void;
 	// transformators construction
-	map<T, Out>(mapping: (v: T) => Out): IEmitter<Out>;
+	map<NewT>(mapping: (v: T) => NewT): IEmitter<NewT>;
 	filter(initialValue: T, predicate: (v: T) => boolean): IEmitter<T>;
 	filterMap<NewT>(initialValue: T, mapping: (v: T) => NewT | void): IEmitter<NewT>;
 	transformTime(initialValue: T, timeShift: (t: number) => number, t0?: number): IEmitter<T>;
 	accumulate<NewT>(initialValue: NewT, accumulator: (acc: NewT, value: T) => NewT): IEmitter<NewT>;
+	merge(...emitters: IEmitter<T>[]): IEmitter<T>;
 	sample(initialValue: T, samplingEvent: IEmitter<IElectricEvent<any>>): IEmitter<T>;
 	change<S1>(
 	    switcher1: { when: IEmitter<IElectricEvent<S1>>, to: IEmitter<T> | ((t: T, k: S1) => IEmitter<T>) }

@@ -1,14 +1,15 @@
 var electric = require('../../src/electric');
 var ui = require('../../src/emitters/ui');
 var rui = require('../../src/receivers/ui');
+var eevent = require('../../src/electric-event');
 function formatBoolean(value) {
     return value ? '☑ true' : '☐ false';
 }
 var clicks = ui.fromEvent(document.getElementById('clicker'), 'click');
-var deleyedClick = clicks.transformTime(undefined, function (t) { return t + 1000; });
+var deleyedClick = clicks.transformTime(eevent.notHappend, function (t) { return t + 1000; });
 clicks.merge(deleyedClick)
     .accumulate('not clicked', function (acc, x) {
-    if (x === undefined) {
+    if (x.happend) {
         return acc;
     }
     return acc === 'clicked' ? 'not clicked' : 'clicked';
@@ -21,7 +22,7 @@ electric.emitter.constant('not clicked').change({ to: electric.emitter.constant(
 ui.fromInputText('text')
     .plugReceiver(rui.htmlReceiverById('typed'));
 ui.fromCheckbox('checkbox')
-    .map(function (checked) { return formatBoolean(checked); })
+    .map(function (b) { return formatBoolean(b); })
     .plugReceiver(rui.htmlReceiverById('checked'));
 ui.fromCheckboxes(['checkbox0', 'checkbox1', 'checkbox2', 'checkbox3'])
     .map(function (d) {
@@ -39,7 +40,7 @@ ui.fromRadioGroup('radio')
     .plugReceiver(rui.htmlReceiverById('radioed'));
 ui.fromSelect('select')
     .plugReceiver(rui.htmlReceiverById('selected'));
-ui.mouse('mouse').hold()
+electric.transformator.hold({ data: {}, type: '' }, ui.mouse('mouse'))
     .map(function (o) {
     return o.type + '<br />' + 'x: ' + o.data.offsetX + '<br /> y: ' + o.data.offsetY;
 })
@@ -61,13 +62,21 @@ var canvas = document.getElementById('canvas');
 canvas.width = trackpadBox.offsetWidth;
 canvas.height = trackpadBox.offsetHeight;
 var trackpad = ui.mouse('trackpad');
-electric.receiver.log(trackpad);
-var xy = trackpad
-    .hold({ data: {} })
+var xy = electric.transformator.hold({ type: '', data: {} }, trackpad)
     .map(function (o) {
     return { x: o.data.offsetX, y: o.data.offsetY };
 });
-var downs = trackpad.filter(false, function (o) { return !o || o.type === 'down'; });
-var ups = trackpad.filter(false, function (o) { return !o || o.type === 'up'; });
-electric.emitter.constant(false).change({ to: xy, when: downs }, { to: electric.emitter.constant(undefined), when: ups })
+var downs = trackpad.map(function (e) {
+    if (e.happend && e.value.type === 'down') {
+        return eevent.of(true);
+    }
+    return eevent.notHappend;
+});
+var ups = trackpad.map(function (e) {
+    if (e.happend && e.value.type === 'up') {
+        return eevent.of(true);
+    }
+    return eevent.notHappend;
+});
+electric.emitter.constant(undefined).change({ to: xy, when: downs }, { to: electric.emitter.constant(undefined), when: ups })
     .plugReceiver(paint);

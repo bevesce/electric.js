@@ -53,6 +53,18 @@ export function map<In1, In2, In3, In4, In5, In6, In7, Out>(
 	);
 };
 
+export function mapMany<Out>(
+    mapping: (...vs: any[]) => Out,
+    ...emitters: inf.IEmitter<any>[]
+): inf.IEmitter<Out> {
+    return namedTransformator(
+        'map many<' + emitters.map(e => e.name).join(', ') + '>',
+        emitters,
+        transformators.map(mapping, emitters.length),
+        mapping.apply(null, emitters.map(e => e.dirtyCurrentValue()))
+    );
+}
+
 export function filter<InOut>(
     initialValue: InOut,
     predicate: (v1: InOut) => boolean,
