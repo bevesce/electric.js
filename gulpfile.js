@@ -10,6 +10,11 @@ gulp.task('test', function() {
         .pipe(mocha());
 });
 
+gulp.task('test-todomvc', function() {
+    return gulp.src('./build/examples/todomvc/test/*.js', {read: false})
+        .pipe(mocha());
+});
+
 gulp.task('build-test', function() {
 	var tsResult = gulp.src('./test/*.ts')
 		.pipe(typescript({
@@ -40,6 +45,7 @@ gulp.task('build-src', function() {
 gulp.task('build-examples', function() {
 	var tsResult = gulp.src([
 		'./examples/*.ts', './examples/**/*.ts',
+		'./examples/*.ts', './examples/**/js/*.ts',
 		'./examples/*.tsx', './examples/**/*.tsx',
 	])
 		.pipe(typescript({
@@ -66,7 +72,11 @@ gulp.task('server', function() {
 		livereload: true
 	});
 	gulp.watch([
-		'./examples/*.*', './examples/**/*.*', './build/test-in-browser/*.*'
+		'./examples/*.*',
+		'./build/examples/**/*.html',
+		'./build/examples/**/*.css',
+		'./examples/**/*.*',
+		'./build/test-in-browser/*.*'
 	], [
 		'livereload'
 	]);
@@ -76,6 +86,8 @@ gulp.task('livereload', function(){
 	gulp.src([
 		'./examples/*.*',
 		'./examples/**/*.*',
+		'./build/examples/**/*.html',
+		'./build/examples/**/**/*.css',
 		'./build/test-in-browser/*.*',
 	])
 	    .pipe(connect.reload());
@@ -88,4 +100,7 @@ gulp.task('watch', function(){
 	gulp.watch('./build/test/*.js', ['test']);
 	gulp.watch('./test/*.ts', ['build-test']);
 	gulp.watch('./test-in-browser/*.ts', ['build-test-in-browser']);
+
+	gulp.watch('./build/examples/todomvc/test/*.js', ['test-todomvc']);
+
 });

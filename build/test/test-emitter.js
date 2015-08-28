@@ -339,7 +339,7 @@ describe('emitters recursion', function () {
             .andBe(done);
     });
 });
-describe.only('manual event emitter', function () {
+describe('manual event emitter', function () {
     it('should be created with notHappend as initial value', function (done) {
         var e = electric.emitter.manualEvent();
         expect(e)

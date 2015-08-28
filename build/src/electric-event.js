@@ -19,10 +19,33 @@ var ElectricEvent = (function () {
             }
         };
     };
+    ElectricEvent.flatLift = function (f) {
+        return function (v1) {
+            if (v1.happend) {
+                return f(v1.value);
+            }
+            else {
+                return ElectricEvent.notHappend;
+            }
+        };
+    };
+    ElectricEvent.liftOnFirst = function (f) {
+        return function (v1, v2) {
+            if (v1.happend) {
+                return ElectricEvent.of(f(v1.value, v2));
+            }
+            else {
+                return ElectricEvent.notHappend;
+            }
+        };
+    };
     ElectricEvent.prototype.map = function (f) {
         throw Error('ElectricEvent is abstract class, use Happend and NotHappend');
     };
     ;
+    ElectricEvent.prototype.flattenMap = function (f) {
+        throw Error('ElectricEvent is abstract class, use Happend and NotHappend');
+    };
     return ElectricEvent;
 })();
 var Happend = (function () {
@@ -33,6 +56,9 @@ var Happend = (function () {
     Happend.prototype.map = function (f) {
         return ElectricEvent.of(f(this.value));
     };
+    Happend.prototype.flattenMap = function (f) {
+        return f(this.value);
+    };
     return Happend;
 })();
 var NotHappend = (function () {
@@ -41,6 +67,9 @@ var NotHappend = (function () {
         this.value = undefined;
     }
     NotHappend.prototype.map = function (f) {
+        return ElectricEvent.notHappend;
+    };
+    NotHappend.prototype.flattenMap = function (f) {
         return ElectricEvent.notHappend;
     };
     return NotHappend;

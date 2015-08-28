@@ -8,6 +8,7 @@ var expect = chai.expect;
 import electric = require("../src/electric");
 import fromPromise = require("../src/emitters/fromPromise");
 import ui = require("../src/emitters/ui");
+import eevent = require('../src/electric-event');
 
 
 
@@ -41,11 +42,11 @@ describe('emitter from event', function() {
 
     it('should impulse events', function(done) {
         expect(ui.fromEvent(<any>mockTarget, 'click'))
-            .to.emit(undefined)
+            .to.emit(eevent.notHappend)
             .after(() => mockTarget.event(1))
-            .to.emit(1, undefined)
+            .to.emit(eevent.of(1), eevent.notHappend)
             .after(() => mockTarget.event(1))
-            .to.emit(1, undefined)
+            .to.emit(eevent.of(1), eevent.notHappend)
             .andBe(done);
         expect(mockTarget.listeners['click']).to.not.be.undefined;
     });

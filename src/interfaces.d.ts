@@ -19,6 +19,7 @@ export interface IReceiverFunction<T> {
 
 export interface IWire<T> {
 	receive(value: T): void;
+	name: string;
 }
 
 export interface IEmitter<T> {
@@ -37,6 +38,10 @@ export interface IEmitter<T> {
 	accumulate<NewT>(initialValue: NewT, accumulator: (acc: NewT, value: T) => NewT): IEmitter<NewT>;
 	merge(...emitters: IEmitter<T>[]): IEmitter<T>;
 	sample(initialValue: T, samplingEvent: IEmitter<IElectricEvent<any>>): IEmitter<T>;
+	when<NewT>(switcher: {
+		happens: (value: T) => boolean,
+		then: (value: T) => NewT
+	}): IEmitter<IElectricEvent<NewT>>;
 	change<S1>(
 	    switcher1: { when: IEmitter<IElectricEvent<S1>>, to: IEmitter<T> | ((t: T, k: S1) => IEmitter<T>) }
 	): IEmitter<T>;

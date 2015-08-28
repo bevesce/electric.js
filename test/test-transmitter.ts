@@ -13,7 +13,7 @@ describe('transmitter', function() {
 		var t = transmitter('0a');
 		var e1 = electric.emitter.manual('1a');
 		var e2 = electric.emitter.manual('2a');
-
+		var c = electric.receiver.collect(t.map(x => x + '!'));
 		expect(t.map(x => x + '!'))
 			.to.emit('0a!')
 			.then.after(() => t.plugEmitter(e1))

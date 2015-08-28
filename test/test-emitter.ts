@@ -390,7 +390,7 @@ describe('emitters recursion', function() {
     });
 });
 
-describe.only('manual event emitter', function() {
+describe('manual event emitter', function() {
     it('should be created with notHappend as initial value', function(done) {
         var e = electric.emitter.manualEvent();
         expect(e)
@@ -400,7 +400,7 @@ describe.only('manual event emitter', function() {
 
     it('should throw on manual emit', function() {
         var e = electric.emitter.manualEvent();
-        expect(() => e.emit(null)).to.throw(Error);
+        expect(() => (<any>e).emit(null)).to.throw(Error);
     });
 
     it('should impulse values packed in ElectricEvent', function(done) {

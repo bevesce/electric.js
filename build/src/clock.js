@@ -40,7 +40,6 @@ function _time(args, transform) {
     var id = exports.scheduler.scheduleInterval(function () { return e.emit(transform(exports.scheduler.now())); }, interval);
     e.name = 'clock<' + subname + '>';
     function releaseResoueces() {
-        console.log('STAABB');
         exports.scheduler.unscheduleInterval(id);
     }
     e.setReleaseResources(releaseResoueces);

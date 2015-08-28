@@ -46,7 +46,7 @@ export function map<In1, In2, In3, In4, In5, In6, In7, Out>(
 ): inf.IEmitter<Out> {
     var emitters = <inf.IEmitter<any>[]>Array.prototype.slice.apply(arguments, [1]);
     return namedTransformator(
-		'map<' + emitters.map(e => e.name).join(', ') + '>',
+		'map',
 		emitters,
 		transformators.map(mapping, emitters.length),
 		mapping.apply(null, emitters.map(e => e.dirtyCurrentValue()))
@@ -58,7 +58,7 @@ export function mapMany<Out>(
     ...emitters: inf.IEmitter<any>[]
 ): inf.IEmitter<Out> {
     return namedTransformator(
-        'map many<' + emitters.map(e => e.name).join(', ') + '>',
+        'map many',
         emitters,
         transformators.map(mapping, emitters.length),
         mapping.apply(null, emitters.map(e => e.dirtyCurrentValue()))
@@ -114,7 +114,7 @@ export function filter<InOut> (
 ): inf.IEmitter<InOut> {
     var emitters = <inf.IEmitter<any>[]>Array.prototype.slice.apply(arguments, [2]);
     return namedTransformator(
-		'filter<' + emitters.map(e => e.name).join(', ') + '>',
+		'filter',
 		emitters,
 		transformators.filter(predicate, emitters.length),
 		initialValue
@@ -170,7 +170,7 @@ export function filterMap<In1, In2, In3, In4, In5, In6, In7, Out>(
 ): inf.IEmitter<Out> {
     var emitters = <inf.IEmitter<any>[]>Array.prototype.slice.apply(arguments, [2]);
     return namedTransformator(
-		'filterMap<' + emitters.map(e => e.name).join(', ') + '>',
+		'filter map',
 		emitters,
 		transformators.filterMap(filterMapping, emitters.length),
 		initialValue
@@ -228,7 +228,7 @@ export function accumulate<In1, In2, In3, In4, In5, In6, In7, Out>(
     var emitters = <inf.IEmitter<any>[]>Array.prototype.slice.apply(arguments, [2]);
     var acc = accumulator.apply([], [initialValue].concat(emitters.map(e => e.dirtyCurrentValue())));
     return namedTransformator(
-        'accumulate<' + emitters.map(e => e.name).join(', ') + '>',
+        'accumulate',
         emitters,
         transformators.accumulate(acc, accumulator),
         acc
@@ -237,7 +237,7 @@ export function accumulate<In1, In2, In3, In4, In5, In6, In7, Out>(
 
 export function merge<T>(...emitters: inf.IEmitter < T > []): inf.IEmitter < T > {
     return namedTransformator(
-        'merge<' + emitters.map(e => e.name).join(', ') + '>',
+        'merge',
         emitters,
         transformators.merge(),
         emitters[0].dirtyCurrentValue()
@@ -250,7 +250,7 @@ export function cumulateOverTime<T>(
     overInMs: number
 ): inf.IEmitter <eevent<T[]>> {
     return namedTransformator(
-        'cumulate<' + emitter + '> over ' + overInMs + 'ms',
+        'cumulate',
         [emitter],
         transformators.cumulateOverTime(overInMs),
         eevent.notHappend
@@ -262,7 +262,7 @@ export function flatten<InOut>(
     emitter: inf.IEmitter<inf.IEmitter<InOut>>
 ): inf.IEmitter<InOut> {
     var transformator = namedTransformator(
-        'flatten<' + emitter.name + '>',
+        'flatten',
         [emitter, emitter.dirtyCurrentValue()],
         transform,
         emitter.dirtyCurrentValue().dirtyCurrentValue()
@@ -283,8 +283,6 @@ export function flatten<InOut>(
 };
 
 
-
-
 export function hold<InOut>(
 	initialValue: InOut,
 	emitter: inf.IEmitter<eevent<InOut>>
@@ -297,9 +295,34 @@ export function hold<InOut>(
 		}
 	}
     return namedTransformator(
-        'hold<' + emitter.name + '>',
+        'hold',
         [emitter],
         transform,
         initialValue
     );
 };
+
+
+export function changes<InOut>(
+    emitter: inf.IEmitter<InOut>
+): inf.IEmitter<eevent<{ previous: InOut, next: InOut }>> {
+    var previous = emitter.dirtyCurrentValue();
+    function transform(
+        emit: inf.IEmitterFunction<eevent<{ previous: InOut, next: InOut }>>,
+        impulse: inf.IEmitterFunction<eevent<{ previous: InOut, next: InOut }>>
+    ) {
+        return function changesTransform(v: InOut[], i: number) {
+            impulse(eevent.of({
+                previous: previous,
+                next: v[i]
+            }));
+            previous = v[i];
+        }
+    }
+    return namedTransformator(
+        'changes',
+        [emitter],
+        transform,
+        eevent.notHappend
+    )
+}

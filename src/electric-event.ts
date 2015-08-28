@@ -50,30 +50,70 @@ class ElectricEvent<T> implements inf.IElectricEvent<T>{
 		}
 	}
 
+	static flatLift<In1, Out>(
+		f: (v1: In1) => ElectricEvent<Out>
+	): (v1: ElectricEvent<In1>) => ElectricEvent<Out> {
+		return function(v1: ElectricEvent<In1>): ElectricEvent<Out> {
+			if (v1.happend) {
+				return f(v1.value);
+			}
+			else {
+				return ElectricEvent.notHappend;
+			}
+		}
+	}
+
+	static liftOnFirst<In1, In2, Out>(
+		f: (v1: In1, v2: In2) => Out
+	): (v1: ElectricEvent<In1>, v2: In2) => ElectricEvent<Out> {
+		return function(v1: ElectricEvent<In1>, v2: In2): ElectricEvent<Out> {
+			if (v1.happend) {
+				return ElectricEvent.of(f(v1.value, v2))
+			}
+			else {
+				return ElectricEvent.notHappend;
+			}
+		}
+	}
+
 	happend: boolean;
 	value: T;
 
 	map<Out>(f: (v: T) => Out): ElectricEvent<Out> {
 		throw Error('ElectricEvent is abstract class, use Happend and NotHappend')
 	};
+
+	flattenMap<Out>(f: (v: T) => ElectricEvent<Out>): ElectricEvent<Out> {
+		throw Error('ElectricEvent is abstract class, use Happend and NotHappend')
+	}
 }
 
 class Happend<T> implements ElectricEvent<T> {
 	value: T;
 	happend = true;
+
 	constructor(value: T) {
 		this.value = value;
 	}
+
 	map<Out>(f: (v: T) => Out): ElectricEvent<Out> {
 		return ElectricEvent.of(f(this.value));
 	}
 
+	flattenMap<Out>(f: (v: T) => ElectricEvent<Out>): ElectricEvent<Out> {
+		return f(this.value);
+	}
 }
 
 class NotHappend<T> implements ElectricEvent<T> {
 	happend = false;
 	value: T = undefined;
+
 	map<Out>(f: (v: T) => Out): ElectricEvent<Out> {
+		return ElectricEvent.notHappend;
+	}
+
+	flattenMap<Out>(f: (v: T) => ElectricEvent<Out>): ElectricEvent<Out> {
 		return ElectricEvent.notHappend;
 	}
 }

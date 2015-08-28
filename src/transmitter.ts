@@ -14,11 +14,18 @@ class Transmitter<In>
 		);
 		return this._wires[index];
 	}
+
+	dropEmitters() {
+		this._wires.forEach(w => w.input.stabilize());
+		this._wires = [];
+	}
 }
 
 
 function transmitter<T>(initialValue: T) {
-	return new Transmitter([], undefined, initialValue);
+	var t = new Transmitter([], undefined, initialValue);
+	t.name = '?| transmitter |>'
+	return t;
 }
 
 export = transmitter;

@@ -17,9 +17,15 @@ var Transmitter = (function (_super) {
         this._wires[index] = new Wire(emitter, this, (function (index) { return function (x) { return _this.receiveOn(x, index); }; })(index));
         return this._wires[index];
     };
+    Transmitter.prototype.dropEmitters = function () {
+        this._wires.forEach(function (w) { return w.input.stabilize(); });
+        this._wires = [];
+    };
     return Transmitter;
 })(emitter.Transformator);
 function transmitter(initialValue) {
-    return new Transmitter([], undefined, initialValue);
+    var t = new Transmitter([], undefined, initialValue);
+    t.name = '?| transmitter |>';
+    return t;
 }
 module.exports = transmitter;

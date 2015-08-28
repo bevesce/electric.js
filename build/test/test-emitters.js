@@ -6,6 +6,7 @@ electricKettle.pourAsync(chai);
 var expect = chai.expect;
 var fromPromise = require("../src/emitters/fromPromise");
 var ui = require("../src/emitters/ui");
+var eevent = require('../src/electric-event');
 describe('emitter from event', function () {
     var mockTarget = {
         listeners: {},
@@ -35,11 +36,11 @@ describe('emitter from event', function () {
     });
     it('should impulse events', function (done) {
         expect(ui.fromEvent(mockTarget, 'click'))
-            .to.emit(undefined)
+            .to.emit(eevent.notHappend)
             .after(function () { return mockTarget.event(1); })
-            .to.emit(1, undefined)
+            .to.emit(eevent.of(1), eevent.notHappend)
             .after(function () { return mockTarget.event(1); })
-            .to.emit(1, undefined)
+            .to.emit(eevent.of(1), eevent.notHappend)
             .andBe(done);
         expect(mockTarget.listeners['click']).to.not.be.undefined;
     });

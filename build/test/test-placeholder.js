@@ -68,7 +68,7 @@ describe('emitter placeholder', function () {
 });
 describe('placeholder in recursion', function () {
     it('should pass receivers to what it is even if receiver was plugged before is', function (done) {
-        var p = placeholder();
+        var p = placeholder(0);
         var emitter = electric.emitter.manual(0);
         var m = p.map(function (x) { return x; });
         p.is(emitter);
@@ -91,7 +91,7 @@ describe('placeholder in recursion', function () {
     });
     it('should allow recursion', function (done) {
         var mouseclick = electric.emitter.manual(eevent.notHappend);
-        var animationBegins = placeholder();
+        var animationBegins = placeholder(eevent.notHappend);
         var animating = electric.emitter.constant(false).change({ to: electric.emitter.constant(true), when: animationBegins });
         animationBegins.is(transformator.map(function (a, c) { return a ? eevent.notHappend : c; }, animating, mouseclick));
         expect(animating)
@@ -103,8 +103,8 @@ describe('placeholder in recursion', function () {
     it('should allow recursion with time transformation', function (done) {
         var constant = electric.emitter.constant;
         var mouseclick = electric.emitter.manual(eevent.notHappend);
-        var animationBegins = placeholder();
-        var animationEnds = placeholder();
+        var animationBegins = placeholder(eevent.notHappend);
+        var animationEnds = placeholder(eevent.notHappend);
         // start animationg on animationBegins
         // and end on animationEnds (1ms after start)
         // BUT! don't allow another start before end

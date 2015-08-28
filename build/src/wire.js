@@ -2,6 +2,7 @@ var Wire = (function () {
     function Wire(input, output, receive, set) {
         this.input = input;
         this.output = output;
+        this.name = '-w-';
         if (set) {
             this._set = set;
             this._futureReceive = receive;

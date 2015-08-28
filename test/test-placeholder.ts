@@ -79,7 +79,7 @@ describe('emitter placeholder', function() {
 
 describe('placeholder in recursion', function() {
     it('should pass receivers to what it is even if receiver was plugged before is', function(done) {
-        var p = placeholder();
+        var p = placeholder(0);
         var emitter = electric.emitter.manual(0);
         var m = p.map(x => x);
         p.is(emitter);
@@ -104,7 +104,7 @@ describe('placeholder in recursion', function() {
 
     it('should allow recursion', function(done) {
         var mouseclick = electric.emitter.manual(eevent.notHappend);
-        var animationBegins = <inf.IPlaceholder<eevent<any>>>placeholder();
+        var animationBegins = <inf.IPlaceholder<eevent<any>>>placeholder(eevent.notHappend);
         var animating = electric.emitter.constant(false).change(
             { to: electric.emitter.constant(true), when: animationBegins }
         )
@@ -125,8 +125,8 @@ describe('placeholder in recursion', function() {
     it('should allow recursion with time transformation', function(done) {
         var constant = electric.emitter.constant;
         var mouseclick = electric.emitter.manual(eevent.notHappend);
-        var animationBegins = <inf.IPlaceholder<eevent<any>>>placeholder();
-        var animationEnds = <inf.IPlaceholder<eevent<any>>>placeholder();
+        var animationBegins = <inf.IPlaceholder<eevent<any>>>placeholder(eevent.notHappend);
+        var animationEnds = <inf.IPlaceholder<eevent<any>>>placeholder(eevent.notHappend);
 
         // start animationg on animationBegins
         // and end on animationEnds (1ms after start)
@@ -208,4 +208,5 @@ describe('placeholder in recursion', function() {
         	expect(given.value).to.be.within(expected.value - 0.01, expected.value + 0.01);
         }
     });
+
 });

@@ -173,4 +173,17 @@ describe('transformators', function () {
             .to.emit(2)
             .andBe(done);
     });
+    transformator.only('changes', function (done) {
+        var emitter = electric.emitter.manual(0);
+        var changes = t.changes(emitter);
+        expect(changes)
+            .to.emit(eevent.notHappend)
+            .then.after(function () { return emitter.emit(1); })
+            .to.emit(eevent.of({ previous: 0, next: 1 }))
+            .to.emit(eevent.notHappend)
+            .then.after(function () { return emitter.emit(2); })
+            .to.emit(eevent.of({ previous: 1, next: 2 }))
+            .to.emit(eevent.notHappend)
+            .andBe(done);
+    });
 });

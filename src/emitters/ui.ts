@@ -6,7 +6,7 @@ import eevent = require('../electric-event');
 
 
 function em(text: any): string {
-	return '*' + text + '*'
+	return '`' + text + '`'
 }
 
 export function fromEvent(
@@ -15,14 +15,15 @@ export function fromEvent(
 	name = '',
 	useCapture = false
 ) {
-	var e = electric.emitter.manualEvent();
-	e.name = name || 'event: ' + type + ' on ' + em(target);
+	var emitter = electric.emitter.manualEvent();
+	emitter.name = name || '| event: ' + type + ' on ' + em(target) + '|>';
 	var impulse = function(event: any) {
-		e.impulse(event);
+		// event.preventDefault();
+		emitter.impulse(event);
 	}
 	target.addEventListener(type, impulse, useCapture);
-	e.setReleaseResources(() => target.removeEventListener(type, impulse, useCapture));
-	return e;
+	emitter.setReleaseResources(() => target.removeEventListener(type, impulse, useCapture));
+	return emitter;
 }
 
 export function fromButton(nodeOrId: utils.NodeOrId) {
@@ -35,11 +36,36 @@ export function fromInputText(nodeOrId: utils.NodeOrId, type = 'keyup') {
 	return fromEvent(input, 'keyup', 'text of ' + em(nodeOrId)).map(() => input.value);
 }
 
+export function fromInputTextEnter(nodeOrId: utils.NodeOrId): inf.IEmitter<eevent<string>> {
+	var input = utils.getNode(nodeOrId);
+	var e = <electric.emitter.EventEmitter<string>>electric.emitter.manualEvent();
+	e.name = '| enter on ' + em(nodeOrId) + ' |>';
+	var impulse = function(event: any) {
+		if (event.keyCode === 13) {
+			e.impulse(<string>input.value);
+		}
+	}
+	input.addEventListener('keydown', impulse, false);
+	e.setReleaseResources(() => input.removeEventListener('keydown', impulse, false));
+	return e;
+}
+
 export function fromCheckbox(nodeOrId: utils.NodeOrId) {
 	var checkbox = utils.getNode(nodeOrId);
 	var e = fromEvent(checkbox, 'click', 'checked of ' + em(nodeOrId));
-	electric.receiver.collect(e);
 	return e.map(() => checkbox.checked);
+};
+
+export function fromCheckboxEvent(nodeOrId: utils.NodeOrId): inf.IEmitter<eevent<boolean>> {
+	var checkbox = utils.getNode(nodeOrId);
+	var e = <electric.emitter.EventEmitter<boolean>>electric.emitter.manualEvent();
+	e.name = '| click on checkbox ' + nodeOrId + ' |>';
+	var impulse = function(event: any) {
+		e.impulse(checkbox.checked);
+	}
+	checkbox.addEventListener('click', impulse, false);
+	e.setReleaseResources(() => checkbox.removeEventListener('click', impulse, false));
+	return e;
 };
 
 interface IKeyValue {
@@ -73,7 +99,6 @@ export function fromCheckboxes(nodeOrIds: utils.NodeOrId[]) {
 	return e;
 };
 
-
 export function fromRadioGroup(nodesOrName: utils.NodesOrName) {
 	var nodes = utils.getNodes(nodesOrName);
 	var emitters = nodes.map(
@@ -91,7 +116,6 @@ export function fromSelect(nodeOrId: utils.NodeOrId) {
 	).map(() => select.value);
 };
 
-
 export function mouse(nodeOrId: utils.NodeOrId): inf.IEmitter<eevent<{type: string, data: any}>> {
 	var mouse = utils.getNode(nodeOrId);
 	var emitters = ['down', 'up', 'over', 'out', 'move'].map(
@@ -100,6 +124,34 @@ export function mouse(nodeOrId: utils.NodeOrId): inf.IEmitter<eevent<{type: stri
 		)
 	);
 	var emitter = transformator.merge(...emitters);
-	emitter.name = 'mouse on ' + em(nodeOrId);
+	emitter.name = '| mouse on ' + em(nodeOrId) + ' |>';
 	return emitter;
 };
+
+
+var hashEmitter: any = null;
+
+export function hash(): inf.IEmitter<string> {
+	if (!hashEmitter) {
+		hashEmitter = electric.emitter.manual(window.location.hash);
+		hashEmitter.name = '| window.location.hash |>';
+		window.addEventListener('hashchange', () => {
+			hashEmitter.emit(window.location.hash);
+		});
+	}
+	return hashEmitter;
+}
+
+export function enter(nodeOrId: utils.NodeOrId): inf.IEmitter<eevent<any>> {
+	var target = utils.getNode(nodeOrId);
+	var e = electric.emitter.manualEvent();
+	e.name = '| enter on ' + em(nodeOrId) + ' |>';
+	var impulse = function(event: any) {
+		if (event.keyCode === 13) {
+			e.impulse(null);
+		}
+	}
+	target.addEventListener('keydown', impulse, false);
+	e.setReleaseResources(() => target.removeEventListener('keydown', impulse, false));
+	return e;
+}

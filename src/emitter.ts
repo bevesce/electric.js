@@ -6,6 +6,11 @@ import Wire = require('./wire');
 export import placeholder = require('./placeholder');
 
 
+function en(name: string) {
+	return '| ' + name + ' |>'
+}
+
+
 export class Emitter<T>
 	implements inf.IEmitter<T>
 {
@@ -16,7 +21,7 @@ export class Emitter<T>
 	constructor(initialValue: T = undefined) {
 		this._receivers = [];
 		this._currentValue = initialValue;
-		this.name = 'emitter'
+		this.name = en(this.name);
 	}
 
 	// when reveiver is plugged current value is not emitted to him
@@ -117,11 +122,18 @@ export class Emitter<T>
 	}
 
 	protected _dispatchToReceiver(receiver: any, value: T) {
-		if (typeof receiver === 'function'){
+		if (typeof receiver === 'function') {
 			receiver(value);
 		}
 		else {
 			receiver.receive(value);
+		}
+	}
+
+	private _ayncDispatchToReceivers(value: T) {
+		var currentReceivers = this._receivers.slice();
+		for (var receiver of currentReceivers) {
+			this._ayncDispatchToReceiver(receiver, value);
 		}
 	}
 
@@ -196,12 +208,14 @@ export class Emitter<T>
 		happens: (value: T) => boolean,
 		then: (value: T) => NewT
 	}): inf.IEmitter<eevent<NewT>> {
-		return namedTransformator(
+		var currentValue = this.dirtyCurrentValue();
+		var t = namedTransformator(
 			'when' + this._enclosedName(),
 			[this],
 			transformators.when(switcher.happens, switcher.then),
 			eevent.notHappend
 		);
+		return t;
 	}
 
 	sample(initialValue: T, samplingEvent: inf.IEmitter<eevent<any>>): inf.IEmitter<T> {
@@ -295,13 +309,13 @@ class ManualEmitter<Out>
 
 export function manual<T>(initialValue: T): ManualEmitter<T> {
 	var e = new ManualEmitter(initialValue);
-	e.name = 'manual emitter';
+	e.name = en('manual')
 	return e;
 }
 
 export function constant<T>(value: T): inf.IEmitter<T> {
 	var e = new Emitter(value);
-	e.name = 'constant(' + value + ')';
+	e.name = en('constant *' + value + '*');
 	return e;
 }
 
@@ -317,7 +331,7 @@ export function manualEvent<T>(): EventEmitter<T> {
 	// and not allow to emit values
 	// it's done by monkey patching ManualEmitter
 	var e = manual(eevent.notHappend);
-	e.name = 'manual event emitter';
+	e.name = en('manual event');
 	var oldImpulse = e.impulse;
 	(<any>e).impulse = (v: T) => oldImpulse.apply(e, [eevent.of(v)]);
 	(<any>e).emit = (v: T) => {
@@ -354,6 +368,7 @@ export class Transformator<In>
 		initialValue: any = undefined
 	) {
 		super(initialValue);
+		this.name = '<| transformator |>'
 		this._values = Array(emitters.length);;
 		if (transform) {
 			this.setTransform(transform);
@@ -376,13 +391,15 @@ export class Transformator<In>
 	}
 
 	private plugEmitters(emitters: Array<inf.IEmitter<In>>) {
-		for (var emitter of emitters) {
-			this.wire(emitter);
+		emitters.forEach(e => this.wire(e));
+		for (var i = 0; i < emitters.length; i++) {
+			this._values[i] = emitters[i].dirtyCurrentValue();
 		}
 	}
 
 	plugEmitter(emitter: inf.IEmitter<In>) {
 		this.wire(emitter);
+		this._values[this._wires.length - 1] = emitter.dirtyCurrentValue();
 		return this._wires.length - 1;
 	}
 
@@ -401,13 +418,13 @@ export class Transformator<In>
 		return this._wires.filter(w => w.input === emitter)[0];
 	}
 
-	protected receiveOn(x: In, index: number) {
-		this._values[index] = x;
+	protected receiveOn(value: In, index: number) {
+		this._values[index] = value;
 		this._transform(this._values, index);
 	}
 
-	protected setOn(x: In, index: number) {
-		this._values[index] = x;
+	protected setOn(value: In, index: number) {
+		this._values[index] = value;
 	}
 }
 
@@ -419,7 +436,7 @@ export function namedTransformator<In>(
 	initialValue?: any
 ) {
 	var t = new Transformator(emitters, transform, initialValue);
-	t.name = name;
+	t.name = '<| ' + name + ' |>';
 	return t;
 }
 

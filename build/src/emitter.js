@@ -9,12 +9,15 @@ var transformators = require('./transformator-helpers');
 var eevent = require('./electric-event');
 var Wire = require('./wire');
 exports.placeholder = require('./placeholder');
+function en(name) {
+    return '| ' + name + ' |>';
+}
 var Emitter = (function () {
     function Emitter(initialValue) {
         if (initialValue === void 0) { initialValue = undefined; }
         this._receivers = [];
         this._currentValue = initialValue;
-        this.name = 'emitter';
+        this.name = en(this.name);
     }
     // when reveiver is plugged current value is not emitted to him
     // instantaneously, but instead it's done asynchronously
@@ -104,6 +107,13 @@ var Emitter = (function () {
             receiver.receive(value);
         }
     };
+    Emitter.prototype._ayncDispatchToReceivers = function (value) {
+        var currentReceivers = this._receivers.slice();
+        for (var _i = 0; _i < currentReceivers.length; _i++) {
+            var receiver = currentReceivers[_i];
+            this._ayncDispatchToReceiver(receiver, value);
+        }
+    };
     Emitter.prototype._ayncDispatchToReceiver = function (receiver, value) {
         var _this = this;
         scheduler.scheduleTimeout(function () { return _this._dispatchToReceiver(receiver, value); }, 0);
@@ -136,7 +146,9 @@ var Emitter = (function () {
         return namedTransformator('merge' + this._enclosedName() + ' with ' + emitters.map(function (e) { return e.name; }).join(', '), [this].concat(emitters), transformators.merge(), this.dirtyCurrentValue());
     };
     Emitter.prototype.when = function (switcher) {
-        return namedTransformator('when' + this._enclosedName(), [this], transformators.when(switcher.happens, switcher.then), eevent.notHappend);
+        var currentValue = this.dirtyCurrentValue();
+        var t = namedTransformator('when' + this._enclosedName(), [this], transformators.when(switcher.happens, switcher.then), eevent.notHappend);
+        return t;
     };
     Emitter.prototype.sample = function (initialValue, samplingEvent) {
         var t = namedTransformator('sample' + this._enclosedName() + ' on ' + this._enclosedName(samplingEvent), [this, samplingEvent], transformators.sample(), initialValue);
@@ -182,13 +194,13 @@ var ManualEmitter = (function (_super) {
 })(Emitter);
 function manual(initialValue) {
     var e = new ManualEmitter(initialValue);
-    e.name = 'manual emitter';
+    e.name = en('manual');
     return e;
 }
 exports.manual = manual;
 function constant(value) {
     var e = new Emitter(value);
-    e.name = 'constant(' + value + ')';
+    e.name = en('constant *' + value + '*');
     return e;
 }
 exports.constant = constant;
@@ -198,7 +210,7 @@ function manualEvent() {
     // and not allow to emit values
     // it's done by monkey patching ManualEmitter
     var e = manual(eevent.notHappend);
-    e.name = 'manual event emitter';
+    e.name = en('manual event');
     var oldImpulse = e.impulse;
     e.impulse = function (v) { return oldImpulse.apply(e, [eevent.of(v)]); };
     e.emit = function (v) {
@@ -214,6 +226,7 @@ var Transformator = (function (_super) {
         if (transform === void 0) { transform = undefined; }
         if (initialValue === void 0) { initialValue = undefined; }
         _super.call(this, initialValue);
+        this.name = '<| transformator |>';
         this._values = Array(emitters.length);
         ;
         if (transform) {
@@ -232,13 +245,15 @@ var Transformator = (function (_super) {
         this.emit(values[index]);
     };
     Transformator.prototype.plugEmitters = function (emitters) {
-        for (var _i = 0; _i < emitters.length; _i++) {
-            var emitter = emitters[_i];
-            this.wire(emitter);
+        var _this = this;
+        emitters.forEach(function (e) { return _this.wire(e); });
+        for (var i = 0; i < emitters.length; i++) {
+            this._values[i] = emitters[i].dirtyCurrentValue();
         }
     };
     Transformator.prototype.plugEmitter = function (emitter) {
         this.wire(emitter);
+        this._values[this._wires.length - 1] = emitter.dirtyCurrentValue();
         return this._wires.length - 1;
     };
     Transformator.prototype.wire = function (emitter) {
@@ -250,12 +265,12 @@ var Transformator = (function (_super) {
     Transformator.prototype._dirtyGetWireTo = function (emitter) {
         return this._wires.filter(function (w) { return w.input === emitter; })[0];
     };
-    Transformator.prototype.receiveOn = function (x, index) {
-        this._values[index] = x;
+    Transformator.prototype.receiveOn = function (value, index) {
+        this._values[index] = value;
         this._transform(this._values, index);
     };
-    Transformator.prototype.setOn = function (x, index) {
-        this._values[index] = x;
+    Transformator.prototype.setOn = function (value, index) {
+        this._values[index] = value;
     };
     return Transformator;
 })(Emitter);
@@ -263,7 +278,7 @@ exports.Transformator = Transformator;
 function namedTransformator(name, emitters, transform, initialValue) {
     if (transform === void 0) { transform = undefined; }
     var t = new Transformator(emitters, transform, initialValue);
-    t.name = name;
+    t.name = '<| ' + name + ' |>';
     return t;
 }
 exports.namedTransformator = namedTransformator;

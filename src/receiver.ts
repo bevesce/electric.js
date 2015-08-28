@@ -1,4 +1,5 @@
 import inf = require('./interfaces');
+import eevent = require('./electric-event');
 
 
 export function logReceiver(message: string) {
@@ -12,7 +13,16 @@ export function logReceiver(message: string) {
 
 export function log(emitter: inf.IEmitter<any>) {
 	emitter.plugReceiver((x: any) => {
-		console.log(emitter.name + ' >>> ', x);
+		console.log(emitter.name, '--', x);
+	});
+}
+
+export function logEvents(emitter: inf.IEmitter<eevent<any>>) {
+	emitter.plugReceiver((x: any) => {
+		if (!x.happend) {
+			return;
+		}
+		console.log(emitter.name, '--', x.value);
 	});
 }
 

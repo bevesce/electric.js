@@ -97,7 +97,6 @@ function _time<T>(
 	);
 	e.name = 'clock<' + subname + '>';
 	function releaseResoueces() {
-		console.log('STAABB');
 		scheduler.unscheduleInterval(id);
 	}
 

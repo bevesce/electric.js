@@ -36,9 +36,9 @@ class Placeholder<Out> {
 	private _initialValue: Out;
 	name: string;
 
-	constructor(initialValue?: Out) {
+	constructor(initialValue: Out) {
 		this._initialValue = initialValue;
-		this.name = 'placeholder';
+		this.name = '| placeholder |>';
 	}
 
 	is(emitter: inf.IEmitter<Out>) {
@@ -50,7 +50,7 @@ class Placeholder<Out> {
 		if ((<any>this._emitter)._dispatchToReceivers) {
 			(<any>this._emitter)._dispatchToReceivers(this._emitter.dirtyCurrentValue());
 		}
-		this.name = emitter.name;
+		this.name = '| ph ' + emitter.name;
 	}
 
 	dirtyCurrentValue() {

@@ -3,19 +3,20 @@ var utils = require('../receivers/utils');
 var transformator = require('../transformator');
 var eevent = require('../electric-event');
 function em(text) {
-    return '*' + text + '*';
+    return '`' + text + '`';
 }
 function fromEvent(target, type, name, useCapture) {
     if (name === void 0) { name = ''; }
     if (useCapture === void 0) { useCapture = false; }
-    var e = electric.emitter.manualEvent();
-    e.name = name || 'event: ' + type + ' on ' + em(target);
+    var emitter = electric.emitter.manualEvent();
+    emitter.name = name || '| event: ' + type + ' on ' + em(target) + '|>';
     var impulse = function (event) {
-        e.impulse(event);
+        // event.preventDefault();
+        emitter.impulse(event);
     };
     target.addEventListener(type, impulse, useCapture);
-    e.setReleaseResources(function () { return target.removeEventListener(type, impulse, useCapture); });
-    return e;
+    emitter.setReleaseResources(function () { return target.removeEventListener(type, impulse, useCapture); });
+    return emitter;
 }
 exports.fromEvent = fromEvent;
 function fromButton(nodeOrId) {
@@ -29,13 +30,39 @@ function fromInputText(nodeOrId, type) {
     return fromEvent(input, 'keyup', 'text of ' + em(nodeOrId)).map(function () { return input.value; });
 }
 exports.fromInputText = fromInputText;
+function fromInputTextEnter(nodeOrId) {
+    var input = utils.getNode(nodeOrId);
+    var e = electric.emitter.manualEvent();
+    e.name = '| enter on ' + em(nodeOrId) + ' |>';
+    var impulse = function (event) {
+        if (event.keyCode === 13) {
+            e.impulse(input.value);
+        }
+    };
+    input.addEventListener('keydown', impulse, false);
+    e.setReleaseResources(function () { return input.removeEventListener('keydown', impulse, false); });
+    return e;
+}
+exports.fromInputTextEnter = fromInputTextEnter;
 function fromCheckbox(nodeOrId) {
     var checkbox = utils.getNode(nodeOrId);
     var e = fromEvent(checkbox, 'click', 'checked of ' + em(nodeOrId));
-    electric.receiver.collect(e);
     return e.map(function () { return checkbox.checked; });
 }
 exports.fromCheckbox = fromCheckbox;
+;
+function fromCheckboxEvent(nodeOrId) {
+    var checkbox = utils.getNode(nodeOrId);
+    var e = electric.emitter.manualEvent();
+    e.name = '| click on checkbox ' + nodeOrId + ' |>';
+    var impulse = function (event) {
+        e.impulse(checkbox.checked);
+    };
+    checkbox.addEventListener('click', impulse, false);
+    e.setReleaseResources(function () { return checkbox.removeEventListener('click', impulse, false); });
+    return e;
+}
+exports.fromCheckboxEvent = fromCheckboxEvent;
 ;
 function joinObjects(objs) {
     var o = {};
@@ -82,8 +109,34 @@ function mouse(nodeOrId) {
     var mouse = utils.getNode(nodeOrId);
     var emitters = ['down', 'up', 'over', 'out', 'move'].map(function (type) { return fromEvent(mouse, 'mouse' + type).map(function (e) { return (e.happend ? eevent.of({ type: type, data: e.value }) : eevent.notHappend); }); });
     var emitter = transformator.merge.apply(transformator, emitters);
-    emitter.name = 'mouse on ' + em(nodeOrId);
+    emitter.name = '| mouse on ' + em(nodeOrId) + ' |>';
     return emitter;
 }
 exports.mouse = mouse;
 ;
+var hashEmitter = null;
+function hash() {
+    if (!hashEmitter) {
+        hashEmitter = electric.emitter.manual(window.location.hash);
+        hashEmitter.name = '| window.location.hash |>';
+        window.addEventListener('hashchange', function () {
+            hashEmitter.emit(window.location.hash);
+        });
+    }
+    return hashEmitter;
+}
+exports.hash = hash;
+function enter(nodeOrId) {
+    var target = utils.getNode(nodeOrId);
+    var e = electric.emitter.manualEvent();
+    e.name = '| enter on ' + em(nodeOrId) + ' |>';
+    var impulse = function (event) {
+        if (event.keyCode === 13) {
+            e.impulse(null);
+        }
+    };
+    target.addEventListener('keydown', impulse, false);
+    e.setReleaseResources(function () { return target.removeEventListener('keydown', impulse, false); });
+    return e;
+}
+exports.enter = enter;

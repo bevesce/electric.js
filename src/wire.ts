@@ -9,6 +9,7 @@ class Wire<InOut>
 	private _futureReceive: (x: InOut) => void;
 	private _set: (x: InOut) => void;
 	private receiverId: number;
+	name: string;
 
 	constructor(
 		input: inf.IEmitter<InOut>,
@@ -18,6 +19,7 @@ class Wire<InOut>
 	) {
 		this.input = input;
 		this.output = output;
+		this.name = '-w-';
 		if (set) {
 			this._set = set
 			this._futureReceive = receive;

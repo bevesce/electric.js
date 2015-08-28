@@ -27,7 +27,7 @@ var Placeholder = (function () {
     function Placeholder(initialValue) {
         this._actions = [];
         this._initialValue = initialValue;
-        this.name = 'placeholder';
+        this.name = '| placeholder |>';
     }
     Placeholder.prototype.is = function (emitter) {
         this._emitter = emitter;
@@ -39,7 +39,7 @@ var Placeholder = (function () {
         if (this._emitter._dispatchToReceivers) {
             this._emitter._dispatchToReceivers(this._emitter.dirtyCurrentValue());
         }
-        this.name = emitter.name;
+        this.name = '| ph ' + emitter.name;
     };
     Placeholder.prototype.dirtyCurrentValue = function () {
         if (this._emitter) {
