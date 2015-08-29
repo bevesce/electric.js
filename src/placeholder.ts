@@ -42,14 +42,14 @@ class Placeholder<Out> {
 	}
 
 	is(emitter: inf.IEmitter<Out>) {
+		if (this._emitter) {
+			throw Error("placeholder is " + this._emitter.name + " so cannot be " + emitter.name);
+		}
 		this._emitter = emitter;
 		for (var action of this._actions) {
 			action(this._emitter);
 		}
 		this._actions = undefined;
-		if ((<any>this._emitter)._dispatchToReceivers) {
-			(<any>this._emitter)._dispatchToReceivers(this._emitter.dirtyCurrentValue());
-		}
 		this.name = '| ph ' + emitter.name;
 	}
 

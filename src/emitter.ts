@@ -84,7 +84,6 @@ export class Emitter<T>
 		throw Error("can't emit <" + value + "> from " + this.name + ", it's stabilized");
 	}
 
-	// semantics:
 	// let's say that f = constant(y).emit(x) is called at t_e
 	// then f(t) = x for t >= t_e, and f(t) = y for t < t_e
 	emit(value: T) {
@@ -95,7 +94,6 @@ export class Emitter<T>
 		this._currentValue = value;
 	}
 
-	// semantics:
 	// let's say that f constant(y).impulse(x) is called at t_i
 	// then f(t_i) = x and f(t) = y when t != t_i
 	impulse(value: T) {
@@ -117,7 +115,7 @@ export class Emitter<T>
 	private _dispatchToReceivers(value: T) {
 		var currentReceivers = this._receivers.slice();
 		for (var receiver of currentReceivers) {
-			this._dispatchToReceiver(receiver, value);
+			this._ayncDispatchToReceiver(receiver, value);
 		}
 	}
 
@@ -325,7 +323,7 @@ export interface EventEmitter<T>
 	impulse(value: T): void;
 }
 
-export function manualEvent<T>(): EventEmitter<T> {
+export function manualEvent<T>(name?: string): EventEmitter<T> {
 	// manual event emitter should
 	// pack impulsed values into event
 	// and not allow to emit values
@@ -337,6 +335,7 @@ export function manualEvent<T>(): EventEmitter<T> {
 	(<any>e).emit = (v: T) => {
 		throw Error("can't emit from event emitter, only impulse");
 	};
+	e.name = name ? en(name) : e.name;
 	// monkey patching requires ugly casting...
 	return <any>e;
 }

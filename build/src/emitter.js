@@ -66,7 +66,6 @@ var Emitter = (function () {
     Emitter.prototype._throwStabilized = function (value) {
         throw Error("can't emit <" + value + "> from " + this.name + ", it's stabilized");
     };
-    // semantics:
     // let's say that f = constant(y).emit(x) is called at t_e
     // then f(t) = x for t >= t_e, and f(t) = y for t < t_e
     Emitter.prototype.emit = function (value) {
@@ -76,7 +75,6 @@ var Emitter = (function () {
         this._dispatchToReceivers(value);
         this._currentValue = value;
     };
-    // semantics:
     // let's say that f constant(y).impulse(x) is called at t_i
     // then f(t_i) = x and f(t) = y when t != t_i
     Emitter.prototype.impulse = function (value) {
@@ -96,7 +94,7 @@ var Emitter = (function () {
         var currentReceivers = this._receivers.slice();
         for (var _i = 0; _i < currentReceivers.length; _i++) {
             var receiver = currentReceivers[_i];
-            this._dispatchToReceiver(receiver, value);
+            this._ayncDispatchToReceiver(receiver, value);
         }
     };
     Emitter.prototype._dispatchToReceiver = function (receiver, value) {
@@ -204,7 +202,7 @@ function constant(value) {
     return e;
 }
 exports.constant = constant;
-function manualEvent() {
+function manualEvent(name) {
     // manual event emitter should
     // pack impulsed values into event
     // and not allow to emit values
@@ -216,6 +214,7 @@ function manualEvent() {
     e.emit = function (v) {
         throw Error("can't emit from event emitter, only impulse");
     };
+    e.name = name ? en(name) : e.name;
     // monkey patching requires ugly casting...
     return e;
 }

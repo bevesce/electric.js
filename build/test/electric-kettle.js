@@ -97,6 +97,7 @@ function pullFromQueueExecuteAndCheck(chai, utils, queue, show) {
         if (show) {
             console.log('EM:', value, item);
         }
+        chai.expect(item).to.not.be.undefined;
         chai.expect(value).to.deep.equal(item.value);
         var i = 0;
         while (!queue.isDone(utils) && queue.top().kind === 'after') {

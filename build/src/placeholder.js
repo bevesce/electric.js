@@ -30,15 +30,15 @@ var Placeholder = (function () {
         this.name = '| placeholder |>';
     }
     Placeholder.prototype.is = function (emitter) {
+        if (this._emitter) {
+            throw Error("placeholder is " + this._emitter.name + " so cannot be " + emitter.name);
+        }
         this._emitter = emitter;
         for (var _i = 0, _a = this._actions; _i < _a.length; _i++) {
             var action = _a[_i];
             action(this._emitter);
         }
         this._actions = undefined;
-        if (this._emitter._dispatchToReceivers) {
-            this._emitter._dispatchToReceivers(this._emitter.dirtyCurrentValue());
-        }
         this.name = '| ph ' + emitter.name;
     };
     Placeholder.prototype.dirtyCurrentValue = function () {

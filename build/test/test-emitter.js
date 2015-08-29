@@ -145,35 +145,38 @@ describe('emitter', function () {
             .to.emit(0)
             .andBe(done);
     });
-    it('should emit values synchronously', function () {
-        // the asumption is that .emit
-        // is always called in not initial even
-        // in js event loop so there's no need
-        // for more asynchronicity
-        // to manually emit values when main code is loading
-        // use emitter.manual
+    it('should emit values asynchronously', function (done) {
         var emitter = electric.emitter.emitter(0);
         var collected = electric.receiver.collect(emitter);
         emitter.emit(1);
         emitter.emit(2);
-        expect(collected).to.eql([1, 2]);
+        expect(collected).to.eql([]);
+        expect(emitter)
+            .to.emit(2)
+            .andBe(done);
     });
-    it('should impulse values synchronously', function () {
+    it('should impulse values asynchronously', function (done) {
         var emitter = electric.emitter.emitter(0);
         var collected = electric.receiver.collect(emitter);
         emitter.impulse(1);
         emitter.impulse(2);
-        expect(collected).to.eql([1, 0, 2, 0]);
+        expect(collected).to.eql([]);
+        expect(emitter)
+            .to.emit(0)
+            .andBe(done);
     });
-    it('should be unpluggable', function () {
+    it('should be unpluggable', function (done) {
         var emitter = electric.emitter.emitter(0);
-        var emitted = 0;
+        var emitted = -1;
         var disposable = emitter.plugReceiver(function (x) { return emitted = x; });
-        emitter.emit(1);
-        expect(emitted).to.equal(1);
-        emitter.unplugReceiver(disposable);
-        emitter.emit(2);
-        expect(emitted).to.equal(1);
+        expect(emitter)
+            .to.emit(0)
+            .then.after(function () { return expect(emitted).to.equal(0); })
+            .then.after(function () { return emitter.unplugReceiver(disposable); })
+            .then.after(function () { return emitter.emit(1); })
+            .to.emit(1)
+            .then.after(function () { return expect(emitted).to.equal(0); })
+            .andBe(done);
     });
     it('should release resources when stabilized', function () {
         var emitter = electric.emitter.manual(0);

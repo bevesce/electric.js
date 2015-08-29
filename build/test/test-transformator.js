@@ -173,7 +173,7 @@ describe('transformators', function () {
             .to.emit(2)
             .andBe(done);
     });
-    transformator.only('changes', function (done) {
+    transformator('changes', function (done) {
         var emitter = electric.emitter.manual(0);
         var changes = t.changes(emitter);
         expect(changes)
