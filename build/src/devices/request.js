@@ -1,5 +1,17 @@
 var electric = require('../electric');
 var fp = require('../fp');
+var Response = (function () {
+    function Response(data, statusCode, statusDescription, decode) {
+        this.statusCode = statusCode;
+        this.statusDescription = statusDescription;
+        this.status = statusShortDescription(statusCode);
+        if (decode && this.status === 'success') {
+            this.data = decode(data);
+        }
+    }
+    return Response;
+})();
+exports.Response = Response;
 var emptyResponse = new Response(null, -1, 'No request was yet made and response was not yet provided');
 function requestDevice(method, url, input, encode, decode) {
     if (encode === void 0) { encode = fp.identity; }
@@ -8,17 +20,21 @@ function requestDevice(method, url, input, encode, decode) {
     state.name = '<| state of ' + method + ': ' + url + ' |>';
     var stateChange = electric.emitter.manualEvent();
     stateChange.name = '<| state change of ' + method + ': ' + url + ' |>';
-    var responseEmitter = electric.emitter.manual(null);
+    var responseEmitter = electric.emitter.manual(emptyResponse);
     responseEmitter.name = '<| response on ' + method + ': ' + url + ' |>';
     input.plugReceiver(function (data) {
-        state.emit('waiting');
+        if (!data.happend) {
+            return;
+        }
         stateChange.impulse('waiting');
+        state.emit('waiting');
         request(method, url, function (response) {
+            console.log('impulse! ' + response.status);
+            electric.scheduler.scheduleTimeout(function () { return stateChange.impulse(response.status); }, 500);
             state.emit(response.status);
-            stateChange.impulse(response.status);
             responseEmitter.emit(response);
         }, {
-            data: data,
+            data: data.value,
             encode: encode,
             decode: decode
         });
@@ -36,9 +52,12 @@ function JSONRequestDevice(method, url, input) {
 exports.JSONRequestDevice = JSONRequestDevice;
 function request(method, url, callback, args) {
     args.encode = args.encode || fp.identity;
-    args.decode = args.encode || fp.identity;
+    args.decode = args.decode || fp.identity;
     var req = new XMLHttpRequest();
     req.onreadystatechange = function () {
+        if (req.readyState !== 4) {
+            return;
+        }
         callback(extractResponse(req, args.decode));
     };
     req.open(method, url, true);
@@ -50,30 +69,9 @@ function request(method, url, callback, args) {
     }
 }
 exports.request = request;
-function makeRequest(method, url, data, callback) {
-    var request = new XMLHttpRequest();
-    request.onreadystatechange = function () {
-        if (request.readyState === 4) {
-            callback(request);
-        }
-    };
-    request.open(method, url, true);
-    request.send(data);
-}
-;
 function extractResponse(request, decode) {
-    return new Response(decode(request.responseText), request.status, request.statusText);
+    return new Response(request.responseText, request.status, request.statusText, decode);
 }
-var Response = (function () {
-    function Response(data, statusCode, statusDescription) {
-        this.data = data;
-        this.statusCode = statusCode;
-        this.statusDescription = statusDescription;
-        this.status = statusShortDescription(statusCode);
-    }
-    return Response;
-})();
-exports.Response = Response;
 function statusShortDescription(statusCode) {
     // 5xx server error
     // 4xx client error
@@ -84,7 +82,10 @@ function statusShortDescription(statusCode) {
         return 'redirection';
     }
     else if (statusCode == -1) {
-        return 'waiting';
+        return 'none';
+    }
+    else if (statusCode == 0) {
+        return 'error';
     }
     // 2xx success
     return 'success';

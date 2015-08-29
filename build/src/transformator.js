@@ -92,3 +92,21 @@ function changes(emitter) {
     return namedTransformator('changes', [emitter], transform, eevent.notHappend);
 }
 exports.changes = changes;
+function skipFirst(emitter) {
+    function transform(emit, impulse) {
+        var skipped = false;
+        return function skipFirstTransform(v, i) {
+            if (v[i].happend) {
+                if (skipped) {
+                    impulse(v[i]);
+                }
+                else {
+                    skipped = true;
+                }
+            }
+        };
+    }
+    return namedTransformator('skip 1', [emitter], transform, eevent.notHappend);
+}
+exports.skipFirst = skipFirst;
+;

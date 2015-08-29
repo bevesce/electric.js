@@ -1,3 +1,8 @@
+export function identity<T>(x: T) {
+	return x;
+}
+
+
 interface AnyFunction {
 	(...args: any[]): any;
 };

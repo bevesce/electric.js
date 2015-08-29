@@ -9,7 +9,7 @@ export = collection;
 
 
 function collection(
-	initial: item[],
+	initialTasks: inf.IEmitter<eevent<item[]>>,
 	input: {
 		insert: inf.IEmitter<eevent<string>>,
 		check: inf.IEmitter<eevent<{ id: number, completed: boolean }>>,
@@ -20,8 +20,6 @@ function collection(
 		filter: inf.IEmitter<string>
 	}
 ) {
-	var initialTasks = electric.emitter.constant(initial);
-
 	var ac = electric.emitter.placeholder(13);
 	var cc = electric.emitter.placeholder(26);
 	var toggleTo = electric.transformator.map(
@@ -32,13 +30,14 @@ function collection(
 	);
 	var insert: inf.IEmitter<eevent<item>> = notEmpty(input.insert);
 
-	var tasks = initialTasks.change(
+	var tasks = electric.emitter.constant([]).change(
 		{ to: appended, when: insert },
 		{ to: checked, when: input.check },
 		{ to: allWithCompleted, when: toggleTo },
 		{ to: retitled, when: input.retitle },
 		{ to: deleted, when: input.del },
-		{ to: cleared, when: input.clear }
+		{ to: cleared, when: input.clear },
+		{ to: concatenated, when: initialTasks }
 	);
 
 	var $ = eevent.lift;
@@ -119,6 +118,10 @@ function deleted(items: item[], id: number) {
 
 function cleared(items: item[], _: {}) {
 	return cont(onlyActive(items));
+}
+
+function concatenated(items: item[], otherItems: item[]) {
+	return cont(otherItems.concat(items));
 }
 
 function filterWithRoute(items: item[], route: string) {

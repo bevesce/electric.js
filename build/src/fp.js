@@ -1,3 +1,7 @@
+function identity(x) {
+    return x;
+}
+exports.identity = identity;
 ;
 function curry(f, arity) {
     if (arity === void 0) { arity = 2; }

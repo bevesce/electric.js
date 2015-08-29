@@ -60,12 +60,12 @@ gulp.task('build-examples', function() {
 gulp.task('build', ['build-test', 'build-src', 'build-examples']);
 
 
-// gulp.task('sass', function(){
-// 	gulp.src('./styles/*.scss')
-// 		.pipe(sass().on('error', sass.logError))
-// 		.pipe(gulp.dest('build/styles/'))
-// 		.pipe(livereload());
-// });
+gulp.task('sass', function(){
+	gulp.src('./build/examples/todomvc-request-response/css/*.scss')
+		.pipe(sass().on('error', sass.logError))
+		.pipe(gulp.dest('./build/examples/todomvc-request-response/css/'));
+		// .pipe(livereload());
+});
 
 gulp.task('server', function() {
 	connect.server({
@@ -75,6 +75,7 @@ gulp.task('server', function() {
 		'./examples/*.*',
 		'./build/examples/**/*.html',
 		'./build/examples/**/*.css',
+		'./build/examples/**/**/*.css',
 		'./examples/**/*.*',
 		'./build/test-in-browser/*.*'
 	], [
@@ -102,5 +103,8 @@ gulp.task('watch', function(){
 	gulp.watch('./test-in-browser/*.ts', ['build-test-in-browser']);
 
 	gulp.watch('./build/examples/todomvc/test/*.js', ['test-todomvc']);
+
+
+	gulp.watch('./build/examples/todomvc-request-response/css/*.scss', ['sass']);
 
 });

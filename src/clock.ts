@@ -15,6 +15,15 @@ export interface ITimeValue<T> {
 export type IIntegrable = TimeValue<number>;
 export type IDerivable = TimeValue<number>;
 
+export function interval(intervalInMs: number) {
+	var timer = emitter.manualEvent();
+	scheduler.scheduleInterval(() => {
+		timer.impulse(Date.now())
+	}, intervalInMs)
+	timer.name = '| interval |>';
+	return timer;
+}
+
 
 export class TimeValue<T>
 	implements ITimeValue<T>

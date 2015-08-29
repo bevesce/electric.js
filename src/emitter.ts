@@ -273,7 +273,7 @@ export class Emitter<T>
 		to: inf.IEmitter<T> | ((t: T, k: any) => inf.IEmitter<T>)
 	}[]): inf.IEmitter<T> {
 		return namedTransformator(
-			'change' + this._enclosedName(),
+			'change to when',
 			[<inf.IEmitter<any>>this].concat(switchers.map(s => s.when)),
 			transformators.change(switchers),
 			this._currentValue

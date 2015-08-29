@@ -1,35 +1,64 @@
 import inf = require('../../src/interfaces');
 import electric = require('../electric');
+import eevent = require('../electric-event');
 import fp = require('../fp');
 
+
+export class Response<T> {
+	data: T;
+	statusCode: number;
+	statusDescription: string;
+	status: string;
+
+	constructor(
+		data: string,
+		statusCode: number,
+		statusDescription: string,
+		decode?: (responseText: string) => T
+	) {
+		this.statusCode = statusCode;
+		this.statusDescription = statusDescription;
+		this.status = statusShortDescription(statusCode)
+		if (decode && this.status === 'success') {
+			this.data = decode(data);
+		}
+	}
+}
 
 var emptyResponse = new Response(null, -1, 'No request was yet made and response was not yet provided');
 
 
 export function requestDevice<T>(
-	method: string, url: string, input: inf.IEmitter<T>,
+	method: string, url: string, input: inf.IEmitter<eevent<T>>,
 	encode: (data: T) => string = fp.identity, decode: (data: string) => T = fp.identity
 ) {
 	var state = electric.emitter.manual('none');
 	state.name = '<| state of ' + method + ': ' + url + ' |>';
-	var stateChange = electric.emitter.manualEvent();
+	var stateChange = <electric.emitter.EventEmitter<string>>electric.emitter.manualEvent();
 	stateChange.name = '<| state change of ' + method + ': ' + url + ' |>';
-	var responseEmitter = electric.emitter.manual(null);
+	var responseEmitter = electric.emitter.manual(emptyResponse);
 	responseEmitter.name = '<| response on ' + method + ': ' + url + ' |>';
 
 	input.plugReceiver(data => {
-		state.emit('waiting');
+		if (!data.happend) {
+			return;
+		}
 		stateChange.impulse('waiting');
+		state.emit('waiting');
 		request(
 			method,
 			url,
 			(response: Response<T>) => {
+				console.log('impulse! ' + response.status);
+				electric.scheduler.scheduleTimeout(
+					() => stateChange.impulse(response.status),
+					500
+				);
 				state.emit(response.status);
-				stateChange.impulse(response.status);
 				responseEmitter.emit(response);
 			},
 			{
-				data: <T>data,
+				data: <T>data.value,
 				encode: encode,
 				decode: decode
 			}
@@ -43,8 +72,8 @@ export function requestDevice<T>(
 	}
 }
 
-export function JSONRequestDevice(
-	method: string, url: string, input: inf.IEmitter<any>
+export function JSONRequestDevice<T>(
+	method: string, url: string, input: inf.IEmitter<eevent<T>>
 ) {
 	return requestDevice(method, url, input, JSON.stringify, JSON.parse);
 }
@@ -60,9 +89,12 @@ export function request<T>(
 	}
 ) {
 	args.encode = args.encode || fp.identity;
-	args.decode = args.encode || fp.identity;
+	args.decode = args.decode || fp.identity;
 	var req = new XMLHttpRequest();
 	req.onreadystatechange = function() {
+		if (req.readyState !== 4) {
+			return;
+		}
 		callback(
 			extractResponse(req, args.decode)
 		)
@@ -76,42 +108,10 @@ export function request<T>(
 	}
 }
 
-function makeRequest(
-	method: string, url: string, data: string,
-	callback: (request: XMLHttpRequest) => void
-) {
-	var request = new XMLHttpRequest();
-	request.onreadystatechange = function() {
-		if (request.readyState === 4) {
-			callback(request);
-		}
-	};
-	request.open(method, url, true);
-	request.send(data);
-};
-
 function extractResponse<T>(request: XMLHttpRequest, decode: (data: string) => T) {
 	return new Response(
-		decode(request.responseText), request.status, request.statusText
+		request.responseText, request.status, request.statusText, decode
 	);
-}
-
-export class Response<T> {
-	data: T;
-	statusCode: number;
-	statusDescription: string;
-	status: string;
-
-	constructor(
-		data: T,
-		statusCode: number,
-		statusDescription: string
-	) {
-		this.data = data;
-		this.statusCode = statusCode;
-		this.statusDescription = statusDescription;
-		this.status = statusShortDescription(statusCode)
-	}
 }
 
 function statusShortDescription(statusCode: number) {
@@ -126,7 +126,10 @@ function statusShortDescription(statusCode: number) {
 	}
 	// special code when request was not yet made
 	else if (statusCode == -1) {
-		return 'waiting';
+		return 'none';
+	}
+	else if (statusCode == 0) {
+		return 'error';
 	}
 	// 2xx success
 	return 'success'

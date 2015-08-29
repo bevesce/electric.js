@@ -19,6 +19,21 @@ function fromEvent(target, type, name, useCapture) {
     return emitter;
 }
 exports.fromEvent = fromEvent;
+function identity(x) {
+    return x;
+}
+function clicks(nodeOrId, mapping) {
+    if (mapping === void 0) { mapping = identity; }
+    var button = utils.getNode(nodeOrId);
+    var emitter = electric.emitter.manualEvent();
+    function emitterListener(event) {
+        emitter.impulse(mapping(event));
+    }
+    button.addEventListener('click', emitterListener, false);
+    emitter.name = '| clicks on ' + nodeOrId + ' |>';
+    return emitter;
+}
+exports.clicks = clicks;
 function fromButton(nodeOrId) {
     var button = utils.getNode(nodeOrId);
     return fromEvent(button, 'click', 'button clicks on ' + em(nodeOrId));

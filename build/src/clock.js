@@ -1,6 +1,15 @@
 exports.scheduler = require('./scheduler');
 exports.emitter = require('./emitter');
 exports.transformator = require('./transformator');
+function interval(intervalInMs) {
+    var timer = exports.emitter.manualEvent();
+    exports.scheduler.scheduleInterval(function () {
+        timer.impulse(Date.now());
+    }, intervalInMs);
+    timer.name = '| interval |>';
+    return timer;
+}
+exports.interval = interval;
 var TimeValue = (function () {
     function TimeValue(time, value) {
         this.time = time;

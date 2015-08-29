@@ -1,4 +1,5 @@
 var electric = require('../../../src/electric');
+var eevent = require('../../../src/electric-event');
 var rui = require('../../../src/receivers/ui');
 var eui = require('../../../src/emitters/ui');
 var storage = require('./storage');
@@ -11,9 +12,11 @@ var del = electric.emitter.manualEvent('delete');
 var toggle = eui.fromCheckboxEvent('toggle');
 var editingStart = electric.emitter.manualEvent('editing start');
 var retitle = electric.emitter.manualEvent('retitle');
+var syncButtonClick = eui.clicks('sync-button');
 // Transformators
+var initialTasks = electric.emitter.placeholder(eevent.notHappend);
 var tasksDevice = require('./tasks-device');
-var tasks = tasksDevice(storage.restoreTasks(), {
+var tasks = tasksDevice(initialTasks, {
     insert: newTask,
     check: check,
     toggle: toggle,
@@ -22,6 +25,9 @@ var tasks = tasksDevice(storage.restoreTasks(), {
     clear: clear,
     filter: hash
 });
+var syncDevice = require('./sync-device');
+var sync = syncDevice(syncButtonClick, tasks.all);
+initialTasks.is(sync.initialTasks);
 // Receivers
 //// Tasks Renderer Receiver
 var editingId = electric.emitter.constant(undefined).change({ to: function (_, k) { return electric.emitter.constant(k); }, when: editingStart }, { to: electric.emitter.constant(undefined), when: electric.transformator.changes(tasks.visible) });
@@ -91,3 +97,45 @@ function footerFiltersReceiver() {
     };
 }
 ;
+sync.state.plugReceiver(showSyncStateReceiver());
+function showSyncStateReceiver() {
+    var none = document.getElementById('sync-none');
+    var waiting = document.getElementById('sync-waiting');
+    var success = document.getElementById('sync-success');
+    var error = document.getElementById('sync-error');
+    var button = document.getElementById('sync-button');
+    return function (status) {
+        hide(none);
+        hide(waiting);
+        hide(success);
+        hide(error);
+        if (status === 'none') {
+            show(none);
+            enable(button);
+        }
+        else if (status === 'waiting') {
+            show(waiting);
+            disable(button);
+        }
+        else if (status === 'error') {
+            show(error);
+            enable(button);
+        }
+        else if (status === 'success') {
+            show(success);
+            disable(button);
+        }
+    };
+}
+function hide(element) {
+    element.className = hidden(element.className, true);
+}
+function show(element) {
+    element.className = hidden(element.className, false);
+}
+function disable(element) {
+    element.setAttribute('disabled', 'true');
+}
+function enable(element) {
+    element.removeAttribute('disabled');
+}

@@ -326,3 +326,28 @@ export function changes<InOut>(
         eevent.notHappend
     )
 }
+
+
+export function skipFirst<InOut>(
+    emitter: inf.IEmitter<eevent<InOut>>
+): inf.IEmitter<eevent<InOut>> {
+    function transform(emit: inf.IEmitterFunction<eevent<InOut>>, impulse: inf.IEmitterFunction<eevent<InOut>>) {
+        var skipped = false;
+        return function skipFirstTransform(v: eevent<InOut>[], i: number) {
+            if (v[i].happend) {
+                if (skipped) {
+                    impulse(v[i]);
+                }
+                else {
+                    skipped = true;
+                }
+            }
+        }
+    }
+    return namedTransformator(
+        'skip 1',
+        [emitter],
+        transform,
+        eevent.notHappend
+    );
+};

@@ -8,7 +8,7 @@ import kettle = require('../../../test/electric-kettle');
 kettle.pourAsync(chai);
 var expect = chai.expect;
 
-import tasksDevice = require('./../js/changes-device');
+import tasksDevice = require('./../js/tasks-device');
 import item = require('./../js/item');
 
 

@@ -26,6 +26,21 @@ export function fromEvent(
 	return emitter;
 }
 
+function identity<T>(x: T) {
+	return x;
+}
+
+export function clicks<T>(nodeOrId: utils.NodeOrId, mapping: (event: Event) => T = identity) {
+	var button = utils.getNode(nodeOrId);
+	var emitter = electric.emitter.manualEvent();
+	function emitterListener(event: Event) {
+		emitter.impulse(mapping(event))
+	}
+	button.addEventListener('click', emitterListener, false);
+	emitter.name = '| clicks on ' + nodeOrId + ' |>';
+	return emitter;
+}
+
 export function fromButton(nodeOrId: utils.NodeOrId) {
 	var button = utils.getNode(nodeOrId);
 	return fromEvent(button, 'click', 'button clicks on ' + em(nodeOrId));

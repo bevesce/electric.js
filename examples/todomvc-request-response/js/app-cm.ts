@@ -17,11 +17,15 @@ var del = <electric.emitter.EventEmitter<number>>electric.emitter.manualEvent('d
 var toggle = eui.fromCheckboxEvent('toggle');
 var editingStart = <electric.emitter.EventEmitter<number>>electric.emitter.manualEvent('editing start');
 var retitle = <electric.emitter.EventEmitter<{ id: number, title: string }>>electric.emitter.manualEvent('retitle');
+var syncButtonClick = eui.clicks('sync-button');
+
 
 // Transformators
+var initialTasks = electric.emitter.placeholder(eevent.notHappend);
+
 import tasksDevice = require('./tasks-device');
 var tasks = tasksDevice(
-	storage.restoreTasks(),
+	initialTasks,
 	{
 		insert: newTask,
 		check: check,
@@ -32,6 +36,9 @@ var tasks = tasksDevice(
 		filter: hash
 	}
 );
+import syncDevice = require('./sync-device');
+var sync = syncDevice(syncButtonClick, tasks.all);
+initialTasks.is(sync.initialTasks);
 
 // Receivers
 //// Tasks Renderer Receiver
@@ -115,3 +122,51 @@ function footerFiltersReceiver() {
 		previousRoute = route;
 	};
 };
+
+sync.state.plugReceiver(showSyncStateReceiver());
+function showSyncStateReceiver() {
+	var none = document.getElementById('sync-none');
+	var waiting = document.getElementById('sync-waiting');
+	var success = document.getElementById('sync-success');
+	var error = document.getElementById('sync-error');
+	var button = document.getElementById('sync-button');
+	return function(status: string) {
+		hide(none);
+		hide(waiting);
+		hide(success);
+		hide(error);
+
+		if (status === 'none') {
+			show(none);
+			enable(button);
+		}
+		else if (status === 'waiting') {
+			show(waiting);
+			disable(button);
+		}
+		else if (status === 'error') {
+			show(error);
+			enable(button);
+		}
+		else if (status === 'success') {
+			show(success);
+			disable(button);
+		}
+	}
+}
+
+function hide(element: any) {
+	element.className = hidden(element.className, true);
+}
+
+function show(element: any) {
+	element.className = hidden(element.className, false);
+}
+
+function disable(element: Element) {
+	element.setAttribute('disabled', 'true');
+}
+
+function enable(element: Element) {
+	element.removeAttribute('disabled');
+}

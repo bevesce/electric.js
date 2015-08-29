@@ -108,9 +108,9 @@ export function change<Out>(
 				emit(<Out>v[0]);
 			}
 			else if (v[i].happend){
+				this._wires[0].unplug();
 				var to = switchers[i - 1].to;
 				var e = utils.callIfFunction(to, <Out>v[0], v[i].value);
-				this._wires[0].unplug();
 				this._wires[0] = new Wire(
 					e,
 					this,

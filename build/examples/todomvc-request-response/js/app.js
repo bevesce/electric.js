@@ -1,5 +1,6 @@
 (function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);var f=new Error("Cannot find module '"+o+"'");throw f.code="MODULE_NOT_FOUND",f}var l=n[o]={exports:{}};t[o][0].call(l.exports,function(e){var n=t[o][1][e];return s(n?n:e)},l,l.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(require,module,exports){
 var electric = require('../../../src/electric');
+var eevent = require('../../../src/electric-event');
 var rui = require('../../../src/receivers/ui');
 var eui = require('../../../src/emitters/ui');
 var storage = require('./storage');
@@ -12,9 +13,11 @@ var del = electric.emitter.manualEvent('delete');
 var toggle = eui.fromCheckboxEvent('toggle');
 var editingStart = electric.emitter.manualEvent('editing start');
 var retitle = electric.emitter.manualEvent('retitle');
+var syncButtonClick = eui.clicks('sync-button');
 // Transformators
+var initialTasks = electric.emitter.placeholder(eevent.notHappend);
 var tasksDevice = require('./tasks-device');
-var tasks = tasksDevice(storage.restoreTasks(), {
+var tasks = tasksDevice(initialTasks, {
     insert: newTask,
     check: check,
     toggle: toggle,
@@ -23,6 +26,9 @@ var tasks = tasksDevice(storage.restoreTasks(), {
     clear: clear,
     filter: hash
 });
+var syncDevice = require('./sync-device');
+var sync = syncDevice(syncButtonClick, tasks.all);
+initialTasks.is(sync.initialTasks);
 // Receivers
 //// Tasks Renderer Receiver
 var editingId = electric.emitter.constant(undefined).change({ to: function (_, k) { return electric.emitter.constant(k); }, when: editingStart }, { to: electric.emitter.constant(undefined), when: electric.transformator.changes(tasks.visible) });
@@ -92,8 +98,50 @@ function footerFiltersReceiver() {
     };
 }
 ;
+sync.state.plugReceiver(showSyncStateReceiver());
+function showSyncStateReceiver() {
+    var none = document.getElementById('sync-none');
+    var waiting = document.getElementById('sync-waiting');
+    var success = document.getElementById('sync-success');
+    var error = document.getElementById('sync-error');
+    var button = document.getElementById('sync-button');
+    return function (status) {
+        hide(none);
+        hide(waiting);
+        hide(success);
+        hide(error);
+        if (status === 'none') {
+            show(none);
+            enable(button);
+        }
+        else if (status === 'waiting') {
+            show(waiting);
+            disable(button);
+        }
+        else if (status === 'error') {
+            show(error);
+            enable(button);
+        }
+        else if (status === 'success') {
+            show(success);
+            disable(button);
+        }
+    };
+}
+function hide(element) {
+    element.className = hidden(element.className, true);
+}
+function show(element) {
+    element.className = hidden(element.className, false);
+}
+function disable(element) {
+    element.setAttribute('disabled', 'true');
+}
+function enable(element) {
+    element.removeAttribute('disabled');
+}
 
-},{"../../../src/electric":8,"../../../src/emitters/ui":10,"../../../src/receivers/ui":13,"./storage":3,"./tasks-device":4,"./tasks-receiver":5}],2:[function(require,module,exports){
+},{"../../../src/electric":10,"../../../src/electric-event":9,"../../../src/emitters/ui":12,"../../../src/receivers/ui":16,"./storage":3,"./sync-device":4,"./tasks-device":5,"./tasks-receiver":6}],2:[function(require,module,exports){
 var Item = (function () {
     function Item(id, title, completed) {
         this._id = id;
@@ -160,18 +208,68 @@ function tasksReceiver(tasks) {
 exports.tasksReceiver = tasksReceiver;
 
 },{"./item":2}],4:[function(require,module,exports){
+var electric = require('../../../src/electric');
+var eevent = require('../../../src/electric-event');
+var item = require('./item');
+var request = require('../../../src/devices/request');
+var URL = 'http://localhost:8081';
+var POST = 'POST';
+var GET = 'GET';
+function sync(userActivated, tasks) {
+    var tasksChanges = electric.transformator.skipFirst(electric.transformator.changes(tasks));
+    var initialRequestState = electric.emitter.manual('waiting');
+    var initialTasks = electric.emitter.manualEvent();
+    makeInitialRequest(initialRequestState, initialTasks);
+    var state = electric.emitter.placeholder('none');
+    var stateChange = electric.transformator.changes(state);
+    var shouldSyncTasks = electric.emitter.constant(eevent.notHappend).change({
+        to: function (_, diff) {
+            if (diff.next === 'success' || diff.next === 'waiting') {
+                return electric.emitter.constant(eevent.notHappend);
+            }
+            else {
+                return userActivated.merge(electric.clock.interval(30 * 1000));
+            }
+        },
+        when: stateChange
+    });
+    var tasksToSync = electric.transformator.map(function (should, ts) { return should.map(function (_) { return ts; }); }, shouldSyncTasks, tasks);
+    var requestsDevice = createRequestsDevice(tasksToSync);
+    state.is(initialRequestState.change({
+        to: function (fromState, toState) {
+            return electric.emitter.constant(toState);
+        }, when: requestsDevice.stateChange
+    }, { to: electric.emitter.constant('none'), when: tasksChanges }));
+    return {
+        state: state,
+        initialTasks: initialTasks
+    };
+}
+function makeInitialRequest(initialRequestState, initialTasks) {
+    request.request(GET, URL, function (response) {
+        initialRequestState.emit(response.status);
+        if (response.status === 'success') {
+            initialTasks.impulse(response.data.map(item.restore));
+        }
+    }, { decode: JSON.parse });
+}
+function createRequestsDevice(data) {
+    return request.JSONRequestDevice(POST, URL, data);
+}
+module.exports = sync;
+
+},{"../../../src/devices/request":8,"../../../src/electric":10,"../../../src/electric-event":9,"./item":2}],5:[function(require,module,exports){
 var item = require('./item');
 var electric = require('../../../src/electric');
 var eevent = require('../../../src/electric-event');
-function collection(initial, input) {
-    var initialTasks = electric.emitter.constant(initial);
+function collection(initialTasks, input) {
     var ac = electric.emitter.placeholder(13);
     var cc = electric.emitter.placeholder(26);
     var toggleTo = electric.transformator.map(function (a, c, t) {
         return t.map(function (_) { return a !== c; });
     }, ac, cc, input.toggle);
     var insert = notEmpty(input.insert);
-    var tasks = initialTasks.change({ to: appended, when: insert }, { to: checked, when: input.check }, { to: allWithCompleted, when: toggleTo }, { to: retitled, when: input.retitle }, { to: deleted, when: input.del }, { to: cleared, when: input.clear });
+    var tasks = electric.emitter.constant([]).change({ to: appended, when: insert }, { to: checked, when: input.check }, { to: allWithCompleted, when: toggleTo }, { to: retitled, when: input.retitle }, { to: deleted, when: input.del }, { to: cleared, when: input.clear }, { to: concatenated, when: initialTasks });
     var $ = eevent.lift;
     var visible = electric.transformator.map(filterWithRoute, tasks, input.filter);
     var allCount = tasks.map(function (ts) { return ts.length; });
@@ -226,6 +324,9 @@ function deleted(items, id) {
 function cleared(items, _) {
     return cont(onlyActive(items));
 }
+function concatenated(items, otherItems) {
+    return cont(otherItems.concat(items));
+}
 function filterWithRoute(items, route) {
     if (route === '#/active') {
         return onlyActive(items);
@@ -243,7 +344,7 @@ function onlyCompleted(tasks) {
 }
 module.exports = collection;
 
-},{"../../../src/electric":8,"../../../src/electric-event":7,"./item":2}],5:[function(require,module,exports){
+},{"../../../src/electric":10,"../../../src/electric-event":9,"./item":2}],6:[function(require,module,exports){
 var rui = require('../../../src/receivers/ui');
 var check;
 var del;
@@ -336,10 +437,19 @@ function setupTasksEvents(tasks) {
 ;
 module.exports = tasksRendererReceiver;
 
-},{"../../../src/receivers/ui":13}],6:[function(require,module,exports){
+},{"../../../src/receivers/ui":16}],7:[function(require,module,exports){
 exports.scheduler = require('./scheduler');
 exports.emitter = require('./emitter');
 exports.transformator = require('./transformator');
+function interval(intervalInMs) {
+    var timer = exports.emitter.manualEvent();
+    exports.scheduler.scheduleInterval(function () {
+        timer.impulse(Date.now());
+    }, intervalInMs);
+    timer.name = '| interval |>';
+    return timer;
+}
+exports.interval = interval;
 var TimeValue = (function () {
     function TimeValue(time, value) {
         this.time = time;
@@ -429,7 +539,101 @@ function derivative(f) {
 }
 exports.derivative = derivative;
 
-},{"./emitter":9,"./scheduler":15,"./transformator":17}],7:[function(require,module,exports){
+},{"./emitter":11,"./scheduler":18,"./transformator":20}],8:[function(require,module,exports){
+var electric = require('../electric');
+var fp = require('../fp');
+var Response = (function () {
+    function Response(data, statusCode, statusDescription, decode) {
+        this.statusCode = statusCode;
+        this.statusDescription = statusDescription;
+        this.status = statusShortDescription(statusCode);
+        if (decode && this.status === 'success') {
+            this.data = decode(data);
+        }
+    }
+    return Response;
+})();
+exports.Response = Response;
+var emptyResponse = new Response(null, -1, 'No request was yet made and response was not yet provided');
+function requestDevice(method, url, input, encode, decode) {
+    if (encode === void 0) { encode = fp.identity; }
+    if (decode === void 0) { decode = fp.identity; }
+    var state = electric.emitter.manual('none');
+    state.name = '<| state of ' + method + ': ' + url + ' |>';
+    var stateChange = electric.emitter.manualEvent();
+    stateChange.name = '<| state change of ' + method + ': ' + url + ' |>';
+    var responseEmitter = electric.emitter.manual(emptyResponse);
+    responseEmitter.name = '<| response on ' + method + ': ' + url + ' |>';
+    input.plugReceiver(function (data) {
+        if (!data.happend) {
+            return;
+        }
+        stateChange.impulse('waiting');
+        state.emit('waiting');
+        request(method, url, function (response) {
+            console.log('impulse! ' + response.status);
+            electric.scheduler.scheduleTimeout(function () { return stateChange.impulse(response.status); }, 500);
+            state.emit(response.status);
+            responseEmitter.emit(response);
+        }, {
+            data: data.value,
+            encode: encode,
+            decode: decode
+        });
+    });
+    return {
+        state: state,
+        stateChange: stateChange,
+        response: responseEmitter
+    };
+}
+exports.requestDevice = requestDevice;
+function JSONRequestDevice(method, url, input) {
+    return requestDevice(method, url, input, JSON.stringify, JSON.parse);
+}
+exports.JSONRequestDevice = JSONRequestDevice;
+function request(method, url, callback, args) {
+    args.encode = args.encode || fp.identity;
+    args.decode = args.decode || fp.identity;
+    var req = new XMLHttpRequest();
+    req.onreadystatechange = function () {
+        if (req.readyState !== 4) {
+            return;
+        }
+        callback(extractResponse(req, args.decode));
+    };
+    req.open(method, url, true);
+    if (args.data !== undefined) {
+        req.send(args.encode(args.data));
+    }
+    else {
+        req.send();
+    }
+}
+exports.request = request;
+function extractResponse(request, decode) {
+    return new Response(request.responseText, request.status, request.statusText, decode);
+}
+function statusShortDescription(statusCode) {
+    // 5xx server error
+    // 4xx client error
+    if (statusCode >= 400) {
+        return 'error';
+    }
+    else if (statusCode >= 300) {
+        return 'redirection';
+    }
+    else if (statusCode == -1) {
+        return 'none';
+    }
+    else if (statusCode == 0) {
+        return 'error';
+    }
+    // 2xx success
+    return 'success';
+}
+
+},{"../electric":10,"../fp":13}],9:[function(require,module,exports){
 var utils = require('./utils');
 var ElectricEvent = (function () {
     function ElectricEvent() {
@@ -509,7 +713,7 @@ var NotHappend = (function () {
 ElectricEvent.notHappend = new NotHappend();
 module.exports = ElectricEvent;
 
-},{"./utils":19}],8:[function(require,module,exports){
+},{"./utils":22}],10:[function(require,module,exports){
 exports.scheduler = require('./scheduler');
 exports.emitter = require('./emitter');
 exports.transformator = require('./transformator');
@@ -519,7 +723,7 @@ exports.transmitter = require('./transmitter');
 // export import device = require('./device');
 // export import fp = require('./fp');
 
-},{"./clock":6,"./emitter":9,"./receiver":12,"./scheduler":15,"./transformator":17,"./transmitter":18}],9:[function(require,module,exports){
+},{"./clock":7,"./emitter":11,"./receiver":15,"./scheduler":18,"./transformator":20,"./transmitter":21}],11:[function(require,module,exports){
 var __extends = (this && this.__extends) || function (d, b) {
     for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p];
     function __() { this.constructor = d; }
@@ -679,7 +883,7 @@ var Emitter = (function () {
         for (var _i = 0; _i < arguments.length; _i++) {
             switchers[_i - 0] = arguments[_i];
         }
-        return namedTransformator('change' + this._enclosedName(), [this].concat(switchers.map(function (s) { return s.when; })), transformators.change(switchers), this._currentValue);
+        return namedTransformator('change to when', [this].concat(switchers.map(function (s) { return s.when; })), transformators.change(switchers), this._currentValue);
     };
     Emitter.prototype._enclosedName = function (emitter) {
         if (emitter === void 0) { emitter = null; }
@@ -804,7 +1008,7 @@ function namedTransformator(name, emitters, transform, initialValue) {
 }
 exports.namedTransformator = namedTransformator;
 
-},{"./electric-event":7,"./placeholder":11,"./scheduler":15,"./transformator-helpers":16,"./wire":20}],10:[function(require,module,exports){
+},{"./electric-event":9,"./placeholder":14,"./scheduler":18,"./transformator-helpers":19,"./wire":23}],12:[function(require,module,exports){
 var electric = require('../electric');
 var utils = require('../receivers/utils');
 var transformator = require('../transformator');
@@ -826,6 +1030,21 @@ function fromEvent(target, type, name, useCapture) {
     return emitter;
 }
 exports.fromEvent = fromEvent;
+function identity(x) {
+    return x;
+}
+function clicks(nodeOrId, mapping) {
+    if (mapping === void 0) { mapping = identity; }
+    var button = utils.getNode(nodeOrId);
+    var emitter = electric.emitter.manualEvent();
+    function emitterListener(event) {
+        emitter.impulse(mapping(event));
+    }
+    button.addEventListener('click', emitterListener, false);
+    emitter.name = '| clicks on ' + nodeOrId + ' |>';
+    return emitter;
+}
+exports.clicks = clicks;
 function fromButton(nodeOrId) {
     var button = utils.getNode(nodeOrId);
     return fromEvent(button, 'click', 'button clicks on ' + em(nodeOrId));
@@ -948,7 +1167,154 @@ function enter(nodeOrId) {
 }
 exports.enter = enter;
 
-},{"../electric":8,"../electric-event":7,"../receivers/utils":14,"../transformator":17}],11:[function(require,module,exports){
+},{"../electric":10,"../electric-event":9,"../receivers/utils":17,"../transformator":20}],13:[function(require,module,exports){
+function identity(x) {
+    return x;
+}
+exports.identity = identity;
+;
+function curry(f, arity) {
+    if (arity === void 0) { arity = 2; }
+    function partial(prevArgs) {
+        return function () {
+            var args = [];
+            for (var _i = 0; _i < arguments.length; _i++) {
+                args[_i - 0] = arguments[_i];
+            }
+            var nextArgs = prevArgs.slice();
+            nextArgs.splice.apply(nextArgs, [nextArgs.length, 0].concat(args));
+            if (nextArgs.length >= arity) {
+                return f.apply(void 0, nextArgs);
+            }
+            return partial(nextArgs);
+        };
+    }
+    return partial([]);
+}
+exports.curry = curry;
+;
+function property(name) {
+    return function (obj) {
+        return obj[name];
+    };
+}
+exports.property = property;
+;
+function compose(f, g) {
+    return function () {
+        var args = [];
+        for (var _i = 0; _i < arguments.length; _i++) {
+            args[_i - 0] = arguments[_i];
+        }
+        return f(g.apply(void 0, args));
+    };
+}
+exports.compose = compose;
+var maybe;
+(function (maybe) {
+    var Just = (function () {
+        function Just(value) {
+            this.value = value;
+        }
+        Just.prototype.map = function (f) {
+            var result = f(this.flatten());
+            return just(result);
+        };
+        Just.prototype.flatten = function () {
+            return this.value;
+        };
+        Just.prototype.chain = function (f) {
+            return this.map(f).flatten();
+        };
+        return Just;
+    })();
+    function just(value) {
+        return new Just(value);
+    }
+    maybe.just = just;
+    var Nothing = (function () {
+        function Nothing() {
+        }
+        Nothing.prototype.map = function (f) {
+            return maybe.nothing;
+        };
+        Nothing.prototype.bind = function (f) {
+            return maybe.nothing;
+        };
+        Nothing.prototype.flatten = function () {
+            throw Error("can't flatten Nothing");
+        };
+        Nothing.prototype.chain = function (f) {
+            return maybe.nothing;
+        };
+        return Nothing;
+    })();
+    maybe.nothing = new Nothing();
+})(maybe = exports.maybe || (exports.maybe = {}));
+var either;
+(function (either) {
+    var Right = (function () {
+        function Right(value) {
+            this.value = value;
+        }
+        Right.prototype.map = function (f) {
+            var result = f(this.flatten());
+            return right(result);
+        };
+        Right.prototype.flatten = function () {
+            return this.value;
+        };
+        Right.prototype.chain = function (f) {
+            return this.map(f).flatten();
+        };
+        Right.prototype.isRight = function () {
+            return true;
+        };
+        Right.prototype.isLeft = function () {
+            return false;
+        };
+        return Right;
+    })();
+    function right(value) {
+        return new Right(value);
+    }
+    either.right = right;
+    var Left = (function () {
+        function Left(value) {
+            this.lvalue = value;
+        }
+        Left.prototype.map = function (f) {
+            return left(this.lvalue);
+        };
+        Left.prototype.flatten = function () {
+            throw Error("can't flatten Left");
+        };
+        Left.prototype.chain = function (f) {
+            return left(this.lvalue);
+        };
+        Left.prototype.isRight = function () {
+            return false;
+        };
+        Left.prototype.isLeft = function () {
+            return true;
+        };
+        return Left;
+    })();
+    function left(value) {
+        return (new Left(value));
+        // when remove <any> casting:
+        // Neither type 'Left<L, {}>' nor type 'Either<L, R>' is assignable to the other.
+        // Types of property 'flatten' are incompatible.
+        // Type '() => {} | Either<L, {}>' is not assignable to type '() => R | Monad<R>'.
+        // Type '{} | Either<L, {}>' is not assignable to type 'R | Monad<R>'.
+        // Type '{}' is not assignable to type 'R | Monad<R>'.
+        // Type '{}' is not assignable to type 'Monad<R>'.
+        // Property 'flatten' is missing in type '{}'.
+    }
+    either.left = left;
+})(either = exports.either || (exports.either = {}));
+
+},{}],14:[function(require,module,exports){
 // functions that can be simply queued
 var functionsToVoid = [
     'plugReceiver',
@@ -1054,7 +1420,7 @@ function placeholder(initialValue) {
 }
 module.exports = placeholder;
 
-},{}],12:[function(require,module,exports){
+},{}],15:[function(require,module,exports){
 function logReceiver(message) {
     if (!message) {
         message = '<<<';
@@ -1088,7 +1454,7 @@ function collect(emitter) {
 }
 exports.collect = collect;
 
-},{}],13:[function(require,module,exports){
+},{}],16:[function(require,module,exports){
 function htmlReceiverById(id) {
     var element = document.getElementById(id);
     return function (html) {
@@ -1097,7 +1463,7 @@ function htmlReceiverById(id) {
 }
 exports.htmlReceiverById = htmlReceiverById;
 
-},{}],14:[function(require,module,exports){
+},{}],17:[function(require,module,exports){
 function getNode(nodeOrId) {
     if (typeof nodeOrId === 'string') {
         return document.getElementById(nodeOrId);
@@ -1117,7 +1483,7 @@ function getNodes(nodesOfName) {
 }
 exports.getNodes = getNodes;
 
-},{}],15:[function(require,module,exports){
+},{}],18:[function(require,module,exports){
 var stopTime = Date.now();
 var callbacks = {};
 var stopped = false;
@@ -1214,7 +1580,7 @@ function removeFromCallbacksAtTime(callbacksAtTime, callback) {
     }
 }
 
-},{}],16:[function(require,module,exports){
+},{}],19:[function(require,module,exports){
 var utils = require('./utils');
 var Wire = require('./wire');
 var scheduler = require('./scheduler');
@@ -1309,9 +1675,9 @@ function change(switchers) {
                 emit(v[0]);
             }
             else if (v[i].happend) {
+                this._wires[0].unplug();
                 var to = switchers[i - 1].to;
                 var e = utils.callIfFunction(to, v[0], v[i].value);
-                this._wires[0].unplug();
                 this._wires[0] = new Wire(e, this, function (x) { return _this.receiveOn(x, 0); });
             }
         };
@@ -1351,7 +1717,7 @@ function cumulateOverTime(delayInMiliseconds) {
 exports.cumulateOverTime = cumulateOverTime;
 ;
 
-},{"./electric-event":7,"./scheduler":15,"./utils":19,"./wire":20}],17:[function(require,module,exports){
+},{"./electric-event":9,"./scheduler":18,"./utils":22,"./wire":23}],20:[function(require,module,exports){
 var emitter = require('./emitter');
 var namedTransformator = emitter.namedTransformator;
 var transformators = require('./transformator-helpers');
@@ -1446,8 +1812,26 @@ function changes(emitter) {
     return namedTransformator('changes', [emitter], transform, eevent.notHappend);
 }
 exports.changes = changes;
+function skipFirst(emitter) {
+    function transform(emit, impulse) {
+        var skipped = false;
+        return function skipFirstTransform(v, i) {
+            if (v[i].happend) {
+                if (skipped) {
+                    impulse(v[i]);
+                }
+                else {
+                    skipped = true;
+                }
+            }
+        };
+    }
+    return namedTransformator('skip 1', [emitter], transform, eevent.notHappend);
+}
+exports.skipFirst = skipFirst;
+;
 
-},{"../src/electric-event":7,"./emitter":9,"./transformator-helpers":16}],18:[function(require,module,exports){
+},{"../src/electric-event":9,"./emitter":11,"./transformator-helpers":19}],21:[function(require,module,exports){
 var __extends = (this && this.__extends) || function (d, b) {
     for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p];
     function __() { this.constructor = d; }
@@ -1480,7 +1864,7 @@ function transmitter(initialValue) {
 }
 module.exports = transmitter;
 
-},{"./emitter":9,"./wire":20}],19:[function(require,module,exports){
+},{"./emitter":11,"./wire":23}],22:[function(require,module,exports){
 function callIfFunction(obj) {
     var args = [];
     for (var _i = 1; _i < arguments.length; _i++) {
@@ -1513,7 +1897,7 @@ function all(list) {
 }
 exports.all = all;
 
-},{}],20:[function(require,module,exports){
+},{}],23:[function(require,module,exports){
 var Wire = (function () {
     function Wire(input, output, receive, set) {
         this.input = input;
