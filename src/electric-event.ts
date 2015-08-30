@@ -5,6 +5,13 @@ import utils = require('./utils');
 class ElectricEvent<T> implements inf.IElectricEvent<T>{
 	static notHappend: NotHappend<any>;
 
+	static restore<K>(e: {happend: boolean, value: K}) {
+		if (e.happend) {
+			return ElectricEvent.of(e.value);
+		}
+		return ElectricEvent.notHappend;
+	}
+
 	static of<K>(value: K): ElectricEvent<K> {
 		return new Happend(value)
 	}

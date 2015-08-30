@@ -402,6 +402,10 @@ export class Transformator<In>
 		return this._wires.length - 1;
 	}
 
+	unplugEmitter(emitter: inf.IEmitter<In>) {
+		this._wires.filter(w => w.input === emitter).forEach(w => w.unplug());
+	}
+
 	wire(emitter: inf.IEmitter<any>) {
 		var index = this._wires.length;
 		this._wires[index] = new Wire(

@@ -7,7 +7,7 @@ var kettle = require('../../../test/electric-kettle');
 kettle.pourAsync(chai);
 var expect = chai.expect;
 describe('counter', function () {
-    it.only('should emit count', function (done) {
+    it('should emit count', function (done) {
         var emitter = electric.emitter.manual([]);
         expect(counter(emitter).count)
             .to.emit(0)

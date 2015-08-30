@@ -255,6 +255,9 @@ var Transformator = (function (_super) {
         this._values[this._wires.length - 1] = emitter.dirtyCurrentValue();
         return this._wires.length - 1;
     };
+    Transformator.prototype.unplugEmitter = function (emitter) {
+        this._wires.filter(function (w) { return w.input === emitter; }).forEach(function (w) { return w.unplug(); });
+    };
     Transformator.prototype.wire = function (emitter) {
         var _this = this;
         var index = this._wires.length;

@@ -6,7 +6,6 @@ import eevent = require('../../../src/electric-event');
 
 export = changesRendererReceiver;
 
-
 var check: electric.emitter.EventEmitter<{ id: number, completed: boolean }>;
 var del: electric.emitter.EventEmitter<number>;
 var editing: electric.emitter.EventEmitter<number>;
@@ -115,6 +114,7 @@ function renderRemove(change: Change) {
 }
 
 function renderCheck(change: Change) {
+	console.log('REDNE', change);
 	var elemtent = listItemById[change.id];
 	if (elemtent && change.completed) {
 		elemtent.className += ' completed';

@@ -96,6 +96,7 @@ function renderRemove(change) {
     }
 }
 function renderCheck(change) {
+    console.log('REDNE', change);
     var elemtent = listItemById[change.id];
     if (elemtent && change.completed) {
         elemtent.className += ' completed';

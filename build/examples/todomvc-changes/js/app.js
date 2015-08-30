@@ -114,6 +114,9 @@ var Change = (function () {
         this.title = title;
         this.index = index;
     }
+    Change.restore = function (c) {
+        return new Change(c.type, c.id, c.completed, c.title, c.index);
+    };
     Change.check = function (id, completed) {
         return new Change('check', id, completed);
     };
@@ -413,6 +416,7 @@ var list = document.getElementById('todo-list');
 var listItemById = {};
 var labelById = {};
 var inputById = {};
+var checkboxById = {};
 function changesRendererReceiver(del_, retitle_, editing_, check_) {
     var renderedInitial = false;
     var previousEditingId;
@@ -468,6 +472,7 @@ function createListItem(change) {
     }
     on(checkbox, 'click', check.impulse, function () { return ({ id: change.id, completed: checkbox.checked }); });
     div.appendChild(checkbox);
+    checkboxById[change.id] = checkbox;
     var label = dom.label();
     var text = dom.text(change.title);
     label.appendChild(text);
@@ -495,15 +500,19 @@ function renderRemove(change) {
         listItemById[change.id] = null;
         labelById[change.id] = null;
         inputById[change.id] = null;
+        checkboxById[change.id] = null;
     }
 }
 function renderCheck(change) {
     var elemtent = listItemById[change.id];
     if (elemtent && change.completed) {
         elemtent.className += ' completed';
+        console.log('XXX');
+        checkboxById[change.id].setAttribute('checked', 'true');
     }
     else if (elemtent) {
         removeClass(elemtent, 'completed');
+        checkboxById[change.id].removeAttribute('checked');
     }
 }
 function removeClass(element, className) {
@@ -672,6 +681,15 @@ exports.tasksReceiver = tasksReceiver;
 exports.scheduler = require('./scheduler');
 exports.emitter = require('./emitter');
 exports.transformator = require('./transformator');
+function interval(intervalInMs) {
+    var timer = exports.emitter.manualEvent();
+    exports.scheduler.scheduleInterval(function () {
+        timer.impulse(Date.now());
+    }, intervalInMs);
+    timer.name = '| interval |>';
+    return timer;
+}
+exports.interval = interval;
 var TimeValue = (function () {
     function TimeValue(time, value) {
         this.time = time;
@@ -766,6 +784,12 @@ var utils = require('./utils');
 var ElectricEvent = (function () {
     function ElectricEvent() {
     }
+    ElectricEvent.restore = function (e) {
+        if (e.happend) {
+            return ElectricEvent.of(e.value);
+        }
+        return ElectricEvent.notHappend;
+    };
     ElectricEvent.of = function (value) {
         return new Happend(value);
     };
@@ -1011,7 +1035,7 @@ var Emitter = (function () {
         for (var _i = 0; _i < arguments.length; _i++) {
             switchers[_i - 0] = arguments[_i];
         }
-        return namedTransformator('change' + this._enclosedName(), [this].concat(switchers.map(function (s) { return s.when; })), transformators.change(switchers), this._currentValue);
+        return namedTransformator('change to when', [this].concat(switchers.map(function (s) { return s.when; })), transformators.change(switchers), this._currentValue);
     };
     Emitter.prototype._enclosedName = function (emitter) {
         if (emitter === void 0) { emitter = null; }
@@ -1109,6 +1133,9 @@ var Transformator = (function (_super) {
         this._values[this._wires.length - 1] = emitter.dirtyCurrentValue();
         return this._wires.length - 1;
     };
+    Transformator.prototype.unplugEmitter = function (emitter) {
+        this._wires.filter(function (w) { return w.input === emitter; }).forEach(function (w) { return w.unplug(); });
+    };
     Transformator.prototype.wire = function (emitter) {
         var _this = this;
         var index = this._wires.length;
@@ -1158,6 +1185,21 @@ function fromEvent(target, type, name, useCapture) {
     return emitter;
 }
 exports.fromEvent = fromEvent;
+function identity(x) {
+    return x;
+}
+function clicks(nodeOrId, mapping) {
+    if (mapping === void 0) { mapping = identity; }
+    var button = utils.getNode(nodeOrId);
+    var emitter = electric.emitter.manualEvent();
+    function emitterListener(event) {
+        emitter.impulse(mapping(event));
+    }
+    button.addEventListener('click', emitterListener, false);
+    emitter.name = '| clicks on ' + nodeOrId + ' |>';
+    return emitter;
+}
+exports.clicks = clicks;
 function fromButton(nodeOrId) {
     var button = utils.getNode(nodeOrId);
     return fromEvent(button, 'click', 'button clicks on ' + em(nodeOrId));
@@ -1641,9 +1683,9 @@ function change(switchers) {
                 emit(v[0]);
             }
             else if (v[i].happend) {
+                this._wires[0].unplug();
                 var to = switchers[i - 1].to;
                 var e = utils.callIfFunction(to, v[0], v[i].value);
-                this._wires[0].unplug();
                 this._wires[0] = new Wire(e, this, function (x) { return _this.receiveOn(x, 0); });
             }
         };
@@ -1778,6 +1820,24 @@ function changes(emitter) {
     return namedTransformator('changes', [emitter], transform, eevent.notHappend);
 }
 exports.changes = changes;
+function skipFirst(emitter) {
+    function transform(emit, impulse) {
+        var skipped = false;
+        return function skipFirstTransform(v, i) {
+            if (v[i].happend) {
+                if (skipped) {
+                    impulse(v[i]);
+                }
+                else {
+                    skipped = true;
+                }
+            }
+        };
+    }
+    return namedTransformator('skip 1', [emitter], transform, eevent.notHappend);
+}
+exports.skipFirst = skipFirst;
+;
 
 },{"../src/electric-event":9,"./emitter":11,"./transformator-helpers":18}],20:[function(require,module,exports){
 var __extends = (this && this.__extends) || function (d, b) {

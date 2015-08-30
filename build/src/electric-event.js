@@ -2,6 +2,12 @@ var utils = require('./utils');
 var ElectricEvent = (function () {
     function ElectricEvent() {
     }
+    ElectricEvent.restore = function (e) {
+        if (e.happend) {
+            return ElectricEvent.of(e.value);
+        }
+        return ElectricEvent.notHappend;
+    };
     ElectricEvent.of = function (value) {
         return new Happend(value);
     };

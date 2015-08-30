@@ -7,16 +7,16 @@ class Change {
 	title: string;
 	index: number;
 
+	static restore(c: { type: string, id: number, completed: boolean, title: string, index: number }) {
+		return new Change(c.type, c.id, c.completed, c.title, c.index);
+	}
+
 	constructor(type: string, id: number, completed?: boolean, title?: string, index?: number) {
 		this.type = type;
 		this.id = id;
 		this.completed = completed;
 		this.title = title;
 		this.index = index;
-	}
-
-	static restore(c: {type: string, id: number, completed: boolean, title: string, index: number}) {
-		return new Change(c.type, c.id, c.completed, c.title, c.index);
 	}
 
 	static check(id: number, completed: boolean) {
