@@ -1,5 +1,7 @@
 import calculus = require('./calculus');
 
+export = Point;
+
 
 var _maxX: number;
 var _minX: number;
@@ -7,76 +9,52 @@ var _maxY: number;
 var _minY: number;
 
 
-export function setBounds(
-	minX: number, maxX: number,
-	minY: number, maxY: number
-) {
-	_minX = minX;
-	_maxX = maxX;
-	_minY = minY;
-	_maxY = maxY;
-}
-
-
-export class Point implements calculus.Antiderivative {
+class Point implements calculus.Antiderivative {
 	x: number;
 	y: number;
+	angle: number;
 
-	static of(x: number, y: number) {
-		return new Point(x, y);
+	static of(x: number, y: number, angle?: number) {
+		return new Point(x, y, angle);
 	}
 
 	static zero() {
 		return Point.of(0, 0)
 	}
 
-	constructor(x: number, y: number) {
-		this.x;
-		this.y;
-	}
-
-	add(other: Point) {
-		var x = boundTo(this.x + other.x, _minX, _maxX);
-		var y = boundTo(this.y + other.y, _minY, _maxY);
-		return Point.of(x, y);
-	}
-
-	equals(other: Point) {
-		return this.x === other.x && this.y === other.y;
-	}
-}
-
-
-export class PointWithAngle implements calculus.Antiderivative {
-	x: number;
-	y: number;
-	angle: number;
-
-	static of(x: number, y: number, angle: number) {
-		return new PointWithAngle(x, y, angle);
-	}
-
-	static zero() {
-		return PointWithAngle.of(0, 0, -Math.PI / 2);
+	static setBounds(
+		minX: number, maxX: number,
+		minY: number, maxY: number
+	) {
+		_minX = minX;
+		_maxX = maxX;
+		_minY = minY;
+		_maxY = maxY;
 	}
 
 	constructor(x: number, y: number, angle: number) {
 		this.x = x;
 		this.y = y;
-		this.angle = angle;
+		this.angle = angle
 	}
 
-	add(other: PointWithAngle) {
-		var x = boundTo(this.x + other.x, _minX, _maxX);
-		var y = boundTo(this.y + other.y, _minY, _maxY);
-		var angle = this.angle + other.angle
-		return PointWithAngle.of(x, y, angle);
+	addDelta(delta: Point) {
+		var dangle = delta.x;
+		var ddist = delta.y;
+
+		var dx = Math.cos(this.angle + dangle) * ddist;
+		var dy = Math.sin(this.angle + dangle) * ddist;
+
+		var x = boundTo(this.x + dx, _minX, _maxX);
+		var y = boundTo(this.y + dy, _minY, _maxY)
+		return Point.of(x, y, this.angle + dangle);
 	}
 
-	equals(other: PointWithAngle): boolean {
-		return this.x === other.x && this.y === other.y && this.angle === other.angle;
+	equals(other: Point) {
+		return this.x === other.x && this.y === other.y && this.angle === other.angle;;
 	}
 }
+
 
 
 function boundTo(v: number, min: number, max: number) {

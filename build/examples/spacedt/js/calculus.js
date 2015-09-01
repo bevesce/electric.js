@@ -7,12 +7,12 @@ function integral(initialValue, emitter, options) {
         value: emitter.dirtyCurrentValue(),
         sum: initialValue
     }, function (acc, v) {
-        var dt = electric.scheduler.now() - acc.time;
+        var now = electric.scheduler.now();
+        var dt = now - acc.time;
         var nv = v.value.add(acc.value).mulT(dt / 2);
-        var sum = acc.sum.add(nv);
-        // console.log('I', v.value.angle, acc.value.angle);
+        var sum = acc.sum.addDelta(nv);
         return {
-            time: v.time,
+            time: now,
             value: v.value,
             sum: sum
         };

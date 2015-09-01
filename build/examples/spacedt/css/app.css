@@ -33,7 +33,6 @@ canvas {
 .speed-bar {
 	height: 10px;
 	float: left;
-	transition: width 1s;
 }
 
 .speed-current {

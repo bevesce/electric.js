@@ -15,7 +15,7 @@ export interface Integrable {
 }
 
 export interface Antiderivative {
-	add(other: Antiderivative): Antiderivative;
+	addDelta(delta: Antiderivative): Antiderivative;
 	equals(other: Antiderivative): boolean;
 }
 
@@ -32,12 +32,12 @@ export function integral<In extends Integrable, Out extends Antiderivative>(
 			sum: initialValue
 		},
 		(acc, v) => {
-			var dt = electric.scheduler.now() - acc.time;
+			var now = electric.scheduler.now()
+			var dt = now - acc.time;
 			var nv = <Out>v.value.add(acc.value).mulT(dt / 2);
-			var sum = <Out>acc.sum.add(nv);
-			// console.log('I', v.value.angle, acc.value.angle);
+			var sum = <Out>acc.sum.addDelta(nv);
 			return {
-				time: v.time,
+				time: now,
 				value: v.value,
 				sum: sum
 			}
