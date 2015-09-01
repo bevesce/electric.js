@@ -2,6 +2,82 @@ var electric = require('../electric');
 var utils = require('../receivers/utils');
 var transformator = require('../transformator');
 var eevent = require('../electric-event');
+var fp = require('../fp');
+var keyCodes = {
+    up: 38,
+    down: 40,
+    left: 37,
+    right: 39,
+    w: 87,
+    a: 65,
+    s: 83,
+    d: 68,
+    enter: 13
+};
+// NEW
+function clicks(nodeOrId, mapping) {
+    if (mapping === void 0) { mapping = fp.identity; }
+    var button = utils.getNode(nodeOrId);
+    var emitter = electric.emitter.manualEvent();
+    function emitterListener(event) {
+        emitter.impulse(mapping(event));
+    }
+    button.addEventListener('click', emitterListener, false);
+    emitter.setReleaseResources(function () { return button.removeEventListener('click', emitterListener); });
+    emitter.name = '| clicks on ' + nodeOrId + ' |>';
+    return emitter;
+}
+exports.clicks = clicks;
+function arrows(layout, nodeOrId, type) {
+    if (layout === void 0) { layout = 'arrows'; }
+    if (nodeOrId === void 0) { nodeOrId = document; }
+    if (type === void 0) { type = 'keydown'; }
+    var layouts = {
+        'arrows': {
+            38: 'up', 40: 'down', 37: 'left', 39: 'right'
+        },
+        'wasd': {
+            87: 'up', 83: 'down', 65: 'left', 68: 'right'
+        },
+        'hjkl': {
+            75: 'up', 74: 'down', 72: 'left', 76: 'right'
+        },
+        'ijkl': {
+            73: 'up', 75: 'down', 74: 'left', 76: 'right'
+        }
+    };
+    var keyCodes = layouts[layout];
+    var target = utils.getNode(nodeOrId);
+    var emitter = electric.emitter.manualEvent();
+    function emitterListener(event) {
+        var direction = keyCodes[event.keyCode];
+        if (direction) {
+            event.preventDefault();
+            emitter.impulse(direction);
+        }
+    }
+    target.addEventListener(type, emitterListener);
+    emitter.name = '| arrows |>';
+    return emitter;
+}
+exports.arrows = arrows;
+function key(name, type, nodeOrId) {
+    if (nodeOrId === void 0) { nodeOrId = document; }
+    var target = utils.getNode(nodeOrId);
+    var emitter = electric.emitter.manualEvent();
+    var keyCode = keyCodes[name];
+    function emitterListener(event) {
+        if (event.keyCode === keyCode) {
+            event.preventDefault();
+            emitter.impulse(name);
+        }
+    }
+    target.addEventListener('key' + type, emitterListener);
+    emitter.name = '| key ' + name + ' on ' + type + ' |>';
+    return emitter;
+}
+exports.key = key;
+// OLD
 function em(text) {
     return '`' + text + '`';
 }
@@ -19,21 +95,6 @@ function fromEvent(target, type, name, useCapture) {
     return emitter;
 }
 exports.fromEvent = fromEvent;
-function identity(x) {
-    return x;
-}
-function clicks(nodeOrId, mapping) {
-    if (mapping === void 0) { mapping = identity; }
-    var button = utils.getNode(nodeOrId);
-    var emitter = electric.emitter.manualEvent();
-    function emitterListener(event) {
-        emitter.impulse(mapping(event));
-    }
-    button.addEventListener('click', emitterListener, false);
-    emitter.name = '| clicks on ' + nodeOrId + ' |>';
-    return emitter;
-}
-exports.clicks = clicks;
 function fromButton(nodeOrId) {
     var button = utils.getNode(nodeOrId);
     return fromEvent(button, 'click', 'button clicks on ' + em(nodeOrId));

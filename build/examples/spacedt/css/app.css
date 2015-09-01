@@ -1,0 +1,47 @@
+body {
+	padding: 0;
+	margin: 0;
+	font-family: Avenir;
+}
+
+canvas {
+	background-color: black;
+	width: 100%;
+	height: 100%;
+}
+
+.space-container {
+	float: left;
+	width: 90%;
+	padding: 0;
+	margin: 0;
+}
+
+.dashboard {
+	float: left;
+	width: 10%;
+	padding: 0;
+	margin: 0;
+	padding: 10px;
+	box-sizing: border-box;
+}
+
+.speed {
+	overflow: hidden;
+}
+
+.speed-bar {
+	height: 10px;
+	float: left;
+	transition: width 1s;
+}
+
+.speed-current {
+	width: 0;
+	background-color: black;
+}
+
+.speed-tomax {
+	width: 100%;
+	background-color: silver;
+}

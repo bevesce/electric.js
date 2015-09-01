@@ -158,7 +158,7 @@ function changeOverActive(change: Change, tasks: item[]) {
 	else if (change.type === 'check' && !change.completed) {
 		var index = howManyMatchingBefore(t => !t.isCompleted(), change.id, tasks);
 		var task = findById(change.id, tasks);
-		return Change.insert(change.id, task.title(), change.complted, index);
+		return Change.insert(change.id, task.title(), change.completed, index);
 	}
 	else if (change.type === 'insert' && change.completed) {
 		return;

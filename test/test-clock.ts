@@ -27,7 +27,7 @@ describe('clock', function() {
 		electric.scheduler.resume();
 	});
 
-	it('should measure time', function() {
+	it.only('should measure time', function() {
 		var time = electric.scheduler.stop();
 		var timer = clock.time({intervalInMs: 1});
 		var r: clock.TimeValue<void>[] = [];
