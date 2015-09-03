@@ -43,10 +43,11 @@ var c = require('./constants');
 var Point = require('./point');
 var createShip = require('./ship');
 var createAsteroidMother = require('./asteroid-mother');
-var random = require('./utils/random');
+var scoreDevice = require('./score');
+var bulletsDevice = require('./bullets');
+var collisionsDevice = require('./collisions');
+var asteroidsDevice = require('./asteroids');
 var insert = require('./utils/insert');
-var MovingPoint = require('./moving-point');
-var keepScore = require('./score');
 var cont = electric.emitter.constant;
 // canvas
 var canvas = document.getElementById('space');
@@ -69,164 +70,54 @@ var shipInput = {
     shoot: eui.key('space', 'up')
 };
 // transformators
+//// ship
 var shipStartingPoint = Point.of(window.innerWidth / 4, window.innerHeight / 2, -Math.PI / 2);
 var ship = createShip(shipStartingPoint, shipInput);
+//// mother
 var asteroidMotherStartingPoint = Point.of(3 * window.innerWidth / 4, window.innerHeight / 2, -Math.PI / 2);
 var asteroidMother = createAsteroidMother(asteroidMotherStartingPoint);
-//// Collisions
+//// bullets, asteroids & collisions
 var bulletBulletCollision = electric.emitter.placeholder(eevent.notHappend);
 var bulletAsteroidCollision = electric.emitter.placeholder(eevent.notHappend);
 var bulletMotherCollision = electric.emitter.placeholder(eevent.notHappend);
 var bulletShipCollision = electric.emitter.placeholder(eevent.notHappend);
-function shootBullet(bullets, xya, velocity) {
-    var speed = velocity.y + c.bullet.speed;
-    var angle = xya.angle;
-    var vshift = Math.sqrt(Math.max(velocity.y, 0)) + 30;
-    var x = xya.x + Math.cos(xya.angle) * vshift;
-    var y = xya.y + Math.sin(xya.angle) * vshift;
-    var newBullet = MovingPoint.start(speed, x, y, angle);
-    return cont(insert(bullets, newBullet));
-}
-var bullets = cont([]).change({ to: function (bs, s) { return shootBullet(bs, s.xya, s.velocity); }, when: ship.shot }, { to: function (bs, c) { return destroyMovingPoints(bs, c.index1, c.index2); }, when: bulletBulletCollision }, { to: function (bs, c) { return destroyMovingPoints(bs, c.index1); }, when: bulletAsteroidCollision }, { to: function (bs, c) { return destroyMovingPoints(bs, c.index1); }, when: bulletMotherCollision });
-function destroyMovingPoints(bullets) {
-    var indices = [];
-    for (var _i = 1; _i < arguments.length; _i++) {
-        indices[_i - 1] = arguments[_i];
-    }
-    var bullets = bullets.slice();
-    indices.sort(function (a, b) { return -(a - b); }).forEach(function (i) { return bullets.splice(i, 1); });
-    return cont(bullets);
-}
-var bulletsXY = electric.transformator.flattenMany(bullets.map(function (bs) { return bs.map(function (b) { return b.xya; }); }));
-function bearAsteroid(asteroids, xya) {
-    var speed = 100;
-    var angle = random(-Math.PI, Math.PI);
-    var x = xya.x;
-    var y = xya.y;
-    var newBullet = MovingPoint.start(speed, x, y, angle);
-    return cont(insert(asteroids, newBullet));
-}
-var asteroids = cont([]).change({ to: function (as, xya) { return bearAsteroid(as, xya); }, when: asteroidMother.birth }, { to: function (as, c) { return destroyMovingPoints(as, c.index2); }, when: bulletAsteroidCollision });
-var asteroidsXY = electric.transformator.flattenMany(asteroids.map(function (bs) { return bs.map(function (b) { return b.xya; }); }));
-var checkBulletBulletCollision = checkIfCollidingWithDistance(c.bullet.radius + c.bullet.radius);
-var checkBulletAsteroidCollision = checkIfCollidingWithDistance(c.bullet.radius + c.asteroid.radius);
-var checkBulletMotherCollision = checkIfCollidingWithDistance(c.bullet.radius + c.asteroidMother.radius);
-var checkShipMotherCollision = checkIfCollidingWithDistance(c.ship.radius + c.asteroidMother.radius);
-var checkBulletShipCollision = checkIfCollidingWithDistance(c.bullet.radius + c.ship.radius);
-var checkShipAsteroidCollision = checkIfCollidingWithDistance(c.ship.radius + c.asteroid.radius);
-bulletBulletCollision.is(bulletsXY.whenThen(function (bullets) {
-    for (var i = 0; i < bullets.length; i++) {
-        var bullet1 = bullets[i];
-        for (var j = i + 1; j < bullets.length; j++) {
-            var bullet2 = bullets[j];
-            if (checkBulletBulletCollision(bullet1, bullet2)) {
-                return {
-                    index1: i,
-                    index2: j,
-                    x: (bullet1.x + bullet2.x) / 2,
-                    y: (bullet1.y + bullet2.y) / 2
-                };
-            }
-        }
-    }
-}));
-var bulletsXYshipXY = electric.transformator.map(function (bs, s) { return ({ bullets: bs, ship: s }); }, bulletsXY, ship.xya);
-bulletShipCollision.is(bulletsXYshipXY.whenThen(function (a) {
-    for (var i = 0; i < a.bullets.length; i++) {
-        var bullet = a.bullets[i];
-        if (checkBulletShipCollision(bullet, a.ship)) {
-            return {
-                index1: i,
-                index2: 0,
-                x: bullet.x,
-                y: bullet.y
-            };
-        }
-    }
-}));
-var shipXYasteroidsXY = electric.transformator.map(function (s, as) { return ({ ship: s, asteroids: as }); }, ship.xya, asteroidsXY);
-var shipAsteroidCollision = shipXYasteroidsXY.whenThen(function (a) {
-    for (var i = 0; i < a.asteroids.length; i++) {
-        var asteroid = a.asteroids[i];
-        if (checkShipAsteroidCollision(a.ship, asteroid)) {
-            return {
-                index1: 0,
-                index2: i,
-                x: (asteroid.x + a.ship.x) / 2,
-                y: (asteroid.y + a.ship.y) / 2
-            };
-        }
-    }
+var bullets = bulletsDevice({
+    shoot: ship.shot,
+    removeBoth: bulletBulletCollision,
+    removeFirst: electric.transformator.merge(bulletMotherCollision, bulletAsteroidCollision)
 });
-var bulletsXYasteroidsXY = electric.transformator.map(function (bs, as) { return ({ bullets: bs, asteroids: as }); }, bulletsXY, asteroidsXY);
-bulletAsteroidCollision.is(bulletsXYasteroidsXY.whenThen(function (a) {
-    for (var i = 0; i < a.bullets.length; i++) {
-        var bullet = a.bullets[i];
-        for (var j = 0; j < a.asteroids.length; j++) {
-            var asteroid = a.asteroids[j];
-            if (checkBulletAsteroidCollision(bullet, asteroid)) {
-                return {
-                    index1: i,
-                    index2: j,
-                    x: asteroid.x,
-                    y: asteroid.y
-                };
-            }
-        }
-    }
-}));
-var bulletsXYasteroidMotherXY = electric.transformator.map(function (bs, m) { return ({ bullets: bs, mother: m }); }, bulletsXY, asteroidMother.xya);
-bulletMotherCollision.is(bulletsXYasteroidMotherXY.whenThen(function (a) {
-    for (var i = 0; i < a.bullets.length; i++) {
-        var bullet = a.bullets[i];
-        if (checkBulletMotherCollision(bullet, a.mother)) {
-            return {
-                index1: i,
-                index2: 0,
-                x: bullet.x,
-                y: bullet.y
-            };
-        }
-    }
-}));
-var shipXYmotherXY = electric.transformator.map(function (s, m) { return ({ ship: s, mother: m }); }, ship.xya, asteroidMother.xya);
-var shipMotherCollision = shipXYmotherXY.whenThen(function (a) {
-    if (checkShipMotherCollision(a.ship, a.mother)) {
-        return {
-            index1: 0,
-            index2: 0,
-            x: a.ship.x,
-            y: a.ship.y
-        };
-    }
+var asteroids = asteroidsDevice({
+    birth: asteroidMother.birth,
+    removeSecond: bulletAsteroidCollision
 });
-function checkIfCollidingWithDistance(distance) {
-    var powDistance = distance * distance;
-    return function (p1, p2) {
-        var dx = p1.x - p2.x;
-        var dy = p1.y - p2.y;
-        var dist = dx * dx + dy * dy;
-        return (dist <= powDistance);
-    };
-}
-var allCollisions = electric.transformator.merge(bulletBulletCollision, bulletAsteroidCollision, bulletMotherCollision, shipMotherCollision, bulletShipCollision, shipAsteroidCollision);
-var collisionsToDraw = cont([]).change({ to: function (cs, c) { return cont(insert(cs, c)); }, when: allCollisions }, {
-    to: function (cs, _) { return cont([]); },
-    when: allCollisions.transformTime(eevent.notHappend, function (t) { return t + c.collision.duration; })
+var collisions = collisionsDevice({
+    bulletsXY: bullets.xy,
+    shipXY: ship.xya,
+    asteroidsXY: asteroids.xy,
+    motherXY: asteroidMother.xya
 });
-var gameEndingCollisions = electric.transformator.merge(shipMotherCollision, shipAsteroidCollision, bulletShipCollision).transformTime(eevent.notHappend, function (t) { return t + 10; });
-var score = keepScore({
-    asteroidHit: bulletAsteroidCollision,
-    motherHit: bulletMotherCollision,
-    gameEnd: gameEndingCollisions
+bulletBulletCollision.is(collisions.bullet.bullet);
+bulletShipCollision.is(collisions.bullet.ship);
+bulletAsteroidCollision.is(collisions.bullet.asteroid);
+bulletMotherCollision.is(collisions.bullet.mother);
+var score = scoreDevice({
+    asteroidHit: collisions.bullet.asteroid,
+    motherHit: collisions.bullet.mother,
+    gameEnd: collisions.gameEnding
 });
 // receivers
 var draw = require('./draw');
 draw.setCtx(canvas.getContext('2d'));
 var dashboard = require('./dashboard');
+score.plugReceiver(dashboard.score());
+var collisionsToDraw = cont([]).change({ to: function (cs, c) { return insert(cs, c); }, when: collisions.all }, {
+    to: function (cs, _) { return cont(cs.slice(1)); },
+    when: collisions.all.transformTime(eevent.notHappend, function (t) { return t + c.collision.duration; })
+});
 var allToDraw = electric.transformator.map(function (s, bs, ms, ebs, cs) { return ({
     ship: s, bullets: bs, mothership: ms, asteroids: ebs, collisions: cs, state: 'ok'
-}); }, ship.xya, bulletsXY, asteroidMother.xya, asteroidsXY, collisionsToDraw);
+}); }, ship.xya, bullets.xy, asteroidMother.xya, asteroids.xy, collisionsToDraw);
+var gameEnd = collisions.gameEnding.transformTime(eevent.notHappend, function (t) { return t + 10; });
 var drawingState = allToDraw.change({
     to: function (s, _) {
         return cont({
@@ -238,13 +129,7 @@ var drawingState = allToDraw.change({
             state: 'game over'
         });
     },
-    when: gameEndingCollisions
-});
-var gameOver = cont(eevent.notHappend).change({ to: clock.intervalValue(true, { inMs: 1000 }), when: gameEndingCollisions });
-gameOver.plugReceiver(function (e) {
-    if (e.happend) {
-        draw.gameOver(width, height);
-    }
+    when: gameEnd
 });
 drawingState.plugReceiver(function (a) {
     if (a.state === 'game over') {
@@ -257,10 +142,15 @@ drawingState.plugReceiver(function (a) {
     draw.asteroidMother(a.mothership);
     draw.ship(a.ship);
 });
+var gameOver = cont(eevent.notHappend).change({ to: clock.intervalValue(true, { inMs: 1000 }), when: gameEnd });
+gameOver.plugReceiver(function (e) {
+    if (e.happend) {
+        draw.gameOver(width, height);
+    }
+});
 ship.v.plugReceiver(dashboard.speed());
-score.plugReceiver(dashboard.score());
 
-},{"../../../src/electric":18,"../../../src/electric-event":17,"../../../src/emitters/ui":20,"./asteroid-mother":3,"./clock":5,"./constants":6,"./dashboard":7,"./draw":8,"./moving-point":9,"./point":10,"./score":11,"./ship":12,"./utils/insert":13,"./utils/random":14}],3:[function(require,module,exports){
+},{"../../../src/electric":22,"../../../src/electric-event":21,"../../../src/emitters/ui":24,"./asteroid-mother":3,"./asteroids":4,"./bullets":5,"./clock":7,"./collisions":8,"./constants":9,"./dashboard":10,"./draw":11,"./point":13,"./score":14,"./ship":15,"./utils/insert":16}],3:[function(require,module,exports){
 var electric = require('../../../src/electric');
 var clock = require('./clock');
 var calculus = require('./calculus');
@@ -288,7 +178,58 @@ function create(startingPoint) {
 }
 module.exports = create;
 
-},{"../../../src/electric":18,"./acceleration":1,"./calculus":4,"./clock":5,"./constants":6,"./point":10,"./utils/random":14,"./velocity":15}],4:[function(require,module,exports){
+},{"../../../src/electric":22,"./acceleration":1,"./calculus":6,"./clock":7,"./constants":9,"./point":13,"./utils/random":17,"./velocity":19}],4:[function(require,module,exports){
+var electric = require('../../../src/electric');
+var MovingPoint = require('./moving-point');
+var random = require('./utils/random');
+var remove = require('./utils/remove');
+var insert = require('./utils/insert');
+var cont = electric.emitter.constant;
+function bearAsteroid(asteroids, xya) {
+    var speed = 100;
+    var angle = random(-Math.PI, Math.PI);
+    var x = xya.x;
+    var y = xya.y;
+    var newBullet = MovingPoint.start(speed, x, y, angle);
+    return insert(asteroids, newBullet);
+}
+function create(input) {
+    var asteroids = cont([]).change({ to: function (as, xya) { return bearAsteroid(as, xya); }, when: input.birth }, { to: function (as, c) { return remove(as, c.index2); }, when: input.removeSecond });
+    var asteroidsXY = electric.transformator.flattenMany(asteroids.map(function (bs) { return bs.map(function (b) { return b.xya; }); }));
+    return {
+        all: asteroids,
+        xy: asteroidsXY
+    };
+}
+module.exports = create;
+
+},{"../../../src/electric":22,"./moving-point":12,"./utils/insert":16,"./utils/random":17,"./utils/remove":18}],5:[function(require,module,exports){
+var electric = require('../../../src/electric');
+var c = require('./constants');
+var MovingPoint = require('./moving-point');
+var remove = require('./utils/remove');
+var insert = require('./utils/insert');
+var cont = electric.emitter.constant;
+function shootBullet(bullets, xya, velocity) {
+    var speed = velocity.y + c.bullet.speed;
+    var angle = xya.angle;
+    var vshift = Math.sqrt(Math.max(velocity.y, 0)) + 30;
+    var x = xya.x + Math.cos(xya.angle) * vshift;
+    var y = xya.y + Math.sin(xya.angle) * vshift;
+    var newBullet = MovingPoint.start(speed, x, y, angle);
+    return insert(bullets, newBullet);
+}
+function create(input) {
+    var bullets = cont([]).change({ to: function (bs, s) { return shootBullet(bs, s.xya, s.velocity); }, when: input.shoot }, { to: function (bs, c) { return remove(bs, c.index1, c.index2); }, when: input.removeBoth }, { to: function (bs, c) { return remove(bs, c.index1); }, when: input.removeFirst });
+    var bulletsXY = electric.transformator.flattenMany(bullets.map(function (bs) { return bs.map(function (b) { return b.xya; }); }));
+    return {
+        all: bullets,
+        xy: bulletsXY
+    };
+}
+module.exports = create;
+
+},{"../../../src/electric":22,"./constants":9,"./moving-point":12,"./utils/insert":16,"./utils/remove":18}],6:[function(require,module,exports){
 var clock = require('./clock');
 var electric = require('../../../src/electric');
 function integral(initialValue, emitter, options) {
@@ -341,7 +282,7 @@ function timeValue(emitter, options) {
     return transformator;
 }
 
-},{"../../../src/electric":18,"./clock":5}],5:[function(require,module,exports){
+},{"../../../src/electric":22,"./clock":7}],7:[function(require,module,exports){
 var electric = require('../../../src/electric');
 function interval(options) {
     var timer = electric.emitter.manualEvent();
@@ -387,7 +328,154 @@ function calculateEmitterName(options) {
     }
 }
 
-},{"../../../src/electric":18}],6:[function(require,module,exports){
+},{"../../../src/electric":22}],8:[function(require,module,exports){
+var electric = require('../../../src/electric');
+var c = require('./constants');
+var map = electric.transformator.map;
+function create(input) {
+    var checkBulletBullet = checkIfCollidingWithDistance(c.bullet.radius + c.bullet.radius);
+    var bulletBullet = input.bulletsXY.whenThen(function (bullets) { return collisionCenterMiddle(checkIfCollidingInOneArray(checkBulletBullet, bullets)); });
+    var checkBulletShip = checkIfCollidingWithDistance(c.bullet.radius + c.ship.radius);
+    var bulletsXYshipXY = map(function (bs, s) { return ({ points: bs, point: s }); }, input.bulletsXY, input.shipXY);
+    var bulletShip = bulletsXYshipXY.whenThen(function (a) { return collisionCenterFirstPoint(checkIfCollidingInArrayVsPoint(checkBulletShip, a.points, a.point)); });
+    var checkShipAsteroid = checkIfCollidingWithDistance(c.ship.radius + c.asteroid.radius);
+    var shipXYasteroidsXY = map(function (s, as) { return ({ point: s, points: as }); }, input.shipXY, input.asteroidsXY);
+    var shipAsteroid = shipXYasteroidsXY.whenThen(function (a) { return collisionCenterMiddle(checkIfCollidingInArrayVsPoint(checkShipAsteroid, a.points, a.point)); });
+    var checkBulletAsteroid = checkIfCollidingWithDistance(c.bullet.radius + c.asteroid.radius);
+    var bulletsXYasteroidsXY = electric.transformator.map(function (bs, as) { return ({ points1: bs, points2: as }); }, input.bulletsXY, input.asteroidsXY);
+    var bulletAsteroid = bulletsXYasteroidsXY.whenThen(function (a) { return collisionCenterSecondPoint(checkIfCollidingBetweenTwoArrays(checkBulletAsteroid, a.points1, a.points2)); });
+    var checkBulletMother = checkIfCollidingWithDistance(c.bullet.radius + c.asteroidMother.radius);
+    var bulletsXYmotherXY = electric.transformator.map(function (bs, m) { return ({ points: bs, point: m }); }, input.bulletsXY, input.motherXY);
+    var bulletMother = bulletsXYmotherXY.whenThen(function (a) { return collisionCenterFirstPoint(checkIfCollidingInArrayVsPoint(checkBulletMother, a.points, a.point)); });
+    var checkShipMother = checkIfCollidingWithDistance(c.ship.radius + c.asteroidMother.radius);
+    var shipXYmotherXY = electric.transformator.map(function (s, m) { return ({ point1: s, point2: m }); }, input.shipXY, input.motherXY);
+    var shipMother = shipXYmotherXY.whenThen(function (a) { return collisionCenterFirstPoint(checkIfCollidingPoints(checkShipMother, a.point1, a.point2)); });
+    var all = electric.transformator.merge(bulletBullet, bulletAsteroid, bulletMother, shipMother, bulletShip, shipAsteroid);
+    var gameEnding = electric.transformator.merge(shipMother, shipAsteroid, bulletShip);
+    return {
+        all: all,
+        asteroid: {
+            bullet: bulletAsteroid,
+            ship: shipAsteroid
+        },
+        bullet: {
+            asteroid: bulletAsteroid,
+            bullet: bulletBullet,
+            mother: bulletMother,
+            ship: bulletShip
+        },
+        gameEnding: gameEnding,
+        mother: {
+            bullet: bulletMother,
+            ship: shipMother
+        },
+        ship: {
+            bullet: bulletShip,
+            asteroid: shipAsteroid,
+            mother: shipMother
+        }
+    };
+}
+function checkIfCollidingPoints(check, point1, point2) {
+    if (check(point1, point2)) {
+        return {
+            index1: 0,
+            index2: 0,
+            point1: point1,
+            point2: point2
+        };
+    }
+}
+function checkIfCollidingInOneArray(check, points) {
+    for (var i = 0; i < points.length; i++) {
+        var point1 = points[i];
+        for (var j = i + 1; j < points.length; j++) {
+            var point2 = points[j];
+            if (check(point1, point2)) {
+                return {
+                    index1: i,
+                    index2: j,
+                    point1: point1,
+                    point2: point2
+                };
+            }
+        }
+    }
+}
+function checkIfCollidingInArrayVsPoint(check, points, point) {
+    for (var i = 0; i < points.length; i++) {
+        var point1 = points[i];
+        if (check(point1, point)) {
+            return {
+                index1: i,
+                index2: 0,
+                point1: point1,
+                point2: point
+            };
+        }
+    }
+}
+function checkIfCollidingBetweenTwoArrays(check, points1, points2) {
+    for (var i = 0; i < points1.length; i++) {
+        var point1 = points1[i];
+        for (var j = 0; j < points2.length; j++) {
+            var point2 = points2[j];
+            if (check(point1, point2)) {
+                return {
+                    index1: i,
+                    index2: j,
+                    point1: point1,
+                    point2: point2
+                };
+            }
+        }
+    }
+}
+function collisionCenterFirstPoint(collision) {
+    if (collision === undefined) {
+        return;
+    }
+    return {
+        index1: collision.index1,
+        index2: collision.index2,
+        x: collision.point1.x,
+        y: collision.point1.y
+    };
+}
+function collisionCenterSecondPoint(collision) {
+    if (collision === undefined) {
+        return;
+    }
+    return {
+        index1: collision.index1,
+        index2: collision.index2,
+        x: collision.point2.x,
+        y: collision.point2.y
+    };
+}
+function collisionCenterMiddle(collision) {
+    if (collision === undefined) {
+        return;
+    }
+    return {
+        index1: collision.index1,
+        index2: collision.index2,
+        x: (collision.point1.x + collision.point2.x) / 2,
+        y: (collision.point1.y + collision.point2.y) / 2
+    };
+}
+function checkIfCollidingWithDistance(distance) {
+    var powDistance = distance * distance;
+    return function (p1, p2) {
+        var dx = p1.x - p2.x;
+        var dy = p1.y - p2.y;
+        var dist = dx * dx + dy * dy;
+        return (dist <= powDistance);
+    };
+}
+module.exports = create;
+
+},{"../../../src/electric":22,"./constants":9}],9:[function(require,module,exports){
 var BULLET_RADIUS = 3;
 var values = {
     asteroid: {
@@ -432,7 +520,7 @@ var values = {
 };
 module.exports = values;
 
-},{}],7:[function(require,module,exports){
+},{}],10:[function(require,module,exports){
 var rui = require('../../../src/receivers/ui');
 var c = require('./constants');
 function speed() {
@@ -471,7 +559,7 @@ function score() {
 }
 exports.score = score;
 
-},{"../../../src/receivers/ui":24,"./constants":6}],8:[function(require,module,exports){
+},{"../../../src/receivers/ui":28,"./constants":9}],11:[function(require,module,exports){
 var c = require('./constants');
 var random = require('./utils/random');
 var _ctx;
@@ -534,7 +622,7 @@ function gameOver(width, height) {
 }
 exports.gameOver = gameOver;
 
-},{"./constants":6,"./utils/random":14}],9:[function(require,module,exports){
+},{"./constants":9,"./utils/random":17}],12:[function(require,module,exports){
 var electric = require('../../../src/electric');
 var calculus = require('./calculus');
 var c = require('./constants');
@@ -556,7 +644,7 @@ var MovingPoint = (function () {
 })();
 module.exports = MovingPoint;
 
-},{"../../../src/electric":18,"./calculus":4,"./constants":6,"./point":10,"./velocity":15}],10:[function(require,module,exports){
+},{"../../../src/electric":22,"./calculus":6,"./constants":9,"./point":13,"./velocity":19}],13:[function(require,module,exports){
 var _maxX;
 var _minX;
 var _maxY;
@@ -608,7 +696,7 @@ function boundTo(v, min, max) {
 }
 module.exports = Point;
 
-},{}],11:[function(require,module,exports){
+},{}],14:[function(require,module,exports){
 var electric = require('../../../src/electric');
 var c = require('./constants');
 var cont = electric.emitter.constant;
@@ -617,7 +705,7 @@ function score(input) {
 }
 module.exports = score;
 
-},{"../../../src/electric":18,"./constants":6}],12:[function(require,module,exports){
+},{"../../../src/electric":22,"./constants":9}],15:[function(require,module,exports){
 var electric = require('../../../src/electric');
 var eevent = require('../../../src/electric-event');
 var eui = require('../../../src/emitters/ui');
@@ -647,21 +735,37 @@ function create(startingPoint, input) {
 }
 module.exports = create;
 
-},{"../../../src/electric":18,"../../../src/electric-event":17,"../../../src/emitters/ui":20,"./acceleration":1,"./calculus":4,"./constants":6,"./point":10,"./velocity":15}],13:[function(require,module,exports){
+},{"../../../src/electric":22,"../../../src/electric-event":21,"../../../src/emitters/ui":24,"./acceleration":1,"./calculus":6,"./constants":9,"./point":13,"./velocity":19}],16:[function(require,module,exports){
+var electric = require('../../../../src/electric');
+var cont = electric.emitter.constant;
 function insert(list, item) {
     var l = list.slice();
     l.push(item);
-    return l;
+    return cont(l);
 }
 module.exports = insert;
 
-},{}],14:[function(require,module,exports){
+},{"../../../../src/electric":22}],17:[function(require,module,exports){
 function random(min, max) {
     return Math.random() * (max - min) + min;
 }
 module.exports = random;
 
-},{}],15:[function(require,module,exports){
+},{}],18:[function(require,module,exports){
+var electric = require('../../../../src/electric');
+var cont = electric.emitter.constant;
+function remove(bullets) {
+    var indices = [];
+    for (var _i = 1; _i < arguments.length; _i++) {
+        indices[_i - 1] = arguments[_i];
+    }
+    var bullets = bullets.slice();
+    indices.sort(function (a, b) { return -(a - b); }).forEach(function (i) { return bullets.splice(i, 1); });
+    return cont(bullets);
+}
+module.exports = remove;
+
+},{"../../../../src/electric":22}],19:[function(require,module,exports){
 var Velocity = (function () {
     function Velocity(x, y, antiderivative, bounds) {
         this.bounds = bounds || {};
@@ -710,7 +814,7 @@ function within(v, min, max) {
 }
 module.exports = Velocity;
 
-},{}],16:[function(require,module,exports){
+},{}],20:[function(require,module,exports){
 exports.scheduler = require('./scheduler');
 exports.emitter = require('./emitter');
 exports.transformator = require('./transformator');
@@ -812,7 +916,7 @@ function derivative(f) {
 }
 exports.derivative = derivative;
 
-},{"./emitter":19,"./scheduler":26,"./transformator":28}],17:[function(require,module,exports){
+},{"./emitter":23,"./scheduler":30,"./transformator":32}],21:[function(require,module,exports){
 var utils = require('./utils');
 var ElectricEvent = (function () {
     function ElectricEvent() {
@@ -898,7 +1002,7 @@ var NotHappend = (function () {
 ElectricEvent.notHappend = new NotHappend();
 module.exports = ElectricEvent;
 
-},{"./utils":30}],18:[function(require,module,exports){
+},{"./utils":34}],22:[function(require,module,exports){
 exports.scheduler = require('./scheduler');
 exports.emitter = require('./emitter');
 exports.transformator = require('./transformator');
@@ -908,7 +1012,7 @@ exports.transmitter = require('./transmitter');
 // export import device = require('./device');
 // export import fp = require('./fp');
 
-},{"./clock":16,"./emitter":19,"./receiver":23,"./scheduler":26,"./transformator":28,"./transmitter":29}],19:[function(require,module,exports){
+},{"./clock":20,"./emitter":23,"./receiver":27,"./scheduler":30,"./transformator":32,"./transmitter":33}],23:[function(require,module,exports){
 var __extends = (this && this.__extends) || function (d, b) {
     for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p];
     function __() { this.constructor = d; }
@@ -1402,7 +1506,7 @@ function namedTransformator(name, emitters, transform, initialValue) {
 }
 exports.namedTransformator = namedTransformator;
 
-},{"./electric-event":17,"./placeholder":22,"./scheduler":26,"./transformator-helpers":27,"./wire":31}],20:[function(require,module,exports){
+},{"./electric-event":21,"./placeholder":26,"./scheduler":30,"./transformator-helpers":31,"./wire":35}],24:[function(require,module,exports){
 var electric = require('../electric');
 var utils = require('../receivers/utils');
 var transformator = require('../transformator');
@@ -1623,7 +1727,7 @@ function enter(nodeOrId) {
 }
 exports.enter = enter;
 
-},{"../electric":18,"../electric-event":17,"../fp":21,"../receivers/utils":25,"../transformator":28}],21:[function(require,module,exports){
+},{"../electric":22,"../electric-event":21,"../fp":25,"../receivers/utils":29,"../transformator":32}],25:[function(require,module,exports){
 function identity(x) {
     return x;
 }
@@ -1770,7 +1874,7 @@ var either;
     either.left = left;
 })(either = exports.either || (exports.either = {}));
 
-},{}],22:[function(require,module,exports){
+},{}],26:[function(require,module,exports){
 // functions that can be simply queued
 var functionsToVoid = [
     'plugReceiver',
@@ -1792,7 +1896,8 @@ var functionsToEmitter = [
     'transformTime',
     'accumulate',
     'sample',
-    'change'
+    'change',
+    'merge'
 ];
 // function to throw if called before is()
 var functionsToSomething = [];
@@ -1876,7 +1981,7 @@ function placeholder(initialValue) {
 }
 module.exports = placeholder;
 
-},{}],23:[function(require,module,exports){
+},{}],27:[function(require,module,exports){
 function logReceiver(message) {
     if (!message) {
         message = '<<<';
@@ -1910,7 +2015,7 @@ function collect(emitter) {
 }
 exports.collect = collect;
 
-},{}],24:[function(require,module,exports){
+},{}],28:[function(require,module,exports){
 function htmlReceiverById(id) {
     var element = document.getElementById(id);
     return function (html) {
@@ -1919,7 +2024,7 @@ function htmlReceiverById(id) {
 }
 exports.htmlReceiverById = htmlReceiverById;
 
-},{}],25:[function(require,module,exports){
+},{}],29:[function(require,module,exports){
 function getNode(nodeOrId) {
     if (typeof nodeOrId === 'string') {
         return document.getElementById(nodeOrId);
@@ -1939,7 +2044,7 @@ function getNodes(nodesOfName) {
 }
 exports.getNodes = getNodes;
 
-},{}],26:[function(require,module,exports){
+},{}],30:[function(require,module,exports){
 var stopTime = Date.now();
 var callbacks = {};
 var stopped = false;
@@ -2036,7 +2141,7 @@ function removeFromCallbacksAtTime(callbacksAtTime, callback) {
     }
 }
 
-},{}],27:[function(require,module,exports){
+},{}],31:[function(require,module,exports){
 var utils = require('./utils');
 var Wire = require('./wire');
 var scheduler = require('./scheduler');
@@ -2189,7 +2294,7 @@ function cumulateOverTime(delayInMiliseconds) {
 exports.cumulateOverTime = cumulateOverTime;
 ;
 
-},{"./electric-event":17,"./scheduler":26,"./utils":30,"./wire":31}],28:[function(require,module,exports){
+},{"./electric-event":21,"./scheduler":30,"./utils":34,"./wire":35}],32:[function(require,module,exports){
 var emitter = require('./emitter');
 var namedTransformator = emitter.namedTransformator;
 var transformators = require('./transformator-helpers');
@@ -2329,7 +2434,7 @@ function flattenMany(emitter) {
 }
 exports.flattenMany = flattenMany;
 
-},{"../src/electric-event":17,"./emitter":19,"./transformator-helpers":27}],29:[function(require,module,exports){
+},{"../src/electric-event":21,"./emitter":23,"./transformator-helpers":31}],33:[function(require,module,exports){
 var __extends = (this && this.__extends) || function (d, b) {
     for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p];
     function __() { this.constructor = d; }
@@ -2362,7 +2467,7 @@ function transmitter(initialValue) {
 }
 module.exports = transmitter;
 
-},{"./emitter":19,"./wire":31}],30:[function(require,module,exports){
+},{"./emitter":23,"./wire":35}],34:[function(require,module,exports){
 function callIfFunction(obj) {
     var args = [];
     for (var _i = 1; _i < arguments.length; _i++) {
@@ -2395,7 +2500,7 @@ function all(list) {
 }
 exports.all = all;
 
-},{}],31:[function(require,module,exports){
+},{}],35:[function(require,module,exports){
 var Wire = (function () {
     function Wire(input, output, receive, set) {
         this.input = input;

@@ -23,7 +23,8 @@ var functionsToEmitter = [
 	'transformTime',
 	'accumulate',
 	'sample',
-	'change'
+	'change',
+	'merge'
 ];
 // function to throw if called before is()
 var functionsToSomething: string[] = [
