@@ -4,8 +4,8 @@ var eui = require('../../../src/emitters/ui');
 var clock = require('./clock');
 var c = require('./constants');
 var Point = require('./point');
-var createShip = require('./ship');
-var createAsteroidMother = require('./asteroid-mother');
+var shipDevice = require('./ship');
+var motherDevice = require('./asteroid-mother');
 var scoreDevice = require('./score');
 var bulletsDevice = require('./bullets');
 var collisionsDevice = require('./collisions');
@@ -35,10 +35,10 @@ var shipInput = {
 // transformators
 //// ship
 var shipStartingPoint = Point.of(window.innerWidth / 4, window.innerHeight / 2, -Math.PI / 2);
-var ship = createShip(shipStartingPoint, shipInput);
+var ship = shipDevice(shipStartingPoint, shipInput);
 //// mother
 var asteroidMotherStartingPoint = Point.of(3 * window.innerWidth / 4, window.innerHeight / 2, -Math.PI / 2);
-var asteroidMother = createAsteroidMother(asteroidMotherStartingPoint);
+var asteroidMother = motherDevice(asteroidMotherStartingPoint);
 //// bullets, asteroids & collisions
 var bulletBulletCollision = electric.emitter.placeholder(eevent.notHappend);
 var bulletAsteroidCollision = electric.emitter.placeholder(eevent.notHappend);
@@ -74,7 +74,7 @@ draw.setCtx(canvas.getContext('2d'));
 var dashboard = require('./dashboard');
 score.plugReceiver(dashboard.score());
 var collisionsToDraw = cont([]).change({ to: function (cs, c) { return insert(cs, c); }, when: collisions.all }, {
-    to: function (cs, _) { return cont(cs.slice(1)); },
+    to: function (cs, _) { return cont([]); },
     when: collisions.all.transformTime(eevent.notHappend, function (t) { return t + c.collision.duration; })
 });
 var allToDraw = electric.transformator.map(function (s, bs, ms, ebs, cs) { return ({
@@ -105,7 +105,7 @@ drawingState.plugReceiver(function (a) {
     draw.asteroidMother(a.mothership);
     draw.ship(a.ship);
 });
-var gameOver = cont(eevent.notHappend).change({ to: clock.intervalValue(true, { inMs: 1000 }), when: gameEnd });
+var gameOver = cont(eevent.notHappend).change({ to: clock.intervalValue(true, { inMs: c.gameover.interval }), when: gameEnd });
 gameOver.plugReceiver(function (e) {
     if (e.happend) {
         draw.gameOver(width, height);

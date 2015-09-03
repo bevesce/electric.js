@@ -4,11 +4,10 @@ var calculus = require('./calculus');
 var c = require('./constants');
 var Point = require('./point');
 var Velocity = require('./velocity');
-var Acceleration = require('./acceleration');
 var random = require('./utils/random');
 var cont = electric.emitter.constant;
 function acceleration(x, y) {
-    return Acceleration.of(x, y, velocity);
+    return Velocity.of(x, y, velocity);
 }
 function velocity(x, y) {
     return Velocity.of(x, y, Point.of);

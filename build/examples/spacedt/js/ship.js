@@ -3,12 +3,11 @@ var eevent = require('../../../src/electric-event');
 var eui = require('../../../src/emitters/ui');
 var calculus = require('./calculus');
 var c = require('./constants');
-var Acceleration = require('./acceleration');
 var Velocity = require('./velocity');
 var Point = require('./point');
 var cont = electric.emitter.constant;
 function shipAcceleration(x, y) {
-    return Acceleration.of(x, y, shipVelocity);
+    return Velocity.of(x, y, shipVelocity);
 }
 function shipVelocity(x, y) {
     return Velocity.of(x, y, Point.of, c.ship.vbounds);

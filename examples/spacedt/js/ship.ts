@@ -16,7 +16,7 @@ var cont = electric.emitter.constant;
 
 
 function shipAcceleration(x: number, y: number) {
-	return Acceleration.of(x, y, shipVelocity);
+	return Velocity.of(x, y, shipVelocity);
 }
 
 function shipVelocity(x: number, y: number) {

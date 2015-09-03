@@ -15,7 +15,7 @@ var cont = electric.emitter.constant;
 
 
 function acceleration(x: number, y: number) {
-	return Acceleration.of(x, y, velocity);
+	return Velocity.of(x, y, velocity);
 }
 
 function velocity(x: number, y: number) {

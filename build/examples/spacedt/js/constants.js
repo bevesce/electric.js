@@ -20,6 +20,9 @@ var values = {
         speed: 100
     },
     fps: 60,
+    gameover: {
+        interval: 1000
+    },
     score: {
         forAsteroid: 3,
         forMother: 100

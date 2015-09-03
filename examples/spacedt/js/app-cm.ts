@@ -8,19 +8,15 @@ import calculus = require('./calculus');
 
 import c = require('./constants');
 import Point = require('./point');
-import Velocity = require('./velocity');
-import Acceleration = require('./acceleration');
-import createShip = require('./ship');
-import createAsteroidMother = require('./asteroid-mother')
-import MovingPoint = require('./moving-point');
+import shipDevice = require('./ship');
+import motherDevice = require('./asteroid-mother')
 import collision = require('./collision');
 import scoreDevice = require('./score');
 import bulletsDevice = require('./bullets');
 import collisionsDevice = require('./collisions');
 import asteroidsDevice = require('./asteroids');
-import random = require('./utils/random');
+
 import insert = require('./utils/insert');
-import remove = require('./utils/remove');
 
 
 var cont = electric.emitter.constant;
@@ -54,12 +50,12 @@ var shipInput = {
 var shipStartingPoint = Point.of(
 	window.innerWidth / 4, window.innerHeight / 2, -Math.PI / 2
 );
-var ship = createShip(shipStartingPoint, shipInput);
+var ship = shipDevice(shipStartingPoint, shipInput);
 //// mother
 var asteroidMotherStartingPoint = Point.of(
 	3 * window.innerWidth / 4, window.innerHeight / 2, -Math.PI / 2
 );
-var asteroidMother = createAsteroidMother(asteroidMotherStartingPoint);
+var asteroidMother = motherDevice(asteroidMotherStartingPoint);
 
 //// bullets, asteroids & collisions
 var bulletBulletCollision = electric.emitter.placeholder(
@@ -113,7 +109,7 @@ score.plugReceiver(dashboard.score());
 var collisionsToDraw = cont([]).change(
 	{ to: (cs, c) => insert(cs, c), when: collisions.all },
 	{
-		to: (cs, _) => cont(cs.slice(1)),
+		to: (cs, _) => cont([]),
 		when: collisions.all.transformTime(
 			eevent.notHappend, t => t + c.collision.duration
 		)
@@ -155,7 +151,7 @@ drawingState.plugReceiver(a => {
 });
 
 var gameOver = cont(eevent.notHappend).change(
-	{ to: clock.intervalValue(true, { inMs: 1000 }), when: gameEnd }
+	{ to: clock.intervalValue(true, { inMs: c.gameover.interval }), when: gameEnd }
 );
 gameOver.plugReceiver(e => {
 	if (e.happend) {
