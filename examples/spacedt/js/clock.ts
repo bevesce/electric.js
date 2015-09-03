@@ -1,11 +1,32 @@
 import electric = require('../../../src/electric');
 
-export = clock;
+export function interval(
+	options: { inMs?: number, fps?: number }
+) {
+	var timer = electric.emitter.manualEvent();
+	electric.scheduler.scheduleInterval(() => {
+		timer.impulse(Date.now())
+	}, calculateInterval(options.inMs, options.fps))
+	timer.name = '| interval |>';
+	return timer;
+}
 
-function clock(
+export function intervalValue<T>(
+	value: T, options: { inMs?: number, fps?: number }
+) {
+	var timer = electric.emitter.manualEvent();
+	electric.scheduler.scheduleInterval(() => {
+		timer.impulse(value)
+	}, calculateInterval(options.inMs, options.fps))
+	timer.name = '| interval |>';
+	return timer;
+}
+
+
+export function time(
 	options: { intervalInMs?: number, fps?: number }
 ) {
-	var interval = calculateInterval(options);
+	var interval = calculateInterval(options.intervalInMs, options.fps);
 	var emitter = electric.emitter.manual(electric.scheduler.now());
 	var id = electric.scheduler.scheduleInterval(
 		() => emitter.emit((electric.scheduler.now())),
@@ -16,12 +37,12 @@ function clock(
 	return emitter;
 }
 
-function calculateInterval(options: { intervalInMs?: number, fps?: number }) {
-	if (options.intervalInMs === undefined) {
-		return 1 / options.fps * 1000
+function calculateInterval(intervalInMs?: number, fps?: number) {
+	if (intervalInMs === undefined) {
+		return 1 / fps * 1000
 	}
 	else {
-		return options.intervalInMs;
+		return intervalInMs;
 	}
 }
 

@@ -144,23 +144,6 @@ describe('transformators', function () {
             .to.emit(eevent.notHappend)
             .and.then.to.finish(done);
     });
-    transformator('flatten', function (done) {
-        var initial = electric.emitter.manual('i1');
-        var emitter = electric.emitter.manual(initial);
-        var flattened = t.flatten(emitter);
-        var toBeEmitted = electric.emitter.manual('t1');
-        expect(flattened)
-            .to.emit('i1')
-            .then.after(function () { return initial.emit('i2'); })
-            .to.emit('i2')
-            .then.after(function () { return emitter.emit(toBeEmitted); })
-            .to.emit('t1')
-            .then.after(function () { return initial.emit('i3'); })
-            .to.emit('i3')
-            .then.after(function () { return toBeEmitted.emit('t2'); })
-            .to.emit('t2')
-            .andBe(done);
-    });
     transformator('hold', function (done) {
         var emitter = electric.emitter.manual(eevent.notHappend);
         var holded = t.hold(0, emitter);
@@ -185,5 +168,63 @@ describe('transformators', function () {
             .to.emit(eevent.of({ previous: 1, next: 2 }))
             .to.emit(eevent.notHappend)
             .andBe(done);
+    });
+});
+describe('flattens', function () {
+    describe('flatten', function () {
+        it('should work on f_a :: t -> (t -> a)', function (done) {
+            var e0 = electric.emitter.manual('0a');
+            var e1 = electric.emitter.manual('1a');
+            var e2 = electric.emitter.manual('2a');
+            var emitters = electric.emitter.manual(e0);
+            expect(t.flatten(emitters))
+                .to.emit('0a')
+                .after(function () { return e0.emit('0b'); })
+                .to.emit('0b')
+                .after(function () { return e0.emit('0c'); })
+                .to.emit('0c')
+                .after(function () { return emitters.emit(e1); })
+                .to.emit('1a')
+                .after(function () { return e1.emit('1b'); })
+                .to.emit('1b')
+                .after(function () { return e0.emit('0d'); })
+                .after(function () { return e1.emit('1c'); })
+                .to.emit('1c')
+                .after(function () { return e0.emit('0e'); })
+                .after(function () { return emitters.emit(e2); })
+                .to.emit('2a')
+                .after(function () { return e2.emit('2b'); })
+                .after(function () { return e0.emit('0f'); })
+                .after(function () { return e1.emit('1d'); })
+                .to.emit('2b')
+                .andBe(done);
+        });
+    });
+    describe('flattenMany', function () {
+        it('should work on f_a :: t -> [t -> a]', function (done) {
+            var e0 = electric.emitter.manual('0a');
+            var e1 = electric.emitter.manual('1a');
+            var e2 = electric.emitter.manual('2a');
+            var emitters = electric.emitter.manual([e0, e1]);
+            expect(t.flattenMany(emitters))
+                .to.emit(['0a', '1a'])
+                .after(function () { return e0.emit('0b'); })
+                .to.emit(['0b', '1a'])
+                .after(function () { return e1.emit('1b'); })
+                .to.emit(['0b', '1b'])
+                .after(function () { return e1.emit('1c'); })
+                .to.emit(['0b', '1c'])
+                .after(function () { return emitters.emit([e1, e2]); })
+                .to.emit(['1c', '2a'])
+                .after(function () { return e2.emit('2b'); })
+                .to.emit(['1c', '2b'])
+                .after(function () { return e1.emit('1d'); })
+                .to.emit(['1d', '2b'])
+                .after(function () { return emitters.emit([e0]); })
+                .to.emit(['0b'])
+                .after(function () { return e0.emit('0c'); })
+                .to.emit(['0c'])
+                .andBe(done);
+        });
     });
 });

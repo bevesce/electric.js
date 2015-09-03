@@ -15,7 +15,8 @@ var keyCodes: { [name: string]: number } = {
 	a: 65,
 	s: 83,
 	d: 68,
-	enter: 13
+	enter: 13,
+	space: 32
 }
 
 

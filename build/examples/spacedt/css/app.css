@@ -1,7 +1,13 @@
+html {
+	height: 100%;
+}
+
 body {
 	padding: 0;
 	margin: 0;
 	font-family: Avenir;
+	height: 100%;
+	overflow: hidden;
 }
 
 canvas {
@@ -28,6 +34,7 @@ canvas {
 
 .speed {
 	overflow: hidden;
+	margin-bottom: 10px;
 }
 
 .speed-bar {
@@ -37,10 +44,36 @@ canvas {
 
 .speed-current {
 	width: 0;
-	background-color: black;
+	background-color: #A691FA;
 }
 
 .speed-tomax {
 	width: 100%;
 	background-color: silver;
+}
+
+.speed-left {
+	width: 49%;
+	background-color: silver;
+}
+
+.speed-right {
+	width: 49%;
+	background-color: silver;
+}
+
+.a-speed-current {
+	width: 2%;
+	background-color: #FA6464;
+}
+
+.score {
+	text-align: right;
+	font-weight: 700;
+}
+
+.instruction {
+	color: gray;
+	margin-bottom: 1em;
+	font-size: 0.7em;
 }

@@ -19,6 +19,11 @@ export interface Antiderivative {
 	equals(other: Antiderivative): boolean;
 }
 
+export interface IntegrableAntiderivative
+	extends Integrable, Antiderivative {
+
+}
+
 export function integral<In extends Integrable, Out extends Antiderivative>(
 	initialValue: Out,
 	emitter: inf.IEmitter<In>,
@@ -45,6 +50,7 @@ export function integral<In extends Integrable, Out extends Antiderivative>(
 	).map(v => v.sum);
 	result.name = '<| integral |>';
 	result.setEquals((x, y) => x.equals(y));
+	result.stabilize = () => timmed.stabilize();
 	return result;
 }
 
@@ -90,9 +96,11 @@ function timeValue<T>(
 	emitter: inf.IEmitter<T>,
 	options: TimeOptions
 ): inf.IEmitter<{ value: T, time: number }> {
-	var time = clock(options);
-	return electric.transformator.map(
+	var time = clock.time(options);
+	var transformator =  electric.transformator.map(
 		(t, v) => ({ time: t, value: v }),
 		time, emitter
 	);
+	transformator.stabilize = () => time.stabilize();
+	return transformator;
 }

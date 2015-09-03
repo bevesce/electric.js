@@ -94,7 +94,7 @@ var Emitter = (function () {
         var currentReceivers = this._receivers.slice();
         for (var _i = 0; _i < currentReceivers.length; _i++) {
             var receiver = currentReceivers[_i];
-            this._ayncDispatchToReceiver(receiver, value);
+            this._dispatchToReceiver(receiver, value);
         }
     };
     Emitter.prototype._dispatchToReceiver = function (receiver, value) {
@@ -144,8 +144,11 @@ var Emitter = (function () {
         return namedTransformator('merge' + this._enclosedName() + ' with ' + emitters.map(function (e) { return e.name; }).join(', '), [this].concat(emitters), transformators.merge(), this.dirtyCurrentValue());
     };
     Emitter.prototype.when = function (switcher) {
-        var currentValue = this.dirtyCurrentValue();
-        var t = namedTransformator('when' + this._enclosedName(), [this], transformators.when(switcher.happens, switcher.then), eevent.notHappend);
+        var t = namedTransformator('when happens then', [this], transformators.when(switcher.happens, switcher.then), eevent.notHappend);
+        return t;
+    };
+    Emitter.prototype.whenThen = function (happens) {
+        var t = namedTransformator('when then', [this], transformators.whenThen(happens), eevent.notHappend);
         return t;
     };
     Emitter.prototype.sample = function (initialValue, samplingEvent) {
@@ -425,7 +428,6 @@ var Transformator = (function (_super) {
         _super.call(this, initialValue);
         this.name = '<| transformator |>';
         this._values = Array(emitters.length);
-        ;
         if (transform) {
             this.setTransform(transform);
         }
@@ -455,6 +457,12 @@ var Transformator = (function (_super) {
     };
     Transformator.prototype.unplugEmitter = function (emitter) {
         this._wires.filter(function (w) { return w.input === emitter; }).forEach(function (w) { return w.unplug(); });
+    };
+    Transformator.prototype.dropEmitters = function (start) {
+        var wiresToDrop = this._wires.slice(1);
+        wiresToDrop.forEach(function (w) { return w.unplug(); });
+        this._wires.splice(start, this._wires.length);
+        this._values.splice(start, this._values.length);
     };
     Transformator.prototype.wire = function (emitter) {
         var _this = this;

@@ -9,7 +9,6 @@ var expect = chai.expect;
 import electric = require('../../../src/electric');
 
 describe('spacedt', function() {
-	it('should exists', function() {
-
+	it('how does this work?', function() {
 	});
 });

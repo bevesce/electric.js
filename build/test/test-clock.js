@@ -19,7 +19,7 @@ describe('clock', function () {
     afterEach(function () {
         electric.scheduler.resume();
     });
-    it.only('should measure time', function () {
+    it('should measure time', function () {
         var time = electric.scheduler.stop();
         var timer = clock.time({ intervalInMs: 1 });
         var r = [];

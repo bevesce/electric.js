@@ -2,7 +2,7 @@ export declare type IDisposable = number;
 
 export interface IElectricEvent<T> {
 	happend: boolean;
-	value?: T;
+	value: T;
 	map<Out>(f: (v: T) => Out): IElectricEvent<Out>
 }
 
@@ -42,6 +42,7 @@ export interface IEmitter<T> {
 		happens: (value: T) => boolean,
 		then: (value: T) => NewT
 	}): IEmitter<IElectricEvent<NewT>>;
+	whenThen<NewT>(happens: (value: T) => NewT | void): IEmitter<IElectricEvent<NewT>>;
 	change<S1>(
 	    switcher1: { when: IEmitter<IElectricEvent<S1>>, to: IEmitter<T> | ((t: T, k: S1) => IEmitter<T>) }
 	): IEmitter<T>;

@@ -19,6 +19,7 @@ function integral(initialValue, emitter, options) {
     }).map(function (v) { return v.sum; });
     result.name = '<| integral |>';
     result.setEquals(function (x, y) { return x.equals(y); });
+    result.stabilize = function () { return timmed.stabilize(); };
     return result;
 }
 exports.integral = integral;
@@ -43,6 +44,8 @@ function differential(initialValue, emitter, options) {
 }
 exports.differential = differential;
 function timeValue(emitter, options) {
-    var time = clock(options);
-    return electric.transformator.map(function (t, v) { return ({ time: t, value: v }); }, time, emitter);
+    var time = clock.time(options);
+    var transformator = electric.transformator.map(function (t, v) { return ({ time: t, value: v }); }, time, emitter);
+    transformator.stabilize = function () { return time.stabilize(); };
+    return transformator;
 }

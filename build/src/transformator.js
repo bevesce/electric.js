@@ -46,26 +46,6 @@ function cumulateOverTime(emitter, overInMs) {
     return namedTransformator('cumulate', [emitter], transformators.cumulateOverTime(overInMs), eevent.notHappend);
 }
 exports.cumulateOverTime = cumulateOverTime;
-// what are semantics of flatten!?
-function flatten(emitter) {
-    var transformator = namedTransformator('flatten', [emitter, emitter.dirtyCurrentValue()], transform, emitter.dirtyCurrentValue().dirtyCurrentValue());
-    // var transformator = new Transformator([]);
-    function transform(emit) {
-        return function flattenTransform(v, i) {
-            if (i == 0) {
-                transformator.plugEmitter(v[i]);
-                emit(v[i].dirtyCurrentValue());
-            }
-            else {
-                emit(v[i]);
-            }
-        };
-    }
-    ;
-    return transformator;
-}
-exports.flatten = flatten;
-;
 function hold(initialValue, emitter) {
     function transform(emit) {
         return function holdTransform(v, i) {
@@ -110,3 +90,49 @@ function skipFirst(emitter) {
 }
 exports.skipFirst = skipFirst;
 ;
+// semantics:
+// f_a :: t -> (t -> a)
+// flatten(f_a) = f(t)
+// flatten(f_a)(t) = f(t)(t)
+function flatten(emitter) {
+    var transformator = namedTransformator('flatten', [emitter, emitter.dirtyCurrentValue()], transform, emitter.dirtyCurrentValue().dirtyCurrentValue());
+    function transform(emit) {
+        return function flattenTransform(v, i) {
+            if (i == 0) {
+                transformator.dropEmitters(1);
+                transformator.plugEmitter(v[0]);
+                emit(v[0].dirtyCurrentValue());
+            }
+            else {
+                emit(v[i]);
+            }
+        };
+    }
+    ;
+    return transformator;
+}
+exports.flatten = flatten;
+;
+// semantics:
+// f_a :: t -> [t -> a]
+// flatten(f_a) = f(t)
+// flatten(f_a)(t) = f(t).map(g => g(t))
+function flattenMany(emitter) {
+    var currentValues = emitter.dirtyCurrentValue().map(function (e) { return e.dirtyCurrentValue(); });
+    var transformator = namedTransformator('flatten many', [emitter].concat(emitter.dirtyCurrentValue()), transform, currentValues);
+    function transform(emit) {
+        return function flattenTransform(v, i) {
+            if (i == 0) {
+                transformator.dropEmitters(1);
+                v[0].forEach(function (e) { return transformator.plugEmitter(e); });
+                emit(v[0].map(function (e) { return e.dirtyCurrentValue(); }));
+            }
+            else {
+                emit(v.slice(1));
+            }
+        };
+    }
+    ;
+    return transformator;
+}
+exports.flattenMany = flattenMany;

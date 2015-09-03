@@ -14,7 +14,7 @@ describe('clock', function() {
 
 	it('should measure time', function(done) {
 		var t0 = electric.scheduler.stop();
-		var time = clock({ intervalInMs: 1 });
+		var time = clock.time({ intervalInMs: 1 });
 		expect(time)
 			.to.emit(t0)
 			.then.after(() => electric.scheduler.advance(3))

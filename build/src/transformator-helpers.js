@@ -111,6 +111,22 @@ function when(happend, then) {
     };
 }
 exports.when = when;
+function whenThen(happens) {
+    return function transform(emit, impulse) {
+        var prevHappend;
+        return function whenTransform(v, i) {
+            var happend = happens(v[i]);
+            if (happend && !prevHappend) {
+                impulse(eevent.of(happend));
+                prevHappend = happend;
+            }
+            else if (!happend) {
+                prevHappend = null;
+            }
+        };
+    };
+}
+exports.whenThen = whenThen;
 function cumulateOverTime(delayInMiliseconds) {
     return function transform(emit, impulse) {
         var accumulated = [];

@@ -257,31 +257,6 @@ export function cumulateOverTime<T>(
     );
 }
 
-// what are semantics of flatten!?
-export function flatten<InOut>(
-    emitter: inf.IEmitter<inf.IEmitter<InOut>>
-): inf.IEmitter<InOut> {
-    var transformator = namedTransformator(
-        'flatten',
-        [emitter, emitter.dirtyCurrentValue()],
-        transform,
-        emitter.dirtyCurrentValue().dirtyCurrentValue()
-    );
-    // var transformator = new Transformator([]);
-    function transform(emit: inf.IEmitterFunction<InOut>) {
-        return function flattenTransform(v: any[], i: number) {
-            if (i == 0){
-                transformator.plugEmitter(v[i]);
-                emit(v[i].dirtyCurrentValue())
-            }
-            else {
-                emit(v[i])
-            }
-        }
-    };
-    return transformator;
-};
-
 
 export function hold<InOut>(
 	initialValue: InOut,
@@ -351,3 +326,61 @@ export function skipFirst<InOut>(
         eevent.notHappend
     );
 };
+
+// semantics:
+// f_a :: t -> (t -> a)
+// flatten(f_a) = f(t)
+// flatten(f_a)(t) = f(t)(t)
+export function flatten<InOut>(
+    emitter: inf.IEmitter<inf.IEmitter<InOut>>
+): inf.IEmitter<InOut> {
+    var transformator = namedTransformator(
+        'flatten',
+        [emitter, emitter.dirtyCurrentValue()],
+        transform,
+        emitter.dirtyCurrentValue().dirtyCurrentValue()
+    );
+    function transform(emit: inf.IEmitterFunction<InOut>) {
+        return function flattenTransform(v: any[], i: number) {
+            if (i == 0) {
+                transformator.dropEmitters(1);
+                transformator.plugEmitter(v[0]);
+                emit(v[0].dirtyCurrentValue());
+            }
+            else {
+                emit(v[i])
+            }
+        }
+    };
+    return transformator;
+};
+
+// semantics:
+// f_a :: t -> [t -> a]
+// flatten(f_a) = f(t)
+// flatten(f_a)(t) = f(t).map(g => g(t))
+export function flattenMany<InOut>(
+    emitter: inf.IEmitter<inf.IEmitter<InOut>[]>
+): inf.IEmitter<InOut[]> {
+    var currentValues = emitter.dirtyCurrentValue().map(e => e.dirtyCurrentValue());
+    var transformator = namedTransformator(
+        'flatten many',
+        [<inf.IEmitter<any>>emitter].concat(emitter.dirtyCurrentValue()),
+        transform,
+        currentValues
+    );
+    function transform(emit: inf.IEmitterFunction<InOut[]>) {
+        return function flattenTransform(v: any[], i: number) {
+            if (i == 0) {
+                transformator.dropEmitters(1);
+                v[0].forEach((e: any) => transformator.plugEmitter(e));
+                emit(v[0].map((e: any) => e.dirtyCurrentValue()));
+            }
+            else {
+                emit(v.slice(1));
+            }
+        }
+    };
+
+    return transformator;
+}

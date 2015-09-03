@@ -1,106 +1,294 @@
 (function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);var f=new Error("Cannot find module '"+o+"'");throw f.code="MODULE_NOT_FOUND",f}var l=n[o]={exports:{}};t[o][0].call(l.exports,function(e){var n=t[o][1][e];return s(n?n:e)},l,l.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(require,module,exports){
-var velocity = require('./velocity');
 var Acceleration = (function () {
-    function Acceleration(x, y) {
+    function Acceleration(x, y, antiderivative) {
         this.x = x;
         this.y = y;
+        this.antiderivative = antiderivative;
     }
-    Acceleration.of = function (x, y) {
-        return new Acceleration(x, y);
+    Acceleration.of = function (x, y, antiderivative) {
+        return new Acceleration(x, y, antiderivative);
     };
-    Acceleration.zero = function () {
-        return Acceleration.of(0, 0);
+    Acceleration.zero = function (antiderivative) {
+        return Acceleration.of(0, 0, antiderivative);
     };
     Acceleration.prototype.add = function (other) {
         var x = this.x + other.x;
         var y = this.y + other.y;
-        return Acceleration.of(x, y);
+        return Acceleration.of(x, y, this.antiderivative);
     };
     Acceleration.prototype.equals = function (other) {
-        return this.x === other.x && this.y === other.y;
+        return this.x === other.x && this.y === other.y && this.antiderivative === other.antiderivative;
     };
     Acceleration.prototype.withX = function (x) {
-        return Acceleration.of(x, this.y);
+        return Acceleration.of(x, this.y, this.antiderivative);
     };
     Acceleration.prototype.withY = function (y) {
-        return Acceleration.of(this.x, y);
+        return Acceleration.of(this.x, y, this.antiderivative);
     };
     Acceleration.prototype.mulT = function (dt) {
         var dx = this.x * dt / 1000;
         var dy = this.y * dt / 1000;
-        return velocity.of(dx, dy);
+        return this.antiderivative(dx, dy);
     };
     return Acceleration;
 })();
 module.exports = Acceleration;
 
-},{"./velocity":6}],2:[function(require,module,exports){
+},{}],2:[function(require,module,exports){
 var electric = require('../../../src/electric');
+var eevent = require('../../../src/electric-event');
 var eui = require('../../../src/emitters/ui');
-var calculus = require('./calculus');
-var point = require('./point');
-var velocity = require('./velocity');
-var acceleration = require('./acceleration');
+var clock = require('./clock');
+var c = require('./constants');
+var Point = require('./point');
+var createShip = require('./ship');
+var createAsteroidMother = require('./asteroid-mother');
+var random = require('./utils/random');
+var insert = require('./utils/insert');
+var MovingPoint = require('./moving-point');
+var keepScore = require('./score');
 var cont = electric.emitter.constant;
+// canvas
 var canvas = document.getElementById('space');
 var width = window.innerWidth;
 var height = window.innerHeight;
+canvas.style.height = height + 'px';
 canvas.width = window.innerWidth;
 canvas.height = window.innerHeight;
-var ctx = canvas.getContext('2d');
-ctx.fillStyle = 'white';
-var MAX_ANGULAR_SPEED = 5;
-var MIN_ANGULAR_SPEED = -MAX_ANGULAR_SPEED;
-var ANGULAR_SPEED_ACCELERATION = 100;
-var MAX_LINEAR_SPEED = 1600;
-var MIN_LINEAR_SPEED = -10;
-var LINEAR_SPEED_ACCELERATION = 400;
-var FPS = 60;
-point.setBounds(0, width, 0, height);
-velocity.setBounds(MIN_ANGULAR_SPEED, MAX_ANGULAR_SPEED, MIN_LINEAR_SPEED, MAX_LINEAR_SPEED);
-var center = point.of(window.innerWidth / 2, window.innerHeight / 2, -Math.PI / 2);
-var shipA = cont(acceleration.zero()).change({ to: function (a, _) { return cont(a.withX(-ANGULAR_SPEED_ACCELERATION)); }, when: eui.key('a', 'down') }, { to: function (a, _) { return cont(a.withX(ANGULAR_SPEED_ACCELERATION)); }, when: eui.key('d', 'down') }, { to: function (a, _) { return cont(a.withX(0)); }, when: eui.key('d', 'up') }, { to: function (a, _) { return cont(a.withX(0)); }, when: eui.key('a', 'up') }, { to: function (a, _) { return cont(a.withY(-LINEAR_SPEED_ACCELERATION)); }, when: eui.key('s', 'down') }, { to: function (a, _) { return cont(a.withY(LINEAR_SPEED_ACCELERATION)); }, when: eui.key('w', 'down') }, { to: function (a, _) { return cont(a.withY(0)); }, when: eui.key('w', 'up') }, { to: function (a, _) { return cont(a.withY(0)); }, when: eui.key('s', 'up') });
-var shipV = calculus.integral(velocity.zero(), shipA, { fps: FPS }).change({ to: function (v, _) { return calculus.integral(v.withX(0), shipA, { fps: FPS }); }, when: eui.key('d', 'up') }, { to: function (v, _) { return calculus.integral(v.withX(0), shipA, { fps: FPS }); }, when: eui.key('a', 'up') });
-var shipXY = calculus.integral(center, shipV, { fps: FPS });
-shipXY.plugReceiver(shipDrawer());
-function shipDrawer() {
-    return function (ship) {
-        canvas.width = canvas.width;
-        ctx.strokeStyle = 'white';
-        ctx.fillStyle = 'blue';
-        ctx.lineWidth = 3;
-        var lShift = Math.cos(ship.angle) * 20;
-        var pShift = Math.sin(ship.angle) * 20;
-        var lShift2 = Math.cos(ship.angle + Math.PI / 2) * 10;
-        var pShift2 = Math.sin(ship.angle + Math.PI / 2) * 10;
-        var pX = -lShift + ship.x;
-        var pY = -pShift + ship.y;
-        ctx.moveTo(ship.x + lShift * 0.5, ship.y + pShift * 0.5);
-        ctx.lineTo(pX + lShift2, pY + pShift2);
-        ctx.lineTo(pX - lShift2, pY - pShift2);
-        ctx.lineTo(ship.x + lShift * 0.5, ship.y + pShift * 0.5);
-        ctx.fill();
-        pX = ship.x;
-        pY = ship.y;
-        ctx.stroke();
+Point.setBounds(0, width, 0, height);
+// emitters
+var shipInput = {
+    accelerate: eui.key('w', 'down'),
+    deccelerate: eui.key('s', 'down'),
+    stopAcceleration: eui.key('w', 'up'),
+    stopDecceleration: eui.key('s', 'up'),
+    rotateLeft: eui.key('a', 'down'),
+    rotateRight: eui.key('d', 'down'),
+    stopRotateLeft: eui.key('a', 'up'),
+    stopRotateRight: eui.key('d', 'up'),
+    shoot: eui.key('space', 'up')
+};
+// transformators
+var shipStartingPoint = Point.of(window.innerWidth / 4, window.innerHeight / 2, -Math.PI / 2);
+var ship = createShip(shipStartingPoint, shipInput);
+var asteroidMotherStartingPoint = Point.of(3 * window.innerWidth / 4, window.innerHeight / 2, -Math.PI / 2);
+var asteroidMother = createAsteroidMother(asteroidMotherStartingPoint);
+//// Collisions
+var bulletBulletCollision = electric.emitter.placeholder(eevent.notHappend);
+var bulletAsteroidCollision = electric.emitter.placeholder(eevent.notHappend);
+var bulletMotherCollision = electric.emitter.placeholder(eevent.notHappend);
+var bulletShipCollision = electric.emitter.placeholder(eevent.notHappend);
+function shootBullet(bullets, xya, velocity) {
+    var speed = velocity.y + c.bullet.speed;
+    var angle = xya.angle;
+    var vshift = Math.sqrt(Math.max(velocity.y, 0)) + 30;
+    var x = xya.x + Math.cos(xya.angle) * vshift;
+    var y = xya.y + Math.sin(xya.angle) * vshift;
+    var newBullet = MovingPoint.start(speed, x, y, angle);
+    return cont(insert(bullets, newBullet));
+}
+var bullets = cont([]).change({ to: function (bs, s) { return shootBullet(bs, s.xya, s.velocity); }, when: ship.shot }, { to: function (bs, c) { return destroyMovingPoints(bs, c.index1, c.index2); }, when: bulletBulletCollision }, { to: function (bs, c) { return destroyMovingPoints(bs, c.index1); }, when: bulletAsteroidCollision }, { to: function (bs, c) { return destroyMovingPoints(bs, c.index1); }, when: bulletMotherCollision });
+function destroyMovingPoints(bullets) {
+    var indices = [];
+    for (var _i = 1; _i < arguments.length; _i++) {
+        indices[_i - 1] = arguments[_i];
+    }
+    var bullets = bullets.slice();
+    indices.sort(function (a, b) { return -(a - b); }).forEach(function (i) { return bullets.splice(i, 1); });
+    return cont(bullets);
+}
+var bulletsXY = electric.transformator.flattenMany(bullets.map(function (bs) { return bs.map(function (b) { return b.xya; }); }));
+function bearAsteroid(asteroids, xya) {
+    var speed = 100;
+    var angle = random(-Math.PI, Math.PI);
+    var x = xya.x;
+    var y = xya.y;
+    var newBullet = MovingPoint.start(speed, x, y, angle);
+    return cont(insert(asteroids, newBullet));
+}
+var asteroids = cont([]).change({ to: function (as, xya) { return bearAsteroid(as, xya); }, when: asteroidMother.birth }, { to: function (as, c) { return destroyMovingPoints(as, c.index2); }, when: bulletAsteroidCollision });
+var asteroidsXY = electric.transformator.flattenMany(asteroids.map(function (bs) { return bs.map(function (b) { return b.xya; }); }));
+var checkBulletBulletCollision = checkIfCollidingWithDistance(c.bullet.radius + c.bullet.radius);
+var checkBulletAsteroidCollision = checkIfCollidingWithDistance(c.bullet.radius + c.asteroid.radius);
+var checkBulletMotherCollision = checkIfCollidingWithDistance(c.bullet.radius + c.asteroidMother.radius);
+var checkShipMotherCollision = checkIfCollidingWithDistance(c.ship.radius + c.asteroidMother.radius);
+var checkBulletShipCollision = checkIfCollidingWithDistance(c.bullet.radius + c.ship.radius);
+var checkShipAsteroidCollision = checkIfCollidingWithDistance(c.ship.radius + c.asteroid.radius);
+bulletBulletCollision.is(bulletsXY.whenThen(function (bullets) {
+    for (var i = 0; i < bullets.length; i++) {
+        var bullet1 = bullets[i];
+        for (var j = i + 1; j < bullets.length; j++) {
+            var bullet2 = bullets[j];
+            if (checkBulletBulletCollision(bullet1, bullet2)) {
+                return {
+                    index1: i,
+                    index2: j,
+                    x: (bullet1.x + bullet2.x) / 2,
+                    y: (bullet1.y + bullet2.y) / 2
+                };
+            }
+        }
+    }
+}));
+var bulletsXYshipXY = electric.transformator.map(function (bs, s) { return ({ bullets: bs, ship: s }); }, bulletsXY, ship.xya);
+bulletShipCollision.is(bulletsXYshipXY.whenThen(function (a) {
+    for (var i = 0; i < a.bullets.length; i++) {
+        var bullet = a.bullets[i];
+        if (checkBulletShipCollision(bullet, a.ship)) {
+            return {
+                index1: i,
+                index2: 0,
+                x: bullet.x,
+                y: bullet.y
+            };
+        }
+    }
+}));
+var shipXYasteroidsXY = electric.transformator.map(function (s, as) { return ({ ship: s, asteroids: as }); }, ship.xya, asteroidsXY);
+var shipAsteroidCollision = shipXYasteroidsXY.whenThen(function (a) {
+    for (var i = 0; i < a.asteroids.length; i++) {
+        var asteroid = a.asteroids[i];
+        if (checkShipAsteroidCollision(a.ship, asteroid)) {
+            return {
+                index1: 0,
+                index2: i,
+                x: (asteroid.x + a.ship.x) / 2,
+                y: (asteroid.y + a.ship.y) / 2
+            };
+        }
+    }
+});
+var bulletsXYasteroidsXY = electric.transformator.map(function (bs, as) { return ({ bullets: bs, asteroids: as }); }, bulletsXY, asteroidsXY);
+bulletAsteroidCollision.is(bulletsXYasteroidsXY.whenThen(function (a) {
+    for (var i = 0; i < a.bullets.length; i++) {
+        var bullet = a.bullets[i];
+        for (var j = 0; j < a.asteroids.length; j++) {
+            var asteroid = a.asteroids[j];
+            if (checkBulletAsteroidCollision(bullet, asteroid)) {
+                return {
+                    index1: i,
+                    index2: j,
+                    x: asteroid.x,
+                    y: asteroid.y
+                };
+            }
+        }
+    }
+}));
+var bulletsXYasteroidMotherXY = electric.transformator.map(function (bs, m) { return ({ bullets: bs, mother: m }); }, bulletsXY, asteroidMother.xya);
+bulletMotherCollision.is(bulletsXYasteroidMotherXY.whenThen(function (a) {
+    for (var i = 0; i < a.bullets.length; i++) {
+        var bullet = a.bullets[i];
+        if (checkBulletMotherCollision(bullet, a.mother)) {
+            return {
+                index1: i,
+                index2: 0,
+                x: bullet.x,
+                y: bullet.y
+            };
+        }
+    }
+}));
+var shipXYmotherXY = electric.transformator.map(function (s, m) { return ({ ship: s, mother: m }); }, ship.xya, asteroidMother.xya);
+var shipMotherCollision = shipXYmotherXY.whenThen(function (a) {
+    if (checkShipMotherCollision(a.ship, a.mother)) {
+        return {
+            index1: 0,
+            index2: 0,
+            x: a.ship.x,
+            y: a.ship.y
+        };
+    }
+});
+function checkIfCollidingWithDistance(distance) {
+    var powDistance = distance * distance;
+    return function (p1, p2) {
+        var dx = p1.x - p2.x;
+        var dy = p1.y - p2.y;
+        var dist = dx * dx + dy * dy;
+        return (dist <= powDistance);
     };
 }
-shipV.map(function (v) { return v.y; }).plugReceiver(speedReceiver());
-function speedReceiver() {
-    var speedBar = document.getElementById('speed');
-    var speedCurrent = document.getElementById('speed-current');
-    var speedLeft = document.getElementById('speed-tomax');
-    return function (s) {
-        s = Math.abs(s);
-        var w = speedBar.offsetWidth;
-        var sc = s / MAX_LINEAR_SPEED * w;
-        var sl = w - sc;
-        speedCurrent.style.width = sc + 'px';
-        speedLeft.style.width = sl + 'px';
-    };
-}
+var allCollisions = electric.transformator.merge(bulletBulletCollision, bulletAsteroidCollision, bulletMotherCollision, shipMotherCollision, bulletShipCollision, shipAsteroidCollision);
+var collisionsToDraw = cont([]).change({ to: function (cs, c) { return cont(insert(cs, c)); }, when: allCollisions }, {
+    to: function (cs, _) { return cont([]); },
+    when: allCollisions.transformTime(eevent.notHappend, function (t) { return t + c.collision.duration; })
+});
+var gameEndingCollisions = electric.transformator.merge(shipMotherCollision, shipAsteroidCollision, bulletShipCollision).transformTime(eevent.notHappend, function (t) { return t + 10; });
+var score = keepScore({
+    asteroidHit: bulletAsteroidCollision,
+    motherHit: bulletMotherCollision,
+    gameEnd: gameEndingCollisions
+});
+// receivers
+var draw = require('./draw');
+draw.setCtx(canvas.getContext('2d'));
+var dashboard = require('./dashboard');
+var allToDraw = electric.transformator.map(function (s, bs, ms, ebs, cs) { return ({
+    ship: s, bullets: bs, mothership: ms, asteroids: ebs, collisions: cs, state: 'ok'
+}); }, ship.xya, bulletsXY, asteroidMother.xya, asteroidsXY, collisionsToDraw);
+var drawingState = allToDraw.change({
+    to: function (s, _) {
+        return cont({
+            ship: s.ship,
+            bullets: s.bullets,
+            mothership: s.mothership,
+            asteroids: s.asteroids,
+            collisions: s.collisions,
+            state: 'game over'
+        });
+    },
+    when: gameEndingCollisions
+});
+var gameOver = cont(eevent.notHappend).change({ to: clock.intervalValue(true, { inMs: 1000 }), when: gameEndingCollisions });
+gameOver.plugReceiver(function (e) {
+    if (e.happend) {
+        draw.gameOver(width, height);
+    }
+});
+drawingState.plugReceiver(function (a) {
+    if (a.state === 'game over') {
+        return;
+    }
+    canvas.width = canvas.width;
+    draw.collisions(a.collisions);
+    draw.bullets(a.bullets, c.bullet.radius, c.bullet.color);
+    draw.bullets(a.asteroids, c.asteroid.radius, c.asteroid.color);
+    draw.asteroidMother(a.mothership);
+    draw.ship(a.ship);
+});
+ship.v.plugReceiver(dashboard.speed());
+score.plugReceiver(dashboard.score());
 
-},{"../../../src/electric":9,"../../../src/emitters/ui":11,"./acceleration":1,"./calculus":3,"./point":5,"./velocity":6}],3:[function(require,module,exports){
+},{"../../../src/electric":18,"../../../src/electric-event":17,"../../../src/emitters/ui":20,"./asteroid-mother":3,"./clock":5,"./constants":6,"./dashboard":7,"./draw":8,"./moving-point":9,"./point":10,"./score":11,"./ship":12,"./utils/insert":13,"./utils/random":14}],3:[function(require,module,exports){
+var electric = require('../../../src/electric');
+var clock = require('./clock');
+var calculus = require('./calculus');
+var c = require('./constants');
+var Point = require('./point');
+var Velocity = require('./velocity');
+var Acceleration = require('./acceleration');
+var random = require('./utils/random');
+var cont = electric.emitter.constant;
+function acceleration(x, y) {
+    return Acceleration.of(x, y, velocity);
+}
+function velocity(x, y) {
+    return Velocity.of(x, y, Point.of);
+}
+function create(startingPoint) {
+    var v = cont(velocity(-Math.PI / 2, 100)).change({ to: function (a, _) { return cont(a.withX(random(-1, 1))); }, when: clock.interval({ inMs: 2000 }) });
+    var xya = calculus.integral(startingPoint, v, { fps: c.fps });
+    var birth = electric.transformator.map(function (time, xya) { return time.map(function (_) { return xya; }); }, clock.interval({ inMs: c.asteroidMother.birthIntervalInMs }), xya);
+    return {
+        v: v,
+        xya: xya,
+        birth: birth
+    };
+}
+module.exports = create;
+
+},{"../../../src/electric":18,"./acceleration":1,"./calculus":4,"./clock":5,"./constants":6,"./point":10,"./utils/random":14,"./velocity":15}],4:[function(require,module,exports){
 var clock = require('./clock');
 var electric = require('../../../src/electric');
 function integral(initialValue, emitter, options) {
@@ -122,6 +310,7 @@ function integral(initialValue, emitter, options) {
     }).map(function (v) { return v.sum; });
     result.name = '<| integral |>';
     result.setEquals(function (x, y) { return x.equals(y); });
+    result.stabilize = function () { return timmed.stabilize(); };
     return result;
 }
 exports.integral = integral;
@@ -146,26 +335,47 @@ function differential(initialValue, emitter, options) {
 }
 exports.differential = differential;
 function timeValue(emitter, options) {
-    var time = clock(options);
-    return electric.transformator.map(function (t, v) { return ({ time: t, value: v }); }, time, emitter);
+    var time = clock.time(options);
+    var transformator = electric.transformator.map(function (t, v) { return ({ time: t, value: v }); }, time, emitter);
+    transformator.stabilize = function () { return time.stabilize(); };
+    return transformator;
 }
 
-},{"../../../src/electric":9,"./clock":4}],4:[function(require,module,exports){
+},{"../../../src/electric":18,"./clock":5}],5:[function(require,module,exports){
 var electric = require('../../../src/electric');
-function clock(options) {
-    var interval = calculateInterval(options);
+function interval(options) {
+    var timer = electric.emitter.manualEvent();
+    electric.scheduler.scheduleInterval(function () {
+        timer.impulse(Date.now());
+    }, calculateInterval(options.inMs, options.fps));
+    timer.name = '| interval |>';
+    return timer;
+}
+exports.interval = interval;
+function intervalValue(value, options) {
+    var timer = electric.emitter.manualEvent();
+    electric.scheduler.scheduleInterval(function () {
+        timer.impulse(value);
+    }, calculateInterval(options.inMs, options.fps));
+    timer.name = '| interval |>';
+    return timer;
+}
+exports.intervalValue = intervalValue;
+function time(options) {
+    var interval = calculateInterval(options.intervalInMs, options.fps);
     var emitter = electric.emitter.manual(electric.scheduler.now());
     var id = electric.scheduler.scheduleInterval(function () { return emitter.emit((electric.scheduler.now())); }, interval);
     emitter.setReleaseResources(function () { return electric.scheduler.unscheduleInterval(id); });
     emitter.name = calculateEmitterName(options);
     return emitter;
 }
-function calculateInterval(options) {
-    if (options.intervalInMs === undefined) {
-        return 1 / options.fps * 1000;
+exports.time = time;
+function calculateInterval(intervalInMs, fps) {
+    if (intervalInMs === undefined) {
+        return 1 / fps * 1000;
     }
     else {
-        return options.intervalInMs;
+        return intervalInMs;
     }
 }
 function calculateEmitterName(options) {
@@ -176,9 +386,177 @@ function calculateEmitterName(options) {
         return '| interval: ' + options.intervalInMs + 'ms |>';
     }
 }
-module.exports = clock;
 
-},{"../../../src/electric":9}],5:[function(require,module,exports){
+},{"../../../src/electric":18}],6:[function(require,module,exports){
+var BULLET_RADIUS = 3;
+var values = {
+    asteroid: {
+        color: '#BCACFA',
+        radius: 20
+    },
+    asteroidMother: {
+        birthIntervalInMs: 2000,
+        color: '#A691FA',
+        radius: 50
+    },
+    collision: {
+        color: '#FA4141',
+        duration: 100,
+        radius: 30
+    },
+    bullet: {
+        color: 'white',
+        radius: 3,
+        speed: 100
+    },
+    fps: 60,
+    score: {
+        forAsteroid: 3,
+        forMother: 100
+    },
+    ship: {
+        acceleration: {
+            angular: 10,
+            de: 1600,
+            linear: 400
+        },
+        color: 'white',
+        radius: 5,
+        vbounds: {
+            maxX: 5,
+            maxY: 2000,
+            minX: -5,
+            minY: -50
+        }
+    }
+};
+module.exports = values;
+
+},{}],7:[function(require,module,exports){
+var rui = require('../../../src/receivers/ui');
+var c = require('./constants');
+function speed() {
+    var speedBar = document.getElementById('speed');
+    var speedCurrent = document.getElementById('speed-current');
+    var speedLeft = document.getElementById('speed-tomax');
+    var aSpeedLeft = document.getElementById('angular-speed-left');
+    var aSpeedCurrent = document.getElementById('angular-speed-current');
+    var aSpeedRight = document.getElementById('angular-speed-right');
+    return function (s) {
+        var speed = Math.abs(s.y);
+        var w = speedBar.offsetWidth;
+        var wh = w / 2;
+        var sc = speed / c.ship.vbounds.maxY * w;
+        var sl = w - sc;
+        speedCurrent.style.width = sc + 'px';
+        speedLeft.style.width = sl + 'px';
+        var anulgarSpeed = s.x;
+        if (anulgarSpeed < 0) {
+            aSpeedRight.style.width = wh + 'px';
+            var l = (anulgarSpeed / c.ship.vbounds.minX) * wh;
+            aSpeedLeft.style.width = (wh - l) + 'px';
+            aSpeedCurrent.style.width = l + 'px';
+        }
+        else {
+            aSpeedLeft.style.width = wh + 'px';
+            var l = (anulgarSpeed / c.ship.vbounds.maxX) * wh;
+            aSpeedRight.style.width = (wh - l) + 'px';
+            aSpeedCurrent.style.width = l + 'px';
+        }
+    };
+}
+exports.speed = speed;
+function score() {
+    return rui.htmlReceiverById('score');
+}
+exports.score = score;
+
+},{"../../../src/receivers/ui":24,"./constants":6}],8:[function(require,module,exports){
+var c = require('./constants');
+var random = require('./utils/random');
+var _ctx;
+function setCtx(ctx) {
+    _ctx = ctx;
+}
+exports.setCtx = setCtx;
+function ship(ship) {
+    _ctx.strokeStyle = c.ship.color;
+    _ctx.fillStyle = c.ship.color;
+    _ctx.lineWidth = 3;
+    var lShift = Math.cos(ship.angle) * 20;
+    var pShift = Math.sin(ship.angle) * 20;
+    var lShift2 = Math.cos(ship.angle + Math.PI / 2) * 5;
+    var pShift2 = Math.sin(ship.angle + Math.PI / 2) * 5;
+    var pX = -lShift * 0.5 + ship.x;
+    var pY = -pShift * 0.5 + ship.y;
+    _ctx.beginPath();
+    _ctx.moveTo(ship.x + lShift * 0.5, ship.y + pShift * 0.5);
+    _ctx.lineTo(pX + lShift2, pY + pShift2);
+    _ctx.lineTo(pX - lShift2, pY - pShift2);
+    _ctx.lineTo(ship.x + lShift * 0.5, ship.y + pShift * 0.5);
+    _ctx.fill();
+    pX = ship.x;
+    pY = ship.y;
+    _ctx.stroke();
+}
+exports.ship = ship;
+function bullets(bullets, radius, color) {
+    _ctx.fillStyle = color;
+    for (var k in bullets) {
+        var bullet = bullets[k];
+        _ctx.beginPath();
+        _ctx.arc(bullet.x, bullet.y, radius, 0, 2 * Math.PI, true);
+        _ctx.fill();
+    }
+}
+exports.bullets = bullets;
+function collisions(collisions) {
+    _ctx.fillStyle = c.collision.color;
+    collisions.forEach(function (collision) {
+        _ctx.beginPath();
+        _ctx.arc(collision.x, collision.y, c.collision.radius, 0, 2 * Math.PI, true);
+        _ctx.fill();
+    });
+}
+exports.collisions = collisions;
+function asteroidMother(mothership) {
+    _ctx.beginPath();
+    _ctx.fillStyle = c.asteroidMother.color;
+    _ctx.arc(mothership.x, mothership.y, c.asteroidMother.radius, 0, 2 * Math.PI, true);
+    _ctx.fill();
+}
+exports.asteroidMother = asteroidMother;
+function gameOver(width, height) {
+    _ctx.beginPath();
+    _ctx.font = 'bold 48px Avenir, sans-serif';
+    _ctx.fillStyle = c.collision.color;
+    _ctx.fillText('GAME OVERdt', random(0, width - 300), random(50, height - 50));
+}
+exports.gameOver = gameOver;
+
+},{"./constants":6,"./utils/random":14}],9:[function(require,module,exports){
+var electric = require('../../../src/electric');
+var calculus = require('./calculus');
+var c = require('./constants');
+var Point = require('./point');
+var Velocity = require('./velocity');
+var cont = electric.emitter.constant;
+function velocity(x, y) {
+    return Velocity.of(x, y, Point.of);
+}
+var MovingPoint = (function () {
+    function MovingPoint(speed, x0, y0, angle) {
+        this.v = cont(velocity(0, speed));
+        this.xya = calculus.integral(Point.of(x0, y0, angle), this.v, { fps: c.fps });
+    }
+    MovingPoint.start = function (speed, x0, y0, angle) {
+        return new MovingPoint(speed, x0, y0, angle);
+    };
+    return MovingPoint;
+})();
+module.exports = MovingPoint;
+
+},{"../../../src/electric":18,"./calculus":4,"./constants":6,"./point":10,"./velocity":15}],10:[function(require,module,exports){
 var _maxX;
 var _minX;
 var _maxY;
@@ -230,33 +608,77 @@ function boundTo(v, min, max) {
 }
 module.exports = Point;
 
-},{}],6:[function(require,module,exports){
-var point = require('./point');
-var _maxX;
-var _minX;
-var _maxY;
-var _minY;
+},{}],11:[function(require,module,exports){
+var electric = require('../../../src/electric');
+var c = require('./constants');
+var cont = electric.emitter.constant;
+function score(input) {
+    return cont(0).change({ to: function (s, _) { return cont(s + c.score.forAsteroid); }, when: input.asteroidHit }, { to: function (s, _) { return cont(s + c.score.forMother); }, when: input.motherHit }).change({ to: function (s, _) { return cont(s); }, when: input.gameEnd });
+}
+module.exports = score;
+
+},{"../../../src/electric":18,"./constants":6}],12:[function(require,module,exports){
+var electric = require('../../../src/electric');
+var eevent = require('../../../src/electric-event');
+var eui = require('../../../src/emitters/ui');
+var calculus = require('./calculus');
+var c = require('./constants');
+var Acceleration = require('./acceleration');
+var Velocity = require('./velocity');
+var Point = require('./point');
+var cont = electric.emitter.constant;
+function shipAcceleration(x, y) {
+    return Acceleration.of(x, y, shipVelocity);
+}
+function shipVelocity(x, y) {
+    return Velocity.of(x, y, Point.of, c.ship.vbounds);
+}
+function create(startingPoint, input) {
+    var shipA = cont(shipAcceleration(0, 0)).change({ to: function (a, _) { return cont(a.withX(-c.ship.acceleration.angular)); }, when: input.rotateLeft }, { to: function (a, _) { return cont(a.withX(c.ship.acceleration.angular)); }, when: input.rotateRight }, { to: function (a, _) { return cont(a.withX(0)); }, when: input.stopRotateRight }, { to: function (a, _) { return cont(a.withX(0)); }, when: input.stopRotateLeft }, { to: function (a, _) { return cont(a.withY(-c.ship.acceleration.de)); }, when: input.deccelerate }, { to: function (a, _) { return cont(a.withY(c.ship.acceleration.linear)); }, when: input.accelerate }, { to: function (a, _) { return cont(a.withY(0)); }, when: input.stopAcceleration }, { to: function (a, _) { return cont(a.withY(0)); }, when: input.stopDecceleration });
+    var shipV = calculus.integral(shipVelocity(0, 0), shipA, { fps: c.fps }).change({ to: function (v, _) { return calculus.integral(v.withX(0), shipA, { fps: c.fps }); }, when: input.stopRotateRight.transformTime(eevent.notHappend, function (t) { return t + 10; }) }, { to: function (v, _) { return calculus.integral(v.withX(0), shipA, { fps: c.fps }); }, when: input.stopRotateLeft.transformTime(eevent.notHappend, function (t) { return t + 10; }) });
+    var shipXYA = calculus.integral(startingPoint, shipV, { fps: c.fps });
+    var shot = electric.transformator.map(function (space, xya, v) { return space.map(function (_) { return ({ xya: xya, velocity: v }); }); }, eui.key('space', 'up'), shipXYA, shipV);
+    return {
+        a: shipA,
+        v: shipV,
+        xya: shipXYA,
+        shot: shot
+    };
+}
+module.exports = create;
+
+},{"../../../src/electric":18,"../../../src/electric-event":17,"../../../src/emitters/ui":20,"./acceleration":1,"./calculus":4,"./constants":6,"./point":10,"./velocity":15}],13:[function(require,module,exports){
+function insert(list, item) {
+    var l = list.slice();
+    l.push(item);
+    return l;
+}
+module.exports = insert;
+
+},{}],14:[function(require,module,exports){
+function random(min, max) {
+    return Math.random() * (max - min) + min;
+}
+module.exports = random;
+
+},{}],15:[function(require,module,exports){
 var Velocity = (function () {
-    function Velocity(x, y) {
-        this.x = within(x, _minX, _maxX);
-        this.y = within(y, _minY, _maxY);
+    function Velocity(x, y, antiderivative, bounds) {
+        this.bounds = bounds || {};
+        this.x = within(x, this.bounds.minX, this.bounds.maxX);
+        this.y = within(y, this.bounds.minY, this.bounds.maxY);
+        this.antiderivative = antiderivative;
     }
-    Velocity.of = function (x, y) {
-        return new Velocity(x, y);
+    Velocity.of = function (x, y, antiderivative, bounds) {
+        return new Velocity(x, y, antiderivative, bounds);
     };
-    Velocity.zero = function () {
-        return Velocity.of(0, 0);
-    };
-    Velocity.setBounds = function (minX, maxX, minY, maxY) {
-        _minX = minX;
-        _maxX = maxX;
-        _minY = minY;
-        _maxY = maxY;
+    Velocity.zero = function (antiderivative, bounds) {
+        return Velocity.of(0, 0, antiderivative, bounds);
     };
     Velocity.prototype.add = function (other) {
-        var x = within(this.x + other.x, _minX, _maxX);
-        var y = within(this.y + other.y, _minY, _maxY);
-        return Velocity.of(x, y);
+        var x = within(this.x + other.x, this.bounds.minX, this.bounds.maxX);
+        var y = within(this.y + other.y, this.bounds.minY, this.bounds.maxY);
+        return Velocity.of(x, y, this.antiderivative, this.bounds);
     };
     Velocity.prototype.addDelta = function (delta) {
         return this.add(delta);
@@ -267,25 +689,28 @@ var Velocity = (function () {
     Velocity.prototype.mulT = function (dt) {
         var dx = this.x * dt / 1000;
         var dy = this.y * dt / 1000;
-        return point.of(dx, dy);
+        return this.antiderivative(dx, dy);
     };
     Velocity.prototype.withX = function (x) {
-        return Velocity.of(x, this.y);
+        return Velocity.of(x, this.y, this.antiderivative, this.bounds);
     };
     Velocity.prototype.withY = function (y) {
-        return Velocity.of(this.x, y);
+        return Velocity.of(this.x, y, this.antiderivative, this.bounds);
     };
     return Velocity;
 })();
 function within(v, min, max) {
-    if (min === undefined || max === undefined) {
-        return v;
+    if (max !== undefined && v > max) {
+        return max;
     }
-    return Math.min(Math.max(v, min), max);
+    if (min !== undefined && v < min) {
+        return min;
+    }
+    return v;
 }
 module.exports = Velocity;
 
-},{"./point":5}],7:[function(require,module,exports){
+},{}],16:[function(require,module,exports){
 exports.scheduler = require('./scheduler');
 exports.emitter = require('./emitter');
 exports.transformator = require('./transformator');
@@ -387,7 +812,7 @@ function derivative(f) {
 }
 exports.derivative = derivative;
 
-},{"./emitter":10,"./scheduler":16,"./transformator":18}],8:[function(require,module,exports){
+},{"./emitter":19,"./scheduler":26,"./transformator":28}],17:[function(require,module,exports){
 var utils = require('./utils');
 var ElectricEvent = (function () {
     function ElectricEvent() {
@@ -473,7 +898,7 @@ var NotHappend = (function () {
 ElectricEvent.notHappend = new NotHappend();
 module.exports = ElectricEvent;
 
-},{"./utils":20}],9:[function(require,module,exports){
+},{"./utils":30}],18:[function(require,module,exports){
 exports.scheduler = require('./scheduler');
 exports.emitter = require('./emitter');
 exports.transformator = require('./transformator');
@@ -483,7 +908,7 @@ exports.transmitter = require('./transmitter');
 // export import device = require('./device');
 // export import fp = require('./fp');
 
-},{"./clock":7,"./emitter":10,"./receiver":14,"./scheduler":16,"./transformator":18,"./transmitter":19}],10:[function(require,module,exports){
+},{"./clock":16,"./emitter":19,"./receiver":23,"./scheduler":26,"./transformator":28,"./transmitter":29}],19:[function(require,module,exports){
 var __extends = (this && this.__extends) || function (d, b) {
     for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p];
     function __() { this.constructor = d; }
@@ -580,7 +1005,7 @@ var Emitter = (function () {
         var currentReceivers = this._receivers.slice();
         for (var _i = 0; _i < currentReceivers.length; _i++) {
             var receiver = currentReceivers[_i];
-            this._ayncDispatchToReceiver(receiver, value);
+            this._dispatchToReceiver(receiver, value);
         }
     };
     Emitter.prototype._dispatchToReceiver = function (receiver, value) {
@@ -630,8 +1055,11 @@ var Emitter = (function () {
         return namedTransformator('merge' + this._enclosedName() + ' with ' + emitters.map(function (e) { return e.name; }).join(', '), [this].concat(emitters), transformators.merge(), this.dirtyCurrentValue());
     };
     Emitter.prototype.when = function (switcher) {
-        var currentValue = this.dirtyCurrentValue();
-        var t = namedTransformator('when' + this._enclosedName(), [this], transformators.when(switcher.happens, switcher.then), eevent.notHappend);
+        var t = namedTransformator('when happens then', [this], transformators.when(switcher.happens, switcher.then), eevent.notHappend);
+        return t;
+    };
+    Emitter.prototype.whenThen = function (happens) {
+        var t = namedTransformator('when then', [this], transformators.whenThen(happens), eevent.notHappend);
         return t;
     };
     Emitter.prototype.sample = function (initialValue, samplingEvent) {
@@ -911,7 +1339,6 @@ var Transformator = (function (_super) {
         _super.call(this, initialValue);
         this.name = '<| transformator |>';
         this._values = Array(emitters.length);
-        ;
         if (transform) {
             this.setTransform(transform);
         }
@@ -942,6 +1369,12 @@ var Transformator = (function (_super) {
     Transformator.prototype.unplugEmitter = function (emitter) {
         this._wires.filter(function (w) { return w.input === emitter; }).forEach(function (w) { return w.unplug(); });
     };
+    Transformator.prototype.dropEmitters = function (start) {
+        var wiresToDrop = this._wires.slice(1);
+        wiresToDrop.forEach(function (w) { return w.unplug(); });
+        this._wires.splice(start, this._wires.length);
+        this._values.splice(start, this._values.length);
+    };
     Transformator.prototype.wire = function (emitter) {
         var _this = this;
         var index = this._wires.length;
@@ -969,7 +1402,7 @@ function namedTransformator(name, emitters, transform, initialValue) {
 }
 exports.namedTransformator = namedTransformator;
 
-},{"./electric-event":8,"./placeholder":13,"./scheduler":16,"./transformator-helpers":17,"./wire":21}],11:[function(require,module,exports){
+},{"./electric-event":17,"./placeholder":22,"./scheduler":26,"./transformator-helpers":27,"./wire":31}],20:[function(require,module,exports){
 var electric = require('../electric');
 var utils = require('../receivers/utils');
 var transformator = require('../transformator');
@@ -984,7 +1417,8 @@ var keyCodes = {
     a: 65,
     s: 83,
     d: 68,
-    enter: 13
+    enter: 13,
+    space: 32
 };
 // NEW
 function clicks(nodeOrId, mapping) {
@@ -1189,7 +1623,7 @@ function enter(nodeOrId) {
 }
 exports.enter = enter;
 
-},{"../electric":9,"../electric-event":8,"../fp":12,"../receivers/utils":15,"../transformator":18}],12:[function(require,module,exports){
+},{"../electric":18,"../electric-event":17,"../fp":21,"../receivers/utils":25,"../transformator":28}],21:[function(require,module,exports){
 function identity(x) {
     return x;
 }
@@ -1336,7 +1770,7 @@ var either;
     either.left = left;
 })(either = exports.either || (exports.either = {}));
 
-},{}],13:[function(require,module,exports){
+},{}],22:[function(require,module,exports){
 // functions that can be simply queued
 var functionsToVoid = [
     'plugReceiver',
@@ -1442,7 +1876,7 @@ function placeholder(initialValue) {
 }
 module.exports = placeholder;
 
-},{}],14:[function(require,module,exports){
+},{}],23:[function(require,module,exports){
 function logReceiver(message) {
     if (!message) {
         message = '<<<';
@@ -1476,7 +1910,16 @@ function collect(emitter) {
 }
 exports.collect = collect;
 
-},{}],15:[function(require,module,exports){
+},{}],24:[function(require,module,exports){
+function htmlReceiverById(id) {
+    var element = document.getElementById(id);
+    return function (html) {
+        element.innerHTML = html;
+    };
+}
+exports.htmlReceiverById = htmlReceiverById;
+
+},{}],25:[function(require,module,exports){
 function getNode(nodeOrId) {
     if (typeof nodeOrId === 'string') {
         return document.getElementById(nodeOrId);
@@ -1496,7 +1939,7 @@ function getNodes(nodesOfName) {
 }
 exports.getNodes = getNodes;
 
-},{}],16:[function(require,module,exports){
+},{}],26:[function(require,module,exports){
 var stopTime = Date.now();
 var callbacks = {};
 var stopped = false;
@@ -1593,7 +2036,7 @@ function removeFromCallbacksAtTime(callbacksAtTime, callback) {
     }
 }
 
-},{}],17:[function(require,module,exports){
+},{}],27:[function(require,module,exports){
 var utils = require('./utils');
 var Wire = require('./wire');
 var scheduler = require('./scheduler');
@@ -1707,6 +2150,22 @@ function when(happend, then) {
     };
 }
 exports.when = when;
+function whenThen(happens) {
+    return function transform(emit, impulse) {
+        var prevHappend;
+        return function whenTransform(v, i) {
+            var happend = happens(v[i]);
+            if (happend && !prevHappend) {
+                impulse(eevent.of(happend));
+                prevHappend = happend;
+            }
+            else if (!happend) {
+                prevHappend = null;
+            }
+        };
+    };
+}
+exports.whenThen = whenThen;
 function cumulateOverTime(delayInMiliseconds) {
     return function transform(emit, impulse) {
         var accumulated = [];
@@ -1730,7 +2189,7 @@ function cumulateOverTime(delayInMiliseconds) {
 exports.cumulateOverTime = cumulateOverTime;
 ;
 
-},{"./electric-event":8,"./scheduler":16,"./utils":20,"./wire":21}],18:[function(require,module,exports){
+},{"./electric-event":17,"./scheduler":26,"./utils":30,"./wire":31}],28:[function(require,module,exports){
 var emitter = require('./emitter');
 var namedTransformator = emitter.namedTransformator;
 var transformators = require('./transformator-helpers');
@@ -1779,26 +2238,6 @@ function cumulateOverTime(emitter, overInMs) {
     return namedTransformator('cumulate', [emitter], transformators.cumulateOverTime(overInMs), eevent.notHappend);
 }
 exports.cumulateOverTime = cumulateOverTime;
-// what are semantics of flatten!?
-function flatten(emitter) {
-    var transformator = namedTransformator('flatten', [emitter, emitter.dirtyCurrentValue()], transform, emitter.dirtyCurrentValue().dirtyCurrentValue());
-    // var transformator = new Transformator([]);
-    function transform(emit) {
-        return function flattenTransform(v, i) {
-            if (i == 0) {
-                transformator.plugEmitter(v[i]);
-                emit(v[i].dirtyCurrentValue());
-            }
-            else {
-                emit(v[i]);
-            }
-        };
-    }
-    ;
-    return transformator;
-}
-exports.flatten = flatten;
-;
 function hold(initialValue, emitter) {
     function transform(emit) {
         return function holdTransform(v, i) {
@@ -1843,8 +2282,54 @@ function skipFirst(emitter) {
 }
 exports.skipFirst = skipFirst;
 ;
+// semantics:
+// f_a :: t -> (t -> a)
+// flatten(f_a) = f(t)
+// flatten(f_a)(t) = f(t)(t)
+function flatten(emitter) {
+    var transformator = namedTransformator('flatten', [emitter, emitter.dirtyCurrentValue()], transform, emitter.dirtyCurrentValue().dirtyCurrentValue());
+    function transform(emit) {
+        return function flattenTransform(v, i) {
+            if (i == 0) {
+                transformator.dropEmitters(1);
+                transformator.plugEmitter(v[0]);
+                emit(v[0].dirtyCurrentValue());
+            }
+            else {
+                emit(v[i]);
+            }
+        };
+    }
+    ;
+    return transformator;
+}
+exports.flatten = flatten;
+;
+// semantics:
+// f_a :: t -> [t -> a]
+// flatten(f_a) = f(t)
+// flatten(f_a)(t) = f(t).map(g => g(t))
+function flattenMany(emitter) {
+    var currentValues = emitter.dirtyCurrentValue().map(function (e) { return e.dirtyCurrentValue(); });
+    var transformator = namedTransformator('flatten many', [emitter].concat(emitter.dirtyCurrentValue()), transform, currentValues);
+    function transform(emit) {
+        return function flattenTransform(v, i) {
+            if (i == 0) {
+                transformator.dropEmitters(1);
+                v[0].forEach(function (e) { return transformator.plugEmitter(e); });
+                emit(v[0].map(function (e) { return e.dirtyCurrentValue(); }));
+            }
+            else {
+                emit(v.slice(1));
+            }
+        };
+    }
+    ;
+    return transformator;
+}
+exports.flattenMany = flattenMany;
 
-},{"../src/electric-event":8,"./emitter":10,"./transformator-helpers":17}],19:[function(require,module,exports){
+},{"../src/electric-event":17,"./emitter":19,"./transformator-helpers":27}],29:[function(require,module,exports){
 var __extends = (this && this.__extends) || function (d, b) {
     for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p];
     function __() { this.constructor = d; }
@@ -1877,7 +2362,7 @@ function transmitter(initialValue) {
 }
 module.exports = transmitter;
 
-},{"./emitter":10,"./wire":21}],20:[function(require,module,exports){
+},{"./emitter":19,"./wire":31}],30:[function(require,module,exports){
 function callIfFunction(obj) {
     var args = [];
     for (var _i = 1; _i < arguments.length; _i++) {
@@ -1910,7 +2395,7 @@ function all(list) {
 }
 exports.all = all;
 
-},{}],21:[function(require,module,exports){
+},{}],31:[function(require,module,exports){
 var Wire = (function () {
     function Wire(input, output, receive, set) {
         this.input = input;

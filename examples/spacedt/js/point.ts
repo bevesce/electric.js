@@ -1,12 +1,13 @@
 import calculus = require('./calculus');
 
-export = Point;
+export = Point
 
 
 var _maxX: number;
 var _minX: number;
 var _maxY: number;
 var _minY: number;
+
 
 
 class Point implements calculus.Antiderivative {
@@ -54,7 +55,6 @@ class Point implements calculus.Antiderivative {
 		return this.x === other.x && this.y === other.y && this.angle === other.angle;;
 	}
 }
-
 
 
 function boundTo(v: number, min: number, max: number) {

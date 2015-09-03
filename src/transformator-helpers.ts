@@ -131,6 +131,22 @@ export function when<In, Out>(happend: (value: In) => boolean, then: (value: In)
 	}
 }
 
+export function whenThen<In, Out>(happens: (value: In) => Out | void) {
+	return function transform(emit: inf.IEmitterFunction<eevent<Out>>, impulse: inf.IEmitterFunction<eevent<Out>>) {
+		var prevHappend: Out;
+		return function whenTransform(v: any[], i: Index) {
+			var happend = happens(v[i]);
+			if (happend && !prevHappend) {
+				impulse(eevent.of(<Out>happend));
+				prevHappend = <Out>happend
+			}
+			else if (!happend) {
+				prevHappend = null;
+			}
+		}
+	}
+}
+
 export function cumulateOverTime<InOut>(
 	delayInMiliseconds: number
 ) {

@@ -5,6 +5,6 @@ var kettle = require('../../../test/electric-kettle');
 kettle.pourAsync(chai);
 var expect = chai.expect;
 describe('spacedt', function () {
-    it('should exists', function () {
+    it('how does this work?', function () {
     });
 });

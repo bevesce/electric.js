@@ -12,7 +12,8 @@ var keyCodes = {
     a: 65,
     s: 83,
     d: 68,
-    enter: 13
+    enter: 13,
+    space: 32
 };
 // NEW
 function clicks(nodeOrId, mapping) {

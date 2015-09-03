@@ -115,7 +115,7 @@ export class Emitter<T>
 	private _dispatchToReceivers(value: T) {
 		var currentReceivers = this._receivers.slice();
 		for (var receiver of currentReceivers) {
-			this._ayncDispatchToReceiver(receiver, value);
+			this._dispatchToReceiver(receiver, value);
 		}
 	}
 
@@ -206,11 +206,20 @@ export class Emitter<T>
 		happens: (value: T) => boolean,
 		then: (value: T) => NewT
 	}): inf.IEmitter<eevent<NewT>> {
-		var currentValue = this.dirtyCurrentValue();
 		var t = namedTransformator(
-			'when' + this._enclosedName(),
+			'when happens then',
 			[this],
 			transformators.when(switcher.happens, switcher.then),
+			eevent.notHappend
+		);
+		return t;
+	}
+
+	whenThen<NewT>(happens: (value: T) => NewT | void): inf.IEmitter<eevent<NewT>> {
+		var t = namedTransformator(
+			'when then',
+			[this],
+			transformators.whenThen(happens),
 			eevent.notHappend
 		);
 		return t;
@@ -576,7 +585,7 @@ export class Transformator<In>
 	) {
 		super(initialValue);
 		this.name = '<| transformator |>'
-		this._values = Array(emitters.length);;
+		this._values = Array(emitters.length);
 		if (transform) {
 			this.setTransform(transform);
 		}
@@ -612,6 +621,13 @@ export class Transformator<In>
 
 	unplugEmitter(emitter: inf.IEmitter<In>) {
 		this._wires.filter(w => w.input === emitter).forEach(w => w.unplug());
+	}
+
+	dropEmitters(start: number) {
+		var wiresToDrop = this._wires.slice(1);
+		wiresToDrop.forEach(w => w.unplug());
+		this._wires.splice(start, this._wires.length);
+		this._values.splice(start, this._values.length);
 	}
 
 	wire(emitter: inf.IEmitter<any>) {

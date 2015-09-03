@@ -17,7 +17,7 @@ export function log(emitter: inf.IEmitter<any>) {
 	});
 }
 
-export function logEvents(emitter: inf.IEmitter<eevent<any>>) {
+export function logEvents(emitter: inf.IEmitter<inf.IElectricEvent<any>>) {
 	emitter.plugReceiver((x: any) => {
 		if (!x.happend) {
 			return;
