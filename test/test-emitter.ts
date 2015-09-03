@@ -158,39 +158,39 @@ describe('emitter', function() {
         emitter.plugReceiver(double);
     });
 
-    it('should emit initial value asynchronously', function(done) {
-        var emitter = electric.emitter.emitter(0);
-        expect(
-            electric.receiver.collect(emitter)
-            ).to.deep.equal([]);
-        // it's emty bacause value will be emitted after
-        // current event in event loop is processed
-        expect(emitter)
-            .to.emit(0)
-            .andBe(done)
-    });
+    // it('should emit initial value asynchronously', function(done) {
+    //     var emitter = electric.emitter.emitter(0);
+    //     expect(
+    //         electric.receiver.collect(emitter)
+    //         ).to.deep.equal([]);
+    //     // it's emty bacause value will be emitted after
+    //     // current event in event loop is processed
+    //     expect(emitter)
+    //         .to.emit(0)
+    //         .andBe(done)
+    // });
 
-    it('should emit values asynchronously', function(done) {
-        var emitter = electric.emitter.emitter(0);
-        var collected = electric.receiver.collect(emitter);
-        emitter.emit(1);
-        emitter.emit(2);
-        expect(collected).to.eql([]);
-        expect(emitter)
-            .to.emit(2)
-            .andBe(done);
-    });
+    // it('should emit values asynchronously', function(done) {
+    //     var emitter = electric.emitter.emitter(0);
+    //     var collected = electric.receiver.collect(emitter);
+    //     emitter.emit(1);
+    //     emitter.emit(2);
+    //     expect(collected).to.eql([]);
+    //     expect(emitter)
+    //         .to.emit(2)
+    //         .andBe(done);
+    // });
 
-    it('should impulse values asynchronously', function(done) {
-        var emitter = electric.emitter.emitter(0);
-        var collected = electric.receiver.collect(emitter);
-        emitter.impulse(1);
-        emitter.impulse(2);
-        expect(collected).to.eql([]);
-        expect(emitter)
-            .to.emit(0)
-            .andBe(done);
-    });
+    // it('should impulse values asynchronously', function(done) {
+    //     var emitter = electric.emitter.emitter(0);
+    //     var collected = electric.receiver.collect(emitter);
+    //     emitter.impulse(1);
+    //     emitter.impulse(2);
+    //     expect(collected).to.eql([]);
+    //     expect(emitter)
+    //         .to.emit(0)
+    //         .andBe(done);
+    // });
 
     it('should be unpluggable', function(done) {
         var emitter = electric.emitter.emitter(0);

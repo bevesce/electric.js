@@ -2,7 +2,7 @@ import inf = require('../../../src/interfaces');
 import electric = require('../../../src/electric');
 
 import c = require('./constants');
-import Point = require('./point');
+import Point = require('./angled-point');
 import collision = require('./collision');
 
 export = create;

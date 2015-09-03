@@ -1,11 +1,11 @@
 var electric = require('../../../src/electric');
 var calculus = require('./calculus');
 var c = require('./constants');
-var Point = require('./point');
-var Velocity = require('./velocity');
+var Point = require('./angled-point');
+var IntegrableAntiderivativeOfTwoNumbers = require('./integrable-antiderivative-of-two-numbers');
 var cont = electric.emitter.constant;
 function velocity(x, y) {
-    return Velocity.of(x, y, Point.of);
+    return IntegrableAntiderivativeOfTwoNumbers.of(x, y, Point.of);
 }
 var MovingPoint = (function () {
     function MovingPoint(speed, x0, y0, angle) {

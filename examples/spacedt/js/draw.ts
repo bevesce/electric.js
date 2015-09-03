@@ -1,5 +1,5 @@
 import c = require('./constants');
-import Point = require('./point');
+import Point = require('./angled-point');
 import random = require('./utils/random');
 
 var _ctx: any;

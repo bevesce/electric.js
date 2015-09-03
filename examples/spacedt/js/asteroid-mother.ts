@@ -4,9 +4,8 @@ import clock = require('./clock');
 import calculus = require('./calculus');
 
 import c = require('./constants');
-import Point = require('./point');
-import Velocity = require('./velocity');
-import Acceleration = require('./acceleration');
+import Point = require('./angled-point');
+import IntegrableAntiderivativeOfTwoNumbers = require('./integrable-antiderivative-of-two-numbers');
 import random = require('./utils/random');
 
 export = create;
@@ -15,11 +14,11 @@ var cont = electric.emitter.constant;
 
 
 function acceleration(x: number, y: number) {
-	return Velocity.of(x, y, velocity);
+	return IntegrableAntiderivativeOfTwoNumbers.of(x, y, velocity);
 }
 
 function velocity(x: number, y: number) {
-	return Velocity.of(x, y, Point.of);
+	return IntegrableAntiderivativeOfTwoNumbers.of(x, y, Point.of);
 }
 
 

@@ -1,10 +1,62 @@
 (function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);var f=new Error("Cannot find module '"+o+"'");throw f.code="MODULE_NOT_FOUND",f}var l=n[o]={exports:{}};t[o][0].call(l.exports,function(e){var n=t[o][1][e];return s(n?n:e)},l,l.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(require,module,exports){
+var _maxX;
+var _minX;
+var _maxY;
+var _minY;
+var Point = (function () {
+    function Point(x, y, angle) {
+        this.x = x;
+        this.y = y;
+        this.angle = angle;
+    }
+    Point.of = function (x, y, angle) {
+        return new Point(x, y, angle);
+    };
+    Point.zero = function () {
+        return Point.of(0, 0);
+    };
+    Point.setBounds = function (minX, maxX, minY, maxY) {
+        _minX = minX;
+        _maxX = maxX;
+        _minY = minY;
+        _maxY = maxY;
+    };
+    Point.prototype.addDelta = function (delta) {
+        var dangle = delta.x;
+        var ddist = delta.y;
+        var dx = Math.cos(this.angle + dangle) * ddist;
+        var dy = Math.sin(this.angle + dangle) * ddist;
+        var x = boundTo(this.x + dx, _minX, _maxX);
+        var y = boundTo(this.y + dy, _minY, _maxY);
+        return Point.of(x, y, this.angle + dangle);
+    };
+    Point.prototype.equals = function (other) {
+        return this.x === other.x && this.y === other.y && this.angle === other.angle;
+        ;
+    };
+    return Point;
+})();
+function boundTo(v, min, max) {
+    if (min == undefined || max == undefined) {
+        return v;
+    }
+    if (v < min) {
+        return max + v;
+    }
+    else if (v > max) {
+        return min - v;
+    }
+    return v;
+}
+module.exports = Point;
+
+},{}],2:[function(require,module,exports){
 var electric = require('../../../src/electric');
 var eevent = require('../../../src/electric-event');
 var eui = require('../../../src/emitters/ui');
 var clock = require('./clock');
 var c = require('./constants');
-var Point = require('./point');
+var Point = require('./angled-point');
 var shipDevice = require('./ship');
 var motherDevice = require('./asteroid-mother');
 var scoreDevice = require('./score');
@@ -114,20 +166,20 @@ gameOver.plugReceiver(function (e) {
 });
 ship.v.plugReceiver(dashboard.speed());
 
-},{"../../../src/electric":21,"../../../src/electric-event":20,"../../../src/emitters/ui":23,"./asteroid-mother":2,"./asteroids":3,"./bullets":4,"./clock":6,"./collisions":7,"./constants":8,"./dashboard":9,"./draw":10,"./point":12,"./score":13,"./ship":14,"./utils/insert":15}],2:[function(require,module,exports){
+},{"../../../src/electric":21,"../../../src/electric-event":20,"../../../src/emitters/ui":23,"./angled-point":1,"./asteroid-mother":3,"./asteroids":4,"./bullets":5,"./clock":7,"./collisions":8,"./constants":9,"./dashboard":10,"./draw":11,"./score":14,"./ship":15,"./utils/insert":16}],3:[function(require,module,exports){
 var electric = require('../../../src/electric');
 var clock = require('./clock');
 var calculus = require('./calculus');
 var c = require('./constants');
-var Point = require('./point');
-var Velocity = require('./velocity');
+var Point = require('./angled-point');
+var IntegrableAntiderivativeOfTwoNumbers = require('./integrable-antiderivative-of-two-numbers');
 var random = require('./utils/random');
 var cont = electric.emitter.constant;
 function acceleration(x, y) {
-    return Velocity.of(x, y, velocity);
+    return IntegrableAntiderivativeOfTwoNumbers.of(x, y, velocity);
 }
 function velocity(x, y) {
-    return Velocity.of(x, y, Point.of);
+    return IntegrableAntiderivativeOfTwoNumbers.of(x, y, Point.of);
 }
 function create(startingPoint) {
     var v = cont(velocity(-Math.PI / 2, 100)).change({ to: function (a, _) { return cont(a.withX(random(-1, 1))); }, when: clock.interval({ inMs: 2000 }) });
@@ -141,7 +193,7 @@ function create(startingPoint) {
 }
 module.exports = create;
 
-},{"../../../src/electric":21,"./calculus":5,"./clock":6,"./constants":8,"./point":12,"./utils/random":16,"./velocity":18}],3:[function(require,module,exports){
+},{"../../../src/electric":21,"./angled-point":1,"./calculus":6,"./clock":7,"./constants":9,"./integrable-antiderivative-of-two-numbers":12,"./utils/random":17}],4:[function(require,module,exports){
 var electric = require('../../../src/electric');
 var MovingPoint = require('./moving-point');
 var random = require('./utils/random');
@@ -166,7 +218,7 @@ function create(input) {
 }
 module.exports = create;
 
-},{"../../../src/electric":21,"./moving-point":11,"./utils/insert":15,"./utils/random":16,"./utils/remove":17}],4:[function(require,module,exports){
+},{"../../../src/electric":21,"./moving-point":13,"./utils/insert":16,"./utils/random":17,"./utils/remove":18}],5:[function(require,module,exports){
 var electric = require('../../../src/electric');
 var c = require('./constants');
 var MovingPoint = require('./moving-point');
@@ -192,7 +244,7 @@ function create(input) {
 }
 module.exports = create;
 
-},{"../../../src/electric":21,"./constants":8,"./moving-point":11,"./utils/insert":15,"./utils/remove":17}],5:[function(require,module,exports){
+},{"../../../src/electric":21,"./constants":9,"./moving-point":13,"./utils/insert":16,"./utils/remove":18}],6:[function(require,module,exports){
 var clock = require('./clock');
 var electric = require('../../../src/electric');
 function integral(initialValue, emitter, options) {
@@ -245,7 +297,7 @@ function timeValue(emitter, options) {
     return transformator;
 }
 
-},{"../../../src/electric":21,"./clock":6}],6:[function(require,module,exports){
+},{"../../../src/electric":21,"./clock":7}],7:[function(require,module,exports){
 var electric = require('../../../src/electric');
 function interval(options) {
     var timer = electric.emitter.manualEvent();
@@ -291,7 +343,7 @@ function calculateEmitterName(options) {
     }
 }
 
-},{"../../../src/electric":21}],7:[function(require,module,exports){
+},{"../../../src/electric":21}],8:[function(require,module,exports){
 var electric = require('../../../src/electric');
 var c = require('./constants');
 var map = electric.transformator.map;
@@ -438,7 +490,7 @@ function checkIfCollidingWithDistance(distance) {
 }
 module.exports = create;
 
-},{"../../../src/electric":21,"./constants":8}],8:[function(require,module,exports){
+},{"../../../src/electric":21,"./constants":9}],9:[function(require,module,exports){
 var BULLET_RADIUS = 3;
 var values = {
     asteroid: {
@@ -486,7 +538,7 @@ var values = {
 };
 module.exports = values;
 
-},{}],9:[function(require,module,exports){
+},{}],10:[function(require,module,exports){
 var rui = require('../../../src/receivers/ui');
 var c = require('./constants');
 function speed() {
@@ -525,7 +577,7 @@ function score() {
 }
 exports.score = score;
 
-},{"../../../src/receivers/ui":27,"./constants":8}],10:[function(require,module,exports){
+},{"../../../src/receivers/ui":27,"./constants":9}],11:[function(require,module,exports){
 var c = require('./constants');
 var random = require('./utils/random');
 var _ctx;
@@ -588,15 +640,64 @@ function gameOver(width, height) {
 }
 exports.gameOver = gameOver;
 
-},{"./constants":8,"./utils/random":16}],11:[function(require,module,exports){
+},{"./constants":9,"./utils/random":17}],12:[function(require,module,exports){
+var IntegrableAntiderivativeOfTwoNumbers = (function () {
+    function IntegrableAntiderivativeOfTwoNumbers(x, y, antiderivative, bounds) {
+        this.bounds = bounds || {};
+        this.x = within(x, this.bounds.minX, this.bounds.maxX);
+        this.y = within(y, this.bounds.minY, this.bounds.maxY);
+        this.antiderivative = antiderivative;
+    }
+    IntegrableAntiderivativeOfTwoNumbers.of = function (x, y, antiderivative, bounds) {
+        return new IntegrableAntiderivativeOfTwoNumbers(x, y, antiderivative, bounds);
+    };
+    IntegrableAntiderivativeOfTwoNumbers.zero = function (antiderivative, bounds) {
+        return IntegrableAntiderivativeOfTwoNumbers.of(0, 0, antiderivative, bounds);
+    };
+    IntegrableAntiderivativeOfTwoNumbers.prototype.add = function (other) {
+        var x = within(this.x + other.x, this.bounds.minX, this.bounds.maxX);
+        var y = within(this.y + other.y, this.bounds.minY, this.bounds.maxY);
+        return IntegrableAntiderivativeOfTwoNumbers.of(x, y, this.antiderivative, this.bounds);
+    };
+    IntegrableAntiderivativeOfTwoNumbers.prototype.addDelta = function (delta) {
+        return this.add(delta);
+    };
+    IntegrableAntiderivativeOfTwoNumbers.prototype.equals = function (other) {
+        return this.x === other.x && this.y === other.y;
+    };
+    IntegrableAntiderivativeOfTwoNumbers.prototype.mulT = function (dt) {
+        var dx = this.x * dt / 1000;
+        var dy = this.y * dt / 1000;
+        return this.antiderivative(dx, dy);
+    };
+    IntegrableAntiderivativeOfTwoNumbers.prototype.withX = function (x) {
+        return IntegrableAntiderivativeOfTwoNumbers.of(x, this.y, this.antiderivative, this.bounds);
+    };
+    IntegrableAntiderivativeOfTwoNumbers.prototype.withY = function (y) {
+        return IntegrableAntiderivativeOfTwoNumbers.of(this.x, y, this.antiderivative, this.bounds);
+    };
+    return IntegrableAntiderivativeOfTwoNumbers;
+})();
+function within(v, min, max) {
+    if (max !== undefined && v > max) {
+        return max;
+    }
+    if (min !== undefined && v < min) {
+        return min;
+    }
+    return v;
+}
+module.exports = IntegrableAntiderivativeOfTwoNumbers;
+
+},{}],13:[function(require,module,exports){
 var electric = require('../../../src/electric');
 var calculus = require('./calculus');
 var c = require('./constants');
-var Point = require('./point');
-var Velocity = require('./velocity');
+var Point = require('./angled-point');
+var IntegrableAntiderivativeOfTwoNumbers = require('./integrable-antiderivative-of-two-numbers');
 var cont = electric.emitter.constant;
 function velocity(x, y) {
-    return Velocity.of(x, y, Point.of);
+    return IntegrableAntiderivativeOfTwoNumbers.of(x, y, Point.of);
 }
 var MovingPoint = (function () {
     function MovingPoint(speed, x0, y0, angle) {
@@ -610,59 +711,7 @@ var MovingPoint = (function () {
 })();
 module.exports = MovingPoint;
 
-},{"../../../src/electric":21,"./calculus":5,"./constants":8,"./point":12,"./velocity":18}],12:[function(require,module,exports){
-var _maxX;
-var _minX;
-var _maxY;
-var _minY;
-var Point = (function () {
-    function Point(x, y, angle) {
-        this.x = x;
-        this.y = y;
-        this.angle = angle;
-    }
-    Point.of = function (x, y, angle) {
-        return new Point(x, y, angle);
-    };
-    Point.zero = function () {
-        return Point.of(0, 0);
-    };
-    Point.setBounds = function (minX, maxX, minY, maxY) {
-        _minX = minX;
-        _maxX = maxX;
-        _minY = minY;
-        _maxY = maxY;
-    };
-    Point.prototype.addDelta = function (delta) {
-        var dangle = delta.x;
-        var ddist = delta.y;
-        var dx = Math.cos(this.angle + dangle) * ddist;
-        var dy = Math.sin(this.angle + dangle) * ddist;
-        var x = boundTo(this.x + dx, _minX, _maxX);
-        var y = boundTo(this.y + dy, _minY, _maxY);
-        return Point.of(x, y, this.angle + dangle);
-    };
-    Point.prototype.equals = function (other) {
-        return this.x === other.x && this.y === other.y && this.angle === other.angle;
-        ;
-    };
-    return Point;
-})();
-function boundTo(v, min, max) {
-    if (min == undefined || max == undefined) {
-        return v;
-    }
-    if (v < min) {
-        return max + v;
-    }
-    else if (v > max) {
-        return min - v;
-    }
-    return v;
-}
-module.exports = Point;
-
-},{}],13:[function(require,module,exports){
+},{"../../../src/electric":21,"./angled-point":1,"./calculus":6,"./constants":9,"./integrable-antiderivative-of-two-numbers":12}],14:[function(require,module,exports){
 var electric = require('../../../src/electric');
 var c = require('./constants');
 var cont = electric.emitter.constant;
@@ -671,20 +720,20 @@ function score(input) {
 }
 module.exports = score;
 
-},{"../../../src/electric":21,"./constants":8}],14:[function(require,module,exports){
+},{"../../../src/electric":21,"./constants":9}],15:[function(require,module,exports){
 var electric = require('../../../src/electric');
 var eevent = require('../../../src/electric-event');
 var eui = require('../../../src/emitters/ui');
 var calculus = require('./calculus');
 var c = require('./constants');
-var Velocity = require('./velocity');
-var Point = require('./point');
+var IntegrableAntiderivativeOfTwoNumbers = require('./integrable-antiderivative-of-two-numbers');
+var Point = require('./angled-point');
 var cont = electric.emitter.constant;
 function shipAcceleration(x, y) {
-    return Velocity.of(x, y, shipVelocity);
+    return IntegrableAntiderivativeOfTwoNumbers.of(x, y, shipVelocity);
 }
 function shipVelocity(x, y) {
-    return Velocity.of(x, y, Point.of, c.ship.vbounds);
+    return IntegrableAntiderivativeOfTwoNumbers.of(x, y, Point.of, c.ship.vbounds);
 }
 function create(startingPoint, input) {
     var shipA = cont(shipAcceleration(0, 0)).change({ to: function (a, _) { return cont(a.withX(-c.ship.acceleration.angular)); }, when: input.rotateLeft }, { to: function (a, _) { return cont(a.withX(c.ship.acceleration.angular)); }, when: input.rotateRight }, { to: function (a, _) { return cont(a.withX(0)); }, when: input.stopRotateRight }, { to: function (a, _) { return cont(a.withX(0)); }, when: input.stopRotateLeft }, { to: function (a, _) { return cont(a.withY(-c.ship.acceleration.de)); }, when: input.deccelerate }, { to: function (a, _) { return cont(a.withY(c.ship.acceleration.linear)); }, when: input.accelerate }, { to: function (a, _) { return cont(a.withY(0)); }, when: input.stopAcceleration }, { to: function (a, _) { return cont(a.withY(0)); }, when: input.stopDecceleration });
@@ -700,7 +749,7 @@ function create(startingPoint, input) {
 }
 module.exports = create;
 
-},{"../../../src/electric":21,"../../../src/electric-event":20,"../../../src/emitters/ui":23,"./calculus":5,"./constants":8,"./point":12,"./velocity":18}],15:[function(require,module,exports){
+},{"../../../src/electric":21,"../../../src/electric-event":20,"../../../src/emitters/ui":23,"./angled-point":1,"./calculus":6,"./constants":9,"./integrable-antiderivative-of-two-numbers":12}],16:[function(require,module,exports){
 var electric = require('../../../../src/electric');
 var cont = electric.emitter.constant;
 function insert(list, item) {
@@ -710,13 +759,13 @@ function insert(list, item) {
 }
 module.exports = insert;
 
-},{"../../../../src/electric":21}],16:[function(require,module,exports){
+},{"../../../../src/electric":21}],17:[function(require,module,exports){
 function random(min, max) {
     return Math.random() * (max - min) + min;
 }
 module.exports = random;
 
-},{}],17:[function(require,module,exports){
+},{}],18:[function(require,module,exports){
 var electric = require('../../../../src/electric');
 var cont = electric.emitter.constant;
 function remove(bullets) {
@@ -730,56 +779,7 @@ function remove(bullets) {
 }
 module.exports = remove;
 
-},{"../../../../src/electric":21}],18:[function(require,module,exports){
-var Velocity = (function () {
-    function Velocity(x, y, antiderivative, bounds) {
-        this.bounds = bounds || {};
-        this.x = within(x, this.bounds.minX, this.bounds.maxX);
-        this.y = within(y, this.bounds.minY, this.bounds.maxY);
-        this.antiderivative = antiderivative;
-    }
-    Velocity.of = function (x, y, antiderivative, bounds) {
-        return new Velocity(x, y, antiderivative, bounds);
-    };
-    Velocity.zero = function (antiderivative, bounds) {
-        return Velocity.of(0, 0, antiderivative, bounds);
-    };
-    Velocity.prototype.add = function (other) {
-        var x = within(this.x + other.x, this.bounds.minX, this.bounds.maxX);
-        var y = within(this.y + other.y, this.bounds.minY, this.bounds.maxY);
-        return Velocity.of(x, y, this.antiderivative, this.bounds);
-    };
-    Velocity.prototype.addDelta = function (delta) {
-        return this.add(delta);
-    };
-    Velocity.prototype.equals = function (other) {
-        return this.x === other.x && this.y === other.y;
-    };
-    Velocity.prototype.mulT = function (dt) {
-        var dx = this.x * dt / 1000;
-        var dy = this.y * dt / 1000;
-        return this.antiderivative(dx, dy);
-    };
-    Velocity.prototype.withX = function (x) {
-        return Velocity.of(x, this.y, this.antiderivative, this.bounds);
-    };
-    Velocity.prototype.withY = function (y) {
-        return Velocity.of(this.x, y, this.antiderivative, this.bounds);
-    };
-    return Velocity;
-})();
-function within(v, min, max) {
-    if (max !== undefined && v > max) {
-        return max;
-    }
-    if (min !== undefined && v < min) {
-        return min;
-    }
-    return v;
-}
-module.exports = Velocity;
-
-},{}],19:[function(require,module,exports){
+},{"../../../../src/electric":21}],19:[function(require,module,exports){
 exports.scheduler = require('./scheduler');
 exports.emitter = require('./emitter');
 exports.transformator = require('./transformator');
@@ -968,14 +968,16 @@ ElectricEvent.notHappend = new NotHappend();
 module.exports = ElectricEvent;
 
 },{"./utils":33}],21:[function(require,module,exports){
+// export import i = require('./interfaces');
 exports.scheduler = require('./scheduler');
 exports.emitter = require('./emitter');
 exports.transformator = require('./transformator');
 exports.receiver = require('./receiver');
 exports.clock = require('./clock');
 exports.transmitter = require('./transmitter');
-// export import device = require('./device');
-// export import fp = require('./fp');
+exports.e = exports.emitter;
+exports.t = exports.transformator;
+exports.r = exports.receiver;
 
 },{"./clock":19,"./emitter":22,"./receiver":26,"./scheduler":29,"./transformator":31,"./transmitter":32}],22:[function(require,module,exports){
 var __extends = (this && this.__extends) || function (d, b) {
@@ -2497,4 +2499,4 @@ var Wire = (function () {
 })();
 module.exports = Wire;
 
-},{}]},{},[1]);
+},{}]},{},[2]);

@@ -2,8 +2,8 @@ import inf = require('../../../src/interfaces');
 import electric = require('../../../src/electric');
 
 import c = require('./constants');
-import Point = require('./point');
-import Velocity = require('./velocity');
+import Point = require('./angled-point');
+import IntegrableAntiderivativeOfTwoNumbers = require('./integrable-antiderivative-of-two-numbers');
 import MovingPoint = require('./moving-point');
 import remove = require('./utils/remove');
 import insert = require('./utils/insert');
@@ -12,9 +12,9 @@ import collision = require('./collision');
 export = create;
 
 var cont = electric.emitter.constant;
+type Velocity = IntegrableAntiderivativeOfTwoNumbers<Point>;
 
-
-function shootBullet(bullets: MovingPoint[], xya: Point, velocity: Velocity<Point>) {
+function shootBullet(bullets: MovingPoint[], xya: Point, velocity: Velocity) {
 	var speed = velocity.y + c.bullet.speed;
 	var angle = xya.angle;
 	var vshift = Math.sqrt(Math.max(velocity.y, 0)) + 30;
@@ -26,7 +26,7 @@ function shootBullet(bullets: MovingPoint[], xya: Point, velocity: Velocity<Poin
 
 
 function create(input: {
-	shoot: inf.IEmitter<inf.IElectricEvent<{ xya: Point, velocity: Velocity<Point> }>>,
+	shoot: inf.IEmitter<inf.IElectricEvent<{ xya: Point, velocity: Velocity }>>,
 	removeBoth: inf.IEmitter<inf.IElectricEvent<collision.Collision>>,
 	removeFirst: inf.IEmitter<inf.IElectricEvent<collision.Collision>>
 }) {

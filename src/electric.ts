@@ -1,4 +1,4 @@
-import inf = require('./interfaces');
+// export import i = require('./interfaces');
 
 export import scheduler = require('./scheduler');
 export import emitter = require('./emitter');
@@ -7,5 +7,6 @@ export import receiver = require('./receiver');
 export import clock = require('./clock');
 export import transmitter = require('./transmitter');
 
-// export import device = require('./device');
-// export import fp = require('./fp');
+export var e = emitter;
+export var t = transformator;
+export var r = receiver;

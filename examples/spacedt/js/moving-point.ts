@@ -4,22 +4,24 @@ import electric = require('../../../src/electric');
 import calculus = require('./calculus');
 
 import c = require('./constants');
-import Point = require('./point');
-import Velocity = require('./velocity');
+import Point = require('./angled-point');
+import IntegrableAntiderivativeOfTwoNumbers = require('./integrable-antiderivative-of-two-numbers');
 
 export = MovingPoint;
 
 var cont = electric.emitter.constant;
 
 
+type Velocity = IntegrableAntiderivativeOfTwoNumbers<Point>
+
 function velocity(x: number, y: number) {
-	return Velocity.of(x, y, Point.of);
+	return IntegrableAntiderivativeOfTwoNumbers.of(x, y, Point.of);
 }
 
 
 
 class MovingPoint {
-	v: inf.IEmitter<Velocity<Point>>;
+	v: inf.IEmitter<Velocity>;
 	xya: inf.IEmitter<Point>;
 
 	static start(speed: number, x0: number, y0: number, angle: number) {

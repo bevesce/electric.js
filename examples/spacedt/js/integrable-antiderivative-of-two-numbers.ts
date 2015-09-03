@@ -1,6 +1,6 @@
 import calculus = require('./calculus');
 
-export = Velocity;
+export = IntegrableAntiderivativeOfTwoNumbers;
 
 
 interface Bounds {
@@ -10,7 +10,8 @@ interface Bounds {
 	maxY?: number;
 }
 
-class Velocity<K extends calculus.Antiderivative>
+
+class IntegrableAntiderivativeOfTwoNumbers<K extends calculus.Antiderivative>
 	implements calculus.Antiderivative, calculus.Integrable
 {
 	x: number;
@@ -24,11 +25,11 @@ class Velocity<K extends calculus.Antiderivative>
 		antiderivative: (x: number, y: number) => K,
 		bounds?: Bounds
 	) {
-		return new Velocity(x, y, antiderivative, bounds);
+		return new IntegrableAntiderivativeOfTwoNumbers(x, y, antiderivative, bounds);
 	}
 
 	static zero<K extends calculus.Antiderivative>(antiderivative: (x: number, y: number) => K, bounds?: Bounds) {
-		return Velocity.of(0, 0, antiderivative, bounds);
+		return IntegrableAntiderivativeOfTwoNumbers.of(0, 0, antiderivative, bounds);
 	}
 
 	constructor(
@@ -42,17 +43,17 @@ class Velocity<K extends calculus.Antiderivative>
 		this.antiderivative = antiderivative;
 	}
 
-	add(other: Velocity<K>) {
+	add(other: IntegrableAntiderivativeOfTwoNumbers<K>) {
 		var x = within(this.x + other.x, this.bounds.minX, this.bounds.maxX);
 		var y = within(this.y + other.y, this.bounds.minY, this.bounds.maxY);
-		return Velocity.of(x, y, this.antiderivative, this.bounds);
+		return IntegrableAntiderivativeOfTwoNumbers.of(x, y, this.antiderivative, this.bounds);
 	}
 
-	addDelta(delta: Velocity<K>) {
+	addDelta(delta: IntegrableAntiderivativeOfTwoNumbers<K>) {
 		return this.add(delta);
 	}
 
-	equals(other: Velocity<K>) {
+	equals(other: IntegrableAntiderivativeOfTwoNumbers<K>) {
 		return this.x === other.x && this.y === other.y;
 	}
 
@@ -63,11 +64,11 @@ class Velocity<K extends calculus.Antiderivative>
 	}
 
 	withX(x: number) {
-		return Velocity.of(x, this.y, this.antiderivative, this.bounds);
+		return IntegrableAntiderivativeOfTwoNumbers.of(x, this.y, this.antiderivative, this.bounds);
 	}
 
 	withY(y: number) {
-		return Velocity.of(this.x, y, this.antiderivative, this.bounds);
+		return IntegrableAntiderivativeOfTwoNumbers.of(this.x, y, this.antiderivative, this.bounds);
 	}
 }
 

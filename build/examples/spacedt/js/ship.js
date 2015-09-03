@@ -3,14 +3,14 @@ var eevent = require('../../../src/electric-event');
 var eui = require('../../../src/emitters/ui');
 var calculus = require('./calculus');
 var c = require('./constants');
-var Velocity = require('./velocity');
-var Point = require('./point');
+var IntegrableAntiderivativeOfTwoNumbers = require('./integrable-antiderivative-of-two-numbers');
+var Point = require('./angled-point');
 var cont = electric.emitter.constant;
 function shipAcceleration(x, y) {
-    return Velocity.of(x, y, shipVelocity);
+    return IntegrableAntiderivativeOfTwoNumbers.of(x, y, shipVelocity);
 }
 function shipVelocity(x, y) {
-    return Velocity.of(x, y, Point.of, c.ship.vbounds);
+    return IntegrableAntiderivativeOfTwoNumbers.of(x, y, Point.of, c.ship.vbounds);
 }
 function create(startingPoint, input) {
     var shipA = cont(shipAcceleration(0, 0)).change({ to: function (a, _) { return cont(a.withX(-c.ship.acceleration.angular)); }, when: input.rotateLeft }, { to: function (a, _) { return cont(a.withX(c.ship.acceleration.angular)); }, when: input.rotateRight }, { to: function (a, _) { return cont(a.withX(0)); }, when: input.stopRotateRight }, { to: function (a, _) { return cont(a.withX(0)); }, when: input.stopRotateLeft }, { to: function (a, _) { return cont(a.withY(-c.ship.acceleration.de)); }, when: input.deccelerate }, { to: function (a, _) { return cont(a.withY(c.ship.acceleration.linear)); }, when: input.accelerate }, { to: function (a, _) { return cont(a.withY(0)); }, when: input.stopAcceleration }, { to: function (a, _) { return cont(a.withY(0)); }, when: input.stopDecceleration });

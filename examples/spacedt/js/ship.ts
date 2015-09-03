@@ -5,9 +5,8 @@ import eui = require('../../../src/emitters/ui');
 import calculus = require('./calculus');
 
 import c = require('./constants');
-import Acceleration = require('./acceleration');
-import Velocity = require('./velocity');
-import Point = require('./point');
+import IntegrableAntiderivativeOfTwoNumbers = require('./integrable-antiderivative-of-two-numbers');
+import Point = require('./angled-point');
 
 export = create;
 
@@ -16,14 +15,12 @@ var cont = electric.emitter.constant;
 
 
 function shipAcceleration(x: number, y: number) {
-	return Velocity.of(x, y, shipVelocity);
+	return IntegrableAntiderivativeOfTwoNumbers.of(x, y, shipVelocity);
 }
 
 function shipVelocity(x: number, y: number) {
-	return Velocity.of(x, y, Point.of, c.ship.vbounds);
+	return IntegrableAntiderivativeOfTwoNumbers.of(x, y, Point.of, c.ship.vbounds);
 }
-
-
 
 function create(
 	startingPoint: Point,

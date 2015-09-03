@@ -1,7 +1,7 @@
 import inf = require('../../../src/interfaces');
 import electric = require('../../../src/electric');
 
-import Point = require('./point');
+import Point = require('./angled-point');
 import MovingPoint = require('./moving-point');
 import random = require('./utils/random');
 import remove = require('./utils/remove');

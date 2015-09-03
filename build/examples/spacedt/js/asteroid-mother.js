@@ -2,15 +2,15 @@ var electric = require('../../../src/electric');
 var clock = require('./clock');
 var calculus = require('./calculus');
 var c = require('./constants');
-var Point = require('./point');
-var Velocity = require('./velocity');
+var Point = require('./angled-point');
+var IntegrableAntiderivativeOfTwoNumbers = require('./integrable-antiderivative-of-two-numbers');
 var random = require('./utils/random');
 var cont = electric.emitter.constant;
 function acceleration(x, y) {
-    return Velocity.of(x, y, velocity);
+    return IntegrableAntiderivativeOfTwoNumbers.of(x, y, velocity);
 }
 function velocity(x, y) {
-    return Velocity.of(x, y, Point.of);
+    return IntegrableAntiderivativeOfTwoNumbers.of(x, y, Point.of);
 }
 function create(startingPoint) {
     var v = cont(velocity(-Math.PI / 2, 100)).change({ to: function (a, _) { return cont(a.withX(random(-1, 1))); }, when: clock.interval({ inMs: 2000 }) });

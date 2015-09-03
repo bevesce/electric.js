@@ -1,8 +1,8 @@
 import rui = require('../../../src/receivers/ui');
 
 import c = require('./constants');
-import Point = require('./point');
-import Velocity = require('./velocity');
+import Point = require('./angled-point');
+import IntegrableAntiderivativeOfTwoNumbers = require('./integrable-antiderivative-of-two-numbers');
 
 
 export function speed() {
@@ -14,7 +14,7 @@ export function speed() {
 	var aSpeedCurrent = document.getElementById('angular-speed-current');
 	var aSpeedRight = document.getElementById('angular-speed-right');
 
-	return function(s: Velocity<Point>) {
+	return function(s: IntegrableAntiderivativeOfTwoNumbers<Point>) {
 		var speed = Math.abs(s.y);
 		var w = speedBar.offsetWidth;
 		var wh = w / 2;

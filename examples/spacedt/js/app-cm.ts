@@ -7,7 +7,7 @@ import clock = require('./clock');
 import calculus = require('./calculus');
 
 import c = require('./constants');
-import Point = require('./point');
+import Point = require('./angled-point');
 import shipDevice = require('./ship');
 import motherDevice = require('./asteroid-mother')
 import collision = require('./collision');
