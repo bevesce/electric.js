@@ -11,14 +11,14 @@ var createElement = vdom.create;
 
 
 function renderTime(count: any) {
-    return h('h1', { className: 'test' }, [count.time]);
+    return h('h1', { className: 'test' }, [count]);
 }
 
 function renderList(list: any[]) {
 	return h(
 		'ul', {},
 		list.map(function(item) {
-			return h('li', {key: item.time}, [item.time])
+			return h('li', {key: item}, [item])
 		})
 	);
 }

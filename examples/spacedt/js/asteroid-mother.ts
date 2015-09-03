@@ -1,11 +1,10 @@
 import electric = require('../../../src/electric');
-
-import clock = require('./clock');
-import calculus = require('./calculus');
+import clock = require('../../../src/clock');
+import calculus = require('../../../src/calculus/calculus');
+import IntegrableAntiderivativeOfTwoNumbers = require('../../../src/calculus/integrable-antiderivative-of-two-numbers');
 
 import c = require('./constants');
 import Point = require('./angled-point');
-import IntegrableAntiderivativeOfTwoNumbers = require('./integrable-antiderivative-of-two-numbers');
 import random = require('./utils/random');
 
 export = create;

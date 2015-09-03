@@ -1,5 +1,6 @@
 (function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);var f=new Error("Cannot find module '"+o+"'");throw f.code="MODULE_NOT_FOUND",f}var l=n[o]={exports:{}};t[o][0].call(l.exports,function(e){var n=t[o][1][e];return s(n?n:e)},l,l.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(require,module,exports){
 var electric = require('../../src/electric');
+var IntegrableAntiderivativeOfNumber = require('../../src/calculus/integrable-antiderivative-of-number');
 var canvas = document.getElementById('canvas');
 var ctx = canvas.getContext('2d');
 canvas.width = window.innerWidth;
@@ -9,127 +10,200 @@ function bar(x, y, ys) {
     ctx.fillStyle = 'white';
     ctx.fillRect(x, ys, 1, y);
 }
-function a(time) {
-    return 1;
+function acceleration(x) {
+    return IntegrableAntiderivativeOfNumber.of(x, velocity);
 }
-var aT = electric.clock.timeFunction(a, { intervalInMs: 10 });
-var vT = electric.clock.integral(aT);
-var sT = electric.clock.integral(vT);
+function velocity(x) {
+    return IntegrableAntiderivativeOfNumber.of(x, shift);
+}
+function shift(x) {
+    return IntegrableAntiderivativeOfNumber.of(x);
+}
+var intervalInMs = 10;
+var interval = { intervalInMs: intervalInMs };
+var aT = electric.e.constant(acceleration(5));
+var vT = electric.calculus.integral(velocity(0), aT, interval);
+var sT = electric.calculus.integral(shift(0), vT, interval);
 var x0 = 0;
-aT.plugReceiver(function (a) {
+electric.clock.intervalValue(5, { inMs: intervalInMs }).plugReceiver(function (a) {
+    if (!a.happend) {
+        return;
+    }
     bar(x0, a.value, 0);
     x0++;
 });
 var x1 = 0;
 vT.plugReceiver(function (v) {
-    bar(x1, v.value, 10);
+    bar(x1, v.x, 10);
     x1++;
 });
 var x2 = 0;
 sT.plugReceiver(function (s) {
-    bar(x2, s.value, 100);
+    bar(x2, s.x, 100);
     x2++;
 });
 
-},{"../../src/electric":4}],2:[function(require,module,exports){
-exports.scheduler = require('./scheduler');
-exports.emitter = require('./emitter');
-exports.transformator = require('./transformator');
-var TimeValue = (function () {
-    function TimeValue(time, value) {
-        this.time = time;
-        this.value = value;
-    }
-    TimeValue.of = function (time, value) {
-        if (value === void 0) { value = undefined; }
-        return new TimeValue(time, value);
-    };
-    TimeValue.lift = function (f) {
-        return function () {
-            var vs = [];
-            for (var _i = 0; _i < arguments.length; _i++) {
-                vs[_i - 0] = arguments[_i];
-            }
-            return TimeValue.of(Math.max.apply(Math, vs.map(function (v) { return v.time; })), f.apply(null, vs.map(function (v) { return v.value; })));
-        };
-    };
-    TimeValue.prototype.map = function (f) {
-        return TimeValue.of(this.time, f(this.value));
-    };
-    return TimeValue;
-})();
-exports.TimeValue = TimeValue;
-function _time(args, transform) {
-    var e = exports.emitter.manual(transform(exports.scheduler.now()));
-    var subname;
-    var interval;
-    if (args.intervalInMs === undefined) {
-        subname = 'fps: ' + args.fps;
-        interval = 1 / args.fps * 1000;
-    }
-    else {
-        subname = 'interval: ' + args.intervalInMs + 'ms';
-        interval = args.intervalInMs;
-    }
-    var id = exports.scheduler.scheduleInterval(function () { return e.emit(transform(exports.scheduler.now())); }, interval);
-    e.name = 'clock<' + subname + '>';
-    function releaseResoueces() {
-        console.log('STAABB');
-        exports.scheduler.unscheduleInterval(id);
-    }
-    e.setReleaseResources(releaseResoueces);
-    return e;
-}
-function time(args) {
-    return _time(args, function (t) { return TimeValue.of(t, undefined); });
-}
-exports.time = time;
-function timeFunction(f, args, t0) {
-    if (t0 === void 0) { t0 = 0; }
-    return _time(args, function (t) { return (TimeValue.of(t, f(t - t0))); });
-}
-exports.timeFunction = timeFunction;
-function equalsWithTime(x, y) {
-    return x.time === y.time && x.value === y.value;
-}
-function integral(f) {
-    var initialAcc = { time: exports.scheduler.now(), value: 0, integral: 0 };
-    var result = f.accumulate(initialAcc, function (acc, v) {
-        var dt = (v.time - acc.time) / 1000;
+},{"../../src/calculus/integrable-antiderivative-of-number":3,"../../src/electric":6}],2:[function(require,module,exports){
+var clock = require('../clock');
+var scheduler = require('../scheduler');
+var transformator = require('../transformator');
+function integral(initialValue, emitter, options) {
+    var timmed = timeValue(emitter, options);
+    var result = timmed.accumulate({
+        time: scheduler.now(),
+        value: emitter.dirtyCurrentValue(),
+        sum: initialValue
+    }, function (acc, v) {
+        var now = scheduler.now();
+        var dt = now - acc.time;
+        var nv = v.value.add(acc.value).mulT(dt / 2);
+        var sum = acc.sum.addDelta(nv);
         return {
-            time: v.time,
+            time: now,
             value: v.value,
-            integral: acc.integral + (acc.value + v.value) / 2 * dt
+            sum: sum
         };
-    }).map(function (v) { return TimeValue.of(v.time, v.integral); });
-    result.setEquals(equalsWithTime);
+    }).map(function (v) { return v.sum; });
+    result.name = '<| integral |>';
+    result.setEquals(function (x, y) { return x.equals(y); });
+    result.stabilize = function () { return timmed.stabilize(); };
     return result;
 }
 exports.integral = integral;
-function derivative(f) {
-    var initialAcc = { time: exports.scheduler.now(), value: undefined, derivative: 0 };
-    var result = f.accumulate(initialAcc, function (acc, v) {
-        var dt = (v.time - acc.time) / 1000;
-        var diff = 0;
-        if (dt !== 0) {
-            diff = (v.value - acc.value) / dt / 1000;
-        }
+function differential(initialValue, emitter, options) {
+    var timmed = timeValue(emitter, options);
+    var result = timmed.accumulate({
+        time: scheduler.now(),
+        value: emitter.dirtyCurrentValue(),
+        diff: initialValue
+    }, function (acc, v) {
+        var dt = v.time - acc.time;
+        var diff = v.value.sub(acc.value).divT(dt);
         return {
             time: v.time,
             value: v.value,
-            derivative: diff
+            diff: diff
         };
-    }).map(function (v) { return TimeValue.of(v.time, v.derivative); });
-    result.setEquals(equalsWithTime);
+    }).map(function (v) { return v.diff; });
+    result.setEquals(function (x, y) { return x.equals(y); });
+    result.name = '<| differential |>';
     return result;
 }
-exports.derivative = derivative;
+exports.differential = differential;
+function timeValue(emitter, options) {
+    var time = clock.time(options);
+    var trans = transformator.map(function (t, v) { return ({ time: t, value: v }); }, time, emitter);
+    trans.stabilize = function () { return time.stabilize(); };
+    return trans;
+}
 
-},{"./emitter":5,"./scheduler":8,"./transformator":10}],3:[function(require,module,exports){
+},{"../clock":4,"../scheduler":10,"../transformator":12}],3:[function(require,module,exports){
+var IntegrableAntiderivativeOfNumber = (function () {
+    function IntegrableAntiderivativeOfNumber(x, antiderivative, bounds) {
+        this.bounds = bounds || {};
+        this.x = within(x, this.bounds.minX, this.bounds.maxX);
+        this.antiderivative = antiderivative;
+    }
+    IntegrableAntiderivativeOfNumber.of = function (x, antiderivative, bounds) {
+        return new IntegrableAntiderivativeOfNumber(x, antiderivative, bounds);
+    };
+    IntegrableAntiderivativeOfNumber.zero = function (antiderivative, bounds) {
+        return IntegrableAntiderivativeOfNumber.of(0, antiderivative, bounds);
+    };
+    IntegrableAntiderivativeOfNumber.prototype.add = function (other) {
+        var x = within(this.x + other.x, this.bounds.minX, this.bounds.maxX);
+        return IntegrableAntiderivativeOfNumber.of(x, this.antiderivative, this.bounds);
+    };
+    IntegrableAntiderivativeOfNumber.prototype.addDelta = function (delta) {
+        return this.add(delta);
+    };
+    IntegrableAntiderivativeOfNumber.prototype.equals = function (other) {
+        return this.x === other.x;
+    };
+    IntegrableAntiderivativeOfNumber.prototype.mulT = function (dt) {
+        var dx = this.x * dt / 1000;
+        return this.antiderivative(dx);
+    };
+    IntegrableAntiderivativeOfNumber.prototype.withX = function (x) {
+        return IntegrableAntiderivativeOfNumber.of(x, this.antiderivative, this.bounds);
+    };
+    IntegrableAntiderivativeOfNumber.prototype.withY = function (y) {
+        return IntegrableAntiderivativeOfNumber.of(this.x, this.antiderivative, this.bounds);
+    };
+    return IntegrableAntiderivativeOfNumber;
+})();
+function within(v, min, max) {
+    if (max !== undefined && v > max) {
+        return max;
+    }
+    if (min !== undefined && v < min) {
+        return min;
+    }
+    return v;
+}
+module.exports = IntegrableAntiderivativeOfNumber;
+
+},{}],4:[function(require,module,exports){
+var scheduler = require('./scheduler');
+var emitter = require('./emitter');
+function interval(options) {
+    var timer = emitter.manualEvent();
+    scheduler.scheduleInterval(function () {
+        timer.impulse(Date.now());
+    }, calculateInterval(options.inMs, options.fps));
+    timer.name = '| interval ' + calculateEmitterName(options);
+    return timer;
+}
+exports.interval = interval;
+function intervalValue(value, options) {
+    var timer = emitter.manualEvent();
+    scheduler.scheduleInterval(function () {
+        timer.impulse(value);
+    }, calculateInterval(options.inMs, options.fps));
+    timer.name = '| interval of ' + value + calculateEmitterName(options);
+    return timer;
+}
+exports.intervalValue = intervalValue;
+function time(options) {
+    var interval = calculateInterval(options.intervalInMs, options.fps);
+    var timeEmitter = emitter.manual(scheduler.now());
+    var id = scheduler.scheduleInterval(function () { return timeEmitter.emit((scheduler.now())); }, interval);
+    timeEmitter.setReleaseResources(function () { return scheduler.unscheduleInterval(id); });
+    timeEmitter.name = '| time ' + calculateEmitterName(options);
+    return timeEmitter;
+}
+exports.time = time;
+function calculateInterval(intervalInMs, fps) {
+    if (intervalInMs === undefined) {
+        return 1 / fps * 1000;
+    }
+    else {
+        return intervalInMs;
+    }
+}
+function calculateEmitterName(options) {
+    if (options.fps !== undefined) {
+        return ' fps: ' + options.fps + ' |>';
+    }
+    else if (options.inMs !== undefined) {
+        return ' interval: ' + options.inMs + 'ms |>';
+    }
+    else {
+        return ' interval: ' + options.intervalInMs + 'ms |>';
+    }
+}
+
+},{"./emitter":7,"./scheduler":10}],5:[function(require,module,exports){
 var utils = require('./utils');
 var ElectricEvent = (function () {
     function ElectricEvent() {
     }
+    ElectricEvent.restore = function (e) {
+        if (e.happend) {
+            return ElectricEvent.of(e.value);
+        }
+        return ElectricEvent.notHappend;
+    };
     ElectricEvent.of = function (value) {
         return new Happend(value);
     };
@@ -147,10 +221,33 @@ var ElectricEvent = (function () {
             }
         };
     };
+    ElectricEvent.flatLift = function (f) {
+        return function (v1) {
+            if (v1.happend) {
+                return f(v1.value);
+            }
+            else {
+                return ElectricEvent.notHappend;
+            }
+        };
+    };
+    ElectricEvent.liftOnFirst = function (f) {
+        return function (v1, v2) {
+            if (v1.happend) {
+                return ElectricEvent.of(f(v1.value, v2));
+            }
+            else {
+                return ElectricEvent.notHappend;
+            }
+        };
+    };
     ElectricEvent.prototype.map = function (f) {
         throw Error('ElectricEvent is abstract class, use Happend and NotHappend');
     };
     ;
+    ElectricEvent.prototype.flattenMap = function (f) {
+        throw Error('ElectricEvent is abstract class, use Happend and NotHappend');
+    };
     return ElectricEvent;
 })();
 var Happend = (function () {
@@ -160,6 +257,9 @@ var Happend = (function () {
     }
     Happend.prototype.map = function (f) {
         return ElectricEvent.of(f(this.value));
+    };
+    Happend.prototype.flattenMap = function (f) {
+        return f(this.value);
     };
     return Happend;
 })();
@@ -171,21 +271,28 @@ var NotHappend = (function () {
     NotHappend.prototype.map = function (f) {
         return ElectricEvent.notHappend;
     };
+    NotHappend.prototype.flattenMap = function (f) {
+        return ElectricEvent.notHappend;
+    };
     return NotHappend;
 })();
 ElectricEvent.notHappend = new NotHappend();
 module.exports = ElectricEvent;
 
-},{"./utils":11}],4:[function(require,module,exports){
+},{"./utils":14}],6:[function(require,module,exports){
 exports.scheduler = require('./scheduler');
 exports.emitter = require('./emitter');
 exports.transformator = require('./transformator');
 exports.receiver = require('./receiver');
 exports.clock = require('./clock');
-// export import device = require('./device');
-// export import fp = require('./fp');
+exports.transmitter = require('./transmitter');
+exports.calculus = require('./calculus/calculus');
+exports.e = exports.emitter;
+exports.t = exports.transformator;
+exports.r = exports.receiver;
+exports.c = exports.calculus;
 
-},{"./clock":2,"./emitter":5,"./receiver":7,"./scheduler":8,"./transformator":10}],5:[function(require,module,exports){
+},{"./calculus/calculus":2,"./clock":4,"./emitter":7,"./receiver":9,"./scheduler":10,"./transformator":12,"./transmitter":13}],7:[function(require,module,exports){
 var __extends = (this && this.__extends) || function (d, b) {
     for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p];
     function __() { this.constructor = d; }
@@ -197,12 +304,15 @@ var transformators = require('./transformator-helpers');
 var eevent = require('./electric-event');
 var Wire = require('./wire');
 exports.placeholder = require('./placeholder');
+function en(name) {
+    return '| ' + name + ' |>';
+}
 var Emitter = (function () {
     function Emitter(initialValue) {
         if (initialValue === void 0) { initialValue = undefined; }
         this._receivers = [];
         this._currentValue = initialValue;
-        this.name = 'emitter';
+        this.name = en(this.name);
     }
     // when reveiver is plugged current value is not emitted to him
     // instantaneously, but instead it's done asynchronously
@@ -251,7 +361,6 @@ var Emitter = (function () {
     Emitter.prototype._throwStabilized = function (value) {
         throw Error("can't emit <" + value + "> from " + this.name + ", it's stabilized");
     };
-    // semantics:
     // let's say that f = constant(y).emit(x) is called at t_e
     // then f(t) = x for t >= t_e, and f(t) = y for t < t_e
     Emitter.prototype.emit = function (value) {
@@ -261,7 +370,6 @@ var Emitter = (function () {
         this._dispatchToReceivers(value);
         this._currentValue = value;
     };
-    // semantics:
     // let's say that f constant(y).impulse(x) is called at t_i
     // then f(t_i) = x and f(t) = y when t != t_i
     Emitter.prototype.impulse = function (value) {
@@ -290,6 +398,13 @@ var Emitter = (function () {
         }
         else {
             receiver.receive(value);
+        }
+    };
+    Emitter.prototype._ayncDispatchToReceivers = function (value) {
+        var currentReceivers = this._receivers.slice();
+        for (var _i = 0; _i < currentReceivers.length; _i++) {
+            var receiver = currentReceivers[_i];
+            this._ayncDispatchToReceiver(receiver, value);
         }
     };
     Emitter.prototype._ayncDispatchToReceiver = function (receiver, value) {
@@ -324,18 +439,221 @@ var Emitter = (function () {
         return namedTransformator('merge' + this._enclosedName() + ' with ' + emitters.map(function (e) { return e.name; }).join(', '), [this].concat(emitters), transformators.merge(), this.dirtyCurrentValue());
     };
     Emitter.prototype.when = function (switcher) {
-        return namedTransformator('when' + this._enclosedName(), [this], transformators.when(switcher.happens, switcher.then), eevent.notHappend);
+        var t = namedTransformator('when happens then', [this], transformators.when(switcher.happens, switcher.then), eevent.notHappend);
+        return t;
+    };
+    Emitter.prototype.whenThen = function (happens) {
+        var t = namedTransformator('when then', [this], transformators.whenThen(happens), eevent.notHappend);
+        return t;
     };
     Emitter.prototype.sample = function (initialValue, samplingEvent) {
         var t = namedTransformator('sample' + this._enclosedName() + ' on ' + this._enclosedName(samplingEvent), [this, samplingEvent], transformators.sample(), initialValue);
         return t;
     };
+    // change<S1, S2, S3, S4, S5, S6, S7, S8, S9>(
+    //     switcher1: { when: inf.IEmitter<eevent<S1>>, to: inf.IEmitter<T> | ((t: T, k: S1) => inf.IEmitter<T>) },
+    //     switcher2: { when: inf.IEmitter<eevent<S2>>, to: inf.IEmitter<T> | ((t: T, k: S2) => inf.IEmitter<T>) },
+    //     switcher3: { when: inf.IEmitter<eevent<S3>>, to: inf.IEmitter<T> | ((t: T, k: S3) => inf.IEmitter<T>) },
+    //     switcher4: { when: inf.IEmitter<eevent<S4>>, to: inf.IEmitter<T> | ((t: T, k: S4) => inf.IEmitter<T>) },
+    //     switcher5: { when: inf.IEmitter<eevent<S5>>, to: inf.IEmitter<T> | ((t: T, k: S5) => inf.IEmitter<T>) },
+    //     switcher6: { when: inf.IEmitter<eevent<S6>>, to: inf.IEmitter<T> | ((t: T, k: S6) => inf.IEmitter<T>) },
+    //     switcher7: { when: inf.IEmitter<eevent<S7>>, to: inf.IEmitter<T> | ((t: T, k: S7) => inf.IEmitter<T>) },
+    //     switcher8: { when: inf.IEmitter<eevent<S8>>, to: inf.IEmitter<T> | ((t: T, k: S8) => inf.IEmitter<T>) },
+    //     switcher9: { when: inf.IEmitter<eevent<S9>>, to: inf.IEmitter<T> | ((t: T, k: S9) => inf.IEmitter<T>) }
+    // ): inf.IEmitter<T>;
+    // change<S1, S2, S3, S4, S5, S6, S7, S8, S9, S10>(
+    //     switcher1: { when: inf.IEmitter<eevent<S1>>, to: inf.IEmitter<T> | ((t: T, k: S1) => inf.IEmitter<T>) },
+    //     switcher2: { when: inf.IEmitter<eevent<S2>>, to: inf.IEmitter<T> | ((t: T, k: S2) => inf.IEmitter<T>) },
+    //     switcher3: { when: inf.IEmitter<eevent<S3>>, to: inf.IEmitter<T> | ((t: T, k: S3) => inf.IEmitter<T>) },
+    //     switcher4: { when: inf.IEmitter<eevent<S4>>, to: inf.IEmitter<T> | ((t: T, k: S4) => inf.IEmitter<T>) },
+    //     switcher5: { when: inf.IEmitter<eevent<S5>>, to: inf.IEmitter<T> | ((t: T, k: S5) => inf.IEmitter<T>) },
+    //     switcher6: { when: inf.IEmitter<eevent<S6>>, to: inf.IEmitter<T> | ((t: T, k: S6) => inf.IEmitter<T>) },
+    //     switcher7: { when: inf.IEmitter<eevent<S7>>, to: inf.IEmitter<T> | ((t: T, k: S7) => inf.IEmitter<T>) },
+    //     switcher8: { when: inf.IEmitter<eevent<S8>>, to: inf.IEmitter<T> | ((t: T, k: S8) => inf.IEmitter<T>) },
+    //     switcher9: { when: inf.IEmitter<eevent<S9>>, to: inf.IEmitter<T> | ((t: T, k: S9) => inf.IEmitter<T>) },
+    //     switcher10: { when: inf.IEmitter<eevent<S10>>, to: inf.IEmitter<T> | ((t: T, k: S10) => inf.IEmitter<T>) }
+    // ): inf.IEmitter<T>;
+    // change<S1, S2, S3, S4, S5, S6, S7, S8, S9, S10, S11>(
+    //     switcher1: { when: inf.IEmitter<eevent<S1>>, to: inf.IEmitter<T> | ((t: T, k: S1) => inf.IEmitter<T>) },
+    //     switcher2: { when: inf.IEmitter<eevent<S2>>, to: inf.IEmitter<T> | ((t: T, k: S2) => inf.IEmitter<T>) },
+    //     switcher3: { when: inf.IEmitter<eevent<S3>>, to: inf.IEmitter<T> | ((t: T, k: S3) => inf.IEmitter<T>) },
+    //     switcher4: { when: inf.IEmitter<eevent<S4>>, to: inf.IEmitter<T> | ((t: T, k: S4) => inf.IEmitter<T>) },
+    //     switcher5: { when: inf.IEmitter<eevent<S5>>, to: inf.IEmitter<T> | ((t: T, k: S5) => inf.IEmitter<T>) },
+    //     switcher6: { when: inf.IEmitter<eevent<S6>>, to: inf.IEmitter<T> | ((t: T, k: S6) => inf.IEmitter<T>) },
+    //     switcher7: { when: inf.IEmitter<eevent<S7>>, to: inf.IEmitter<T> | ((t: T, k: S7) => inf.IEmitter<T>) },
+    //     switcher8: { when: inf.IEmitter<eevent<S8>>, to: inf.IEmitter<T> | ((t: T, k: S8) => inf.IEmitter<T>) },
+    //     switcher9: { when: inf.IEmitter<eevent<S9>>, to: inf.IEmitter<T> | ((t: T, k: S9) => inf.IEmitter<T>) },
+    //     switcher10: { when: inf.IEmitter<eevent<S10>>, to: inf.IEmitter<T> | ((t: T, k: S10) => inf.IEmitter<T>) },
+    //     switcher11: { when: inf.IEmitter<eevent<S11>>, to: inf.IEmitter<T> | ((t: T, k: S11) => inf.IEmitter<T>) }
+    // ): inf.IEmitter<T>;
+    // change<S1, S2, S3, S4, S5, S6, S7, S8, S9, S10, S11, S12>(
+    //     switcher1: { when: inf.IEmitter<eevent<S1>>, to: inf.IEmitter<T> | ((t: T, k: S1) => inf.IEmitter<T>) },
+    //     switcher2: { when: inf.IEmitter<eevent<S2>>, to: inf.IEmitter<T> | ((t: T, k: S2) => inf.IEmitter<T>) },
+    //     switcher3: { when: inf.IEmitter<eevent<S3>>, to: inf.IEmitter<T> | ((t: T, k: S3) => inf.IEmitter<T>) },
+    //     switcher4: { when: inf.IEmitter<eevent<S4>>, to: inf.IEmitter<T> | ((t: T, k: S4) => inf.IEmitter<T>) },
+    //     switcher5: { when: inf.IEmitter<eevent<S5>>, to: inf.IEmitter<T> | ((t: T, k: S5) => inf.IEmitter<T>) },
+    //     switcher6: { when: inf.IEmitter<eevent<S6>>, to: inf.IEmitter<T> | ((t: T, k: S6) => inf.IEmitter<T>) },
+    //     switcher7: { when: inf.IEmitter<eevent<S7>>, to: inf.IEmitter<T> | ((t: T, k: S7) => inf.IEmitter<T>) },
+    //     switcher8: { when: inf.IEmitter<eevent<S8>>, to: inf.IEmitter<T> | ((t: T, k: S8) => inf.IEmitter<T>) },
+    //     switcher9: { when: inf.IEmitter<eevent<S9>>, to: inf.IEmitter<T> | ((t: T, k: S9) => inf.IEmitter<T>) },
+    //     switcher10: { when: inf.IEmitter<eevent<S10>>, to: inf.IEmitter<T> | ((t: T, k: S10) => inf.IEmitter<T>) },
+    //     switcher11: { when: inf.IEmitter<eevent<S11>>, to: inf.IEmitter<T> | ((t: T, k: S11) => inf.IEmitter<T>) },
+    //     switcher12: { when: inf.IEmitter<eevent<S12>>, to: inf.IEmitter<T> | ((t: T, k: S12) => inf.IEmitter<T>) }
+    // ): inf.IEmitter<T>;
+    // change<S1, S2, S3, S4, S5, S6, S7, S8, S9, S10, S11, S12, S13>(
+    //     switcher1: { when: inf.IEmitter<eevent<S1>>, to: inf.IEmitter<T> | ((t: T, k: S1) => inf.IEmitter<T>) },
+    //     switcher2: { when: inf.IEmitter<eevent<S2>>, to: inf.IEmitter<T> | ((t: T, k: S2) => inf.IEmitter<T>) },
+    //     switcher3: { when: inf.IEmitter<eevent<S3>>, to: inf.IEmitter<T> | ((t: T, k: S3) => inf.IEmitter<T>) },
+    //     switcher4: { when: inf.IEmitter<eevent<S4>>, to: inf.IEmitter<T> | ((t: T, k: S4) => inf.IEmitter<T>) },
+    //     switcher5: { when: inf.IEmitter<eevent<S5>>, to: inf.IEmitter<T> | ((t: T, k: S5) => inf.IEmitter<T>) },
+    //     switcher6: { when: inf.IEmitter<eevent<S6>>, to: inf.IEmitter<T> | ((t: T, k: S6) => inf.IEmitter<T>) },
+    //     switcher7: { when: inf.IEmitter<eevent<S7>>, to: inf.IEmitter<T> | ((t: T, k: S7) => inf.IEmitter<T>) },
+    //     switcher8: { when: inf.IEmitter<eevent<S8>>, to: inf.IEmitter<T> | ((t: T, k: S8) => inf.IEmitter<T>) },
+    //     switcher9: { when: inf.IEmitter<eevent<S9>>, to: inf.IEmitter<T> | ((t: T, k: S9) => inf.IEmitter<T>) },
+    //     switcher10: { when: inf.IEmitter<eevent<S10>>, to: inf.IEmitter<T> | ((t: T, k: S10) => inf.IEmitter<T>) },
+    //     switcher11: { when: inf.IEmitter<eevent<S11>>, to: inf.IEmitter<T> | ((t: T, k: S11) => inf.IEmitter<T>) },
+    //     switcher12: { when: inf.IEmitter<eevent<S12>>, to: inf.IEmitter<T> | ((t: T, k: S12) => inf.IEmitter<T>) },
+    //     switcher13: { when: inf.IEmitter<eevent<S13>>, to: inf.IEmitter<T> | ((t: T, k: S13) => inf.IEmitter<T>) }
+    // ): inf.IEmitter<T>;
+    // change<S1, S2, S3, S4, S5, S6, S7, S8, S9, S10, S11, S12, S13, S14>(
+    //     switcher1: { when: inf.IEmitter<eevent<S1>>, to: inf.IEmitter<T> | ((t: T, k: S1) => inf.IEmitter<T>) },
+    //     switcher2: { when: inf.IEmitter<eevent<S2>>, to: inf.IEmitter<T> | ((t: T, k: S2) => inf.IEmitter<T>) },
+    //     switcher3: { when: inf.IEmitter<eevent<S3>>, to: inf.IEmitter<T> | ((t: T, k: S3) => inf.IEmitter<T>) },
+    //     switcher4: { when: inf.IEmitter<eevent<S4>>, to: inf.IEmitter<T> | ((t: T, k: S4) => inf.IEmitter<T>) },
+    //     switcher5: { when: inf.IEmitter<eevent<S5>>, to: inf.IEmitter<T> | ((t: T, k: S5) => inf.IEmitter<T>) },
+    //     switcher6: { when: inf.IEmitter<eevent<S6>>, to: inf.IEmitter<T> | ((t: T, k: S6) => inf.IEmitter<T>) },
+    //     switcher7: { when: inf.IEmitter<eevent<S7>>, to: inf.IEmitter<T> | ((t: T, k: S7) => inf.IEmitter<T>) },
+    //     switcher8: { when: inf.IEmitter<eevent<S8>>, to: inf.IEmitter<T> | ((t: T, k: S8) => inf.IEmitter<T>) },
+    //     switcher9: { when: inf.IEmitter<eevent<S9>>, to: inf.IEmitter<T> | ((t: T, k: S9) => inf.IEmitter<T>) },
+    //     switcher10: { when: inf.IEmitter<eevent<S10>>, to: inf.IEmitter<T> | ((t: T, k: S10) => inf.IEmitter<T>) },
+    //     switcher11: { when: inf.IEmitter<eevent<S11>>, to: inf.IEmitter<T> | ((t: T, k: S11) => inf.IEmitter<T>) },
+    //     switcher12: { when: inf.IEmitter<eevent<S12>>, to: inf.IEmitter<T> | ((t: T, k: S12) => inf.IEmitter<T>) },
+    //     switcher13: { when: inf.IEmitter<eevent<S13>>, to: inf.IEmitter<T> | ((t: T, k: S13) => inf.IEmitter<T>) },
+    //     switcher14: { when: inf.IEmitter<eevent<S14>>, to: inf.IEmitter<T> | ((t: T, k: S14) => inf.IEmitter<T>) }
+    // ): inf.IEmitter<T>;
+    // change<S1, S2, S3, S4, S5, S6, S7, S8, S9, S10, S11, S12, S13, S14, S15>(
+    //     switcher1: { when: inf.IEmitter<eevent<S1>>, to: inf.IEmitter<T> | ((t: T, k: S1) => inf.IEmitter<T>) },
+    //     switcher2: { when: inf.IEmitter<eevent<S2>>, to: inf.IEmitter<T> | ((t: T, k: S2) => inf.IEmitter<T>) },
+    //     switcher3: { when: inf.IEmitter<eevent<S3>>, to: inf.IEmitter<T> | ((t: T, k: S3) => inf.IEmitter<T>) },
+    //     switcher4: { when: inf.IEmitter<eevent<S4>>, to: inf.IEmitter<T> | ((t: T, k: S4) => inf.IEmitter<T>) },
+    //     switcher5: { when: inf.IEmitter<eevent<S5>>, to: inf.IEmitter<T> | ((t: T, k: S5) => inf.IEmitter<T>) },
+    //     switcher6: { when: inf.IEmitter<eevent<S6>>, to: inf.IEmitter<T> | ((t: T, k: S6) => inf.IEmitter<T>) },
+    //     switcher7: { when: inf.IEmitter<eevent<S7>>, to: inf.IEmitter<T> | ((t: T, k: S7) => inf.IEmitter<T>) },
+    //     switcher8: { when: inf.IEmitter<eevent<S8>>, to: inf.IEmitter<T> | ((t: T, k: S8) => inf.IEmitter<T>) },
+    //     switcher9: { when: inf.IEmitter<eevent<S9>>, to: inf.IEmitter<T> | ((t: T, k: S9) => inf.IEmitter<T>) },
+    //     switcher10: { when: inf.IEmitter<eevent<S10>>, to: inf.IEmitter<T> | ((t: T, k: S10) => inf.IEmitter<T>) },
+    //     switcher11: { when: inf.IEmitter<eevent<S11>>, to: inf.IEmitter<T> | ((t: T, k: S11) => inf.IEmitter<T>) },
+    //     switcher12: { when: inf.IEmitter<eevent<S12>>, to: inf.IEmitter<T> | ((t: T, k: S12) => inf.IEmitter<T>) },
+    //     switcher13: { when: inf.IEmitter<eevent<S13>>, to: inf.IEmitter<T> | ((t: T, k: S13) => inf.IEmitter<T>) },
+    //     switcher14: { when: inf.IEmitter<eevent<S14>>, to: inf.IEmitter<T> | ((t: T, k: S14) => inf.IEmitter<T>) },
+    //     switcher15: { when: inf.IEmitter<eevent<S15>>, to: inf.IEmitter<T> | ((t: T, k: S15) => inf.IEmitter<T>) }
+    // ): inf.IEmitter<T>;
+    // change<S1, S2, S3, S4, S5, S6, S7, S8, S9, S10, S11, S12, S13, S14, S15, S16>(
+    //     switcher1: { when: inf.IEmitter<eevent<S1>>, to: inf.IEmitter<T> | ((t: T, k: S1) => inf.IEmitter<T>) },
+    //     switcher2: { when: inf.IEmitter<eevent<S2>>, to: inf.IEmitter<T> | ((t: T, k: S2) => inf.IEmitter<T>) },
+    //     switcher3: { when: inf.IEmitter<eevent<S3>>, to: inf.IEmitter<T> | ((t: T, k: S3) => inf.IEmitter<T>) },
+    //     switcher4: { when: inf.IEmitter<eevent<S4>>, to: inf.IEmitter<T> | ((t: T, k: S4) => inf.IEmitter<T>) },
+    //     switcher5: { when: inf.IEmitter<eevent<S5>>, to: inf.IEmitter<T> | ((t: T, k: S5) => inf.IEmitter<T>) },
+    //     switcher6: { when: inf.IEmitter<eevent<S6>>, to: inf.IEmitter<T> | ((t: T, k: S6) => inf.IEmitter<T>) },
+    //     switcher7: { when: inf.IEmitter<eevent<S7>>, to: inf.IEmitter<T> | ((t: T, k: S7) => inf.IEmitter<T>) },
+    //     switcher8: { when: inf.IEmitter<eevent<S8>>, to: inf.IEmitter<T> | ((t: T, k: S8) => inf.IEmitter<T>) },
+    //     switcher9: { when: inf.IEmitter<eevent<S9>>, to: inf.IEmitter<T> | ((t: T, k: S9) => inf.IEmitter<T>) },
+    //     switcher10: { when: inf.IEmitter<eevent<S10>>, to: inf.IEmitter<T> | ((t: T, k: S10) => inf.IEmitter<T>) },
+    //     switcher11: { when: inf.IEmitter<eevent<S11>>, to: inf.IEmitter<T> | ((t: T, k: S11) => inf.IEmitter<T>) },
+    //     switcher12: { when: inf.IEmitter<eevent<S12>>, to: inf.IEmitter<T> | ((t: T, k: S12) => inf.IEmitter<T>) },
+    //     switcher13: { when: inf.IEmitter<eevent<S13>>, to: inf.IEmitter<T> | ((t: T, k: S13) => inf.IEmitter<T>) },
+    //     switcher14: { when: inf.IEmitter<eevent<S14>>, to: inf.IEmitter<T> | ((t: T, k: S14) => inf.IEmitter<T>) },
+    //     switcher15: { when: inf.IEmitter<eevent<S15>>, to: inf.IEmitter<T> | ((t: T, k: S15) => inf.IEmitter<T>) },
+    //     switcher16: { when: inf.IEmitter<eevent<S16>>, to: inf.IEmitter<T> | ((t: T, k: S16) => inf.IEmitter<T>) }
+    // ): inf.IEmitter<T>;
+    // change<S1, S2, S3, S4, S5, S6, S7, S8, S9, S10, S11, S12, S13, S14, S15, S16, S17>(
+    //     switcher1: { when: inf.IEmitter<eevent<S1>>, to: inf.IEmitter<T> | ((t: T, k: S1) => inf.IEmitter<T>) },
+    //     switcher2: { when: inf.IEmitter<eevent<S2>>, to: inf.IEmitter<T> | ((t: T, k: S2) => inf.IEmitter<T>) },
+    //     switcher3: { when: inf.IEmitter<eevent<S3>>, to: inf.IEmitter<T> | ((t: T, k: S3) => inf.IEmitter<T>) },
+    //     switcher4: { when: inf.IEmitter<eevent<S4>>, to: inf.IEmitter<T> | ((t: T, k: S4) => inf.IEmitter<T>) },
+    //     switcher5: { when: inf.IEmitter<eevent<S5>>, to: inf.IEmitter<T> | ((t: T, k: S5) => inf.IEmitter<T>) },
+    //     switcher6: { when: inf.IEmitter<eevent<S6>>, to: inf.IEmitter<T> | ((t: T, k: S6) => inf.IEmitter<T>) },
+    //     switcher7: { when: inf.IEmitter<eevent<S7>>, to: inf.IEmitter<T> | ((t: T, k: S7) => inf.IEmitter<T>) },
+    //     switcher8: { when: inf.IEmitter<eevent<S8>>, to: inf.IEmitter<T> | ((t: T, k: S8) => inf.IEmitter<T>) },
+    //     switcher9: { when: inf.IEmitter<eevent<S9>>, to: inf.IEmitter<T> | ((t: T, k: S9) => inf.IEmitter<T>) },
+    //     switcher10: { when: inf.IEmitter<eevent<S10>>, to: inf.IEmitter<T> | ((t: T, k: S10) => inf.IEmitter<T>) },
+    //     switcher11: { when: inf.IEmitter<eevent<S11>>, to: inf.IEmitter<T> | ((t: T, k: S11) => inf.IEmitter<T>) },
+    //     switcher12: { when: inf.IEmitter<eevent<S12>>, to: inf.IEmitter<T> | ((t: T, k: S12) => inf.IEmitter<T>) },
+    //     switcher13: { when: inf.IEmitter<eevent<S13>>, to: inf.IEmitter<T> | ((t: T, k: S13) => inf.IEmitter<T>) },
+    //     switcher14: { when: inf.IEmitter<eevent<S14>>, to: inf.IEmitter<T> | ((t: T, k: S14) => inf.IEmitter<T>) },
+    //     switcher15: { when: inf.IEmitter<eevent<S15>>, to: inf.IEmitter<T> | ((t: T, k: S15) => inf.IEmitter<T>) },
+    //     switcher16: { when: inf.IEmitter<eevent<S16>>, to: inf.IEmitter<T> | ((t: T, k: S16) => inf.IEmitter<T>) },
+    //     switcher17: { when: inf.IEmitter<eevent<S17>>, to: inf.IEmitter<T> | ((t: T, k: S17) => inf.IEmitter<T>) }
+    // ): inf.IEmitter<T>;
+    // change<S1, S2, S3, S4, S5, S6, S7, S8, S9, S10, S11, S12, S13, S14, S15, S16, S17, S18>(
+    //     switcher1: { when: inf.IEmitter<eevent<S1>>, to: inf.IEmitter<T> | ((t: T, k: S1) => inf.IEmitter<T>) },
+    //     switcher2: { when: inf.IEmitter<eevent<S2>>, to: inf.IEmitter<T> | ((t: T, k: S2) => inf.IEmitter<T>) },
+    //     switcher3: { when: inf.IEmitter<eevent<S3>>, to: inf.IEmitter<T> | ((t: T, k: S3) => inf.IEmitter<T>) },
+    //     switcher4: { when: inf.IEmitter<eevent<S4>>, to: inf.IEmitter<T> | ((t: T, k: S4) => inf.IEmitter<T>) },
+    //     switcher5: { when: inf.IEmitter<eevent<S5>>, to: inf.IEmitter<T> | ((t: T, k: S5) => inf.IEmitter<T>) },
+    //     switcher6: { when: inf.IEmitter<eevent<S6>>, to: inf.IEmitter<T> | ((t: T, k: S6) => inf.IEmitter<T>) },
+    //     switcher7: { when: inf.IEmitter<eevent<S7>>, to: inf.IEmitter<T> | ((t: T, k: S7) => inf.IEmitter<T>) },
+    //     switcher8: { when: inf.IEmitter<eevent<S8>>, to: inf.IEmitter<T> | ((t: T, k: S8) => inf.IEmitter<T>) },
+    //     switcher9: { when: inf.IEmitter<eevent<S9>>, to: inf.IEmitter<T> | ((t: T, k: S9) => inf.IEmitter<T>) },
+    //     switcher10: { when: inf.IEmitter<eevent<S10>>, to: inf.IEmitter<T> | ((t: T, k: S10) => inf.IEmitter<T>) },
+    //     switcher11: { when: inf.IEmitter<eevent<S11>>, to: inf.IEmitter<T> | ((t: T, k: S11) => inf.IEmitter<T>) },
+    //     switcher12: { when: inf.IEmitter<eevent<S12>>, to: inf.IEmitter<T> | ((t: T, k: S12) => inf.IEmitter<T>) },
+    //     switcher13: { when: inf.IEmitter<eevent<S13>>, to: inf.IEmitter<T> | ((t: T, k: S13) => inf.IEmitter<T>) },
+    //     switcher14: { when: inf.IEmitter<eevent<S14>>, to: inf.IEmitter<T> | ((t: T, k: S14) => inf.IEmitter<T>) },
+    //     switcher15: { when: inf.IEmitter<eevent<S15>>, to: inf.IEmitter<T> | ((t: T, k: S15) => inf.IEmitter<T>) },
+    //     switcher16: { when: inf.IEmitter<eevent<S16>>, to: inf.IEmitter<T> | ((t: T, k: S16) => inf.IEmitter<T>) },
+    //     switcher17: { when: inf.IEmitter<eevent<S17>>, to: inf.IEmitter<T> | ((t: T, k: S17) => inf.IEmitter<T>) },
+    //     switcher18: { when: inf.IEmitter<eevent<S18>>, to: inf.IEmitter<T> | ((t: T, k: S18) => inf.IEmitter<T>) }
+    // ): inf.IEmitter<T>;
+    // change<S1, S2, S3, S4, S5, S6, S7, S8, S9, S10, S11, S12, S13, S14, S15, S16, S17, S18, S19>(
+    //     switcher1: { when: inf.IEmitter<eevent<S1>>, to: inf.IEmitter<T> | ((t: T, k: S1) => inf.IEmitter<T>) },
+    //     switcher2: { when: inf.IEmitter<eevent<S2>>, to: inf.IEmitter<T> | ((t: T, k: S2) => inf.IEmitter<T>) },
+    //     switcher3: { when: inf.IEmitter<eevent<S3>>, to: inf.IEmitter<T> | ((t: T, k: S3) => inf.IEmitter<T>) },
+    //     switcher4: { when: inf.IEmitter<eevent<S4>>, to: inf.IEmitter<T> | ((t: T, k: S4) => inf.IEmitter<T>) },
+    //     switcher5: { when: inf.IEmitter<eevent<S5>>, to: inf.IEmitter<T> | ((t: T, k: S5) => inf.IEmitter<T>) },
+    //     switcher6: { when: inf.IEmitter<eevent<S6>>, to: inf.IEmitter<T> | ((t: T, k: S6) => inf.IEmitter<T>) },
+    //     switcher7: { when: inf.IEmitter<eevent<S7>>, to: inf.IEmitter<T> | ((t: T, k: S7) => inf.IEmitter<T>) },
+    //     switcher8: { when: inf.IEmitter<eevent<S8>>, to: inf.IEmitter<T> | ((t: T, k: S8) => inf.IEmitter<T>) },
+    //     switcher9: { when: inf.IEmitter<eevent<S9>>, to: inf.IEmitter<T> | ((t: T, k: S9) => inf.IEmitter<T>) },
+    //     switcher10: { when: inf.IEmitter<eevent<S10>>, to: inf.IEmitter<T> | ((t: T, k: S10) => inf.IEmitter<T>) },
+    //     switcher11: { when: inf.IEmitter<eevent<S11>>, to: inf.IEmitter<T> | ((t: T, k: S11) => inf.IEmitter<T>) },
+    //     switcher12: { when: inf.IEmitter<eevent<S12>>, to: inf.IEmitter<T> | ((t: T, k: S12) => inf.IEmitter<T>) },
+    //     switcher13: { when: inf.IEmitter<eevent<S13>>, to: inf.IEmitter<T> | ((t: T, k: S13) => inf.IEmitter<T>) },
+    //     switcher14: { when: inf.IEmitter<eevent<S14>>, to: inf.IEmitter<T> | ((t: T, k: S14) => inf.IEmitter<T>) },
+    //     switcher15: { when: inf.IEmitter<eevent<S15>>, to: inf.IEmitter<T> | ((t: T, k: S15) => inf.IEmitter<T>) },
+    //     switcher16: { when: inf.IEmitter<eevent<S16>>, to: inf.IEmitter<T> | ((t: T, k: S16) => inf.IEmitter<T>) },
+    //     switcher17: { when: inf.IEmitter<eevent<S17>>, to: inf.IEmitter<T> | ((t: T, k: S17) => inf.IEmitter<T>) },
+    //     switcher18: { when: inf.IEmitter<eevent<S18>>, to: inf.IEmitter<T> | ((t: T, k: S18) => inf.IEmitter<T>) },
+    //     switcher19: { when: inf.IEmitter<eevent<S19>>, to: inf.IEmitter<T> | ((t: T, k: S19) => inf.IEmitter<T>) }
+    // ): inf.IEmitter<T>;
+    // change<S1, S2, S3, S4, S5, S6, S7, S8, S9, S10, S11, S12, S13, S14, S15, S16, S17, S18, S19, S20>(
+    //     switcher1: { when: inf.IEmitter<eevent<S1>>, to: inf.IEmitter<T> | ((t: T, k: S1) => inf.IEmitter<T>) },
+    //     switcher2: { when: inf.IEmitter<eevent<S2>>, to: inf.IEmitter<T> | ((t: T, k: S2) => inf.IEmitter<T>) },
+    //     switcher3: { when: inf.IEmitter<eevent<S3>>, to: inf.IEmitter<T> | ((t: T, k: S3) => inf.IEmitter<T>) },
+    //     switcher4: { when: inf.IEmitter<eevent<S4>>, to: inf.IEmitter<T> | ((t: T, k: S4) => inf.IEmitter<T>) },
+    //     switcher5: { when: inf.IEmitter<eevent<S5>>, to: inf.IEmitter<T> | ((t: T, k: S5) => inf.IEmitter<T>) },
+    //     switcher6: { when: inf.IEmitter<eevent<S6>>, to: inf.IEmitter<T> | ((t: T, k: S6) => inf.IEmitter<T>) },
+    //     switcher7: { when: inf.IEmitter<eevent<S7>>, to: inf.IEmitter<T> | ((t: T, k: S7) => inf.IEmitter<T>) },
+    //     switcher8: { when: inf.IEmitter<eevent<S8>>, to: inf.IEmitter<T> | ((t: T, k: S8) => inf.IEmitter<T>) },
+    //     switcher9: { when: inf.IEmitter<eevent<S9>>, to: inf.IEmitter<T> | ((t: T, k: S9) => inf.IEmitter<T>) },
+    //     switcher10: { when: inf.IEmitter<eevent<S10>>, to: inf.IEmitter<T> | ((t: T, k: S10) => inf.IEmitter<T>) },
+    //     switcher11: { when: inf.IEmitter<eevent<S11>>, to: inf.IEmitter<T> | ((t: T, k: S11) => inf.IEmitter<T>) },
+    //     switcher12: { when: inf.IEmitter<eevent<S12>>, to: inf.IEmitter<T> | ((t: T, k: S12) => inf.IEmitter<T>) },
+    //     switcher13: { when: inf.IEmitter<eevent<S13>>, to: inf.IEmitter<T> | ((t: T, k: S13) => inf.IEmitter<T>) },
+    //     switcher14: { when: inf.IEmitter<eevent<S14>>, to: inf.IEmitter<T> | ((t: T, k: S14) => inf.IEmitter<T>) },
+    //     switcher15: { when: inf.IEmitter<eevent<S15>>, to: inf.IEmitter<T> | ((t: T, k: S15) => inf.IEmitter<T>) },
+    //     switcher16: { when: inf.IEmitter<eevent<S16>>, to: inf.IEmitter<T> | ((t: T, k: S16) => inf.IEmitter<T>) },
+    //     switcher17: { when: inf.IEmitter<eevent<S17>>, to: inf.IEmitter<T> | ((t: T, k: S17) => inf.IEmitter<T>) },
+    //     switcher18: { when: inf.IEmitter<eevent<S18>>, to: inf.IEmitter<T> | ((t: T, k: S18) => inf.IEmitter<T>) },
+    //     switcher19: { when: inf.IEmitter<eevent<S19>>, to: inf.IEmitter<T> | ((t: T, k: S19) => inf.IEmitter<T>) },
+    //     switcher20: { when: inf.IEmitter<eevent<S20>>, to: inf.IEmitter<T> | ((t: T, k: S20) => inf.IEmitter<T>) }
+    // ): inf.IEmitter<T>;
     Emitter.prototype.change = function () {
         var switchers = [];
         for (var _i = 0; _i < arguments.length; _i++) {
             switchers[_i - 0] = arguments[_i];
         }
-        return namedTransformator('change' + this._enclosedName(), [this].concat(switchers.map(function (s) { return s.when; })), transformators.change(switchers), this._currentValue);
+        return namedTransformator('change to when', [this].concat(switchers.map(function (s) { return s.when; })), transformators.change(switchers), this._currentValue);
     };
     Emitter.prototype._enclosedName = function (emitter) {
         if (emitter === void 0) { emitter = null; }
@@ -370,28 +688,29 @@ var ManualEmitter = (function (_super) {
 })(Emitter);
 function manual(initialValue) {
     var e = new ManualEmitter(initialValue);
-    e.name = 'manual emitter';
+    e.name = en('manual');
     return e;
 }
 exports.manual = manual;
 function constant(value) {
     var e = new Emitter(value);
-    e.name = 'constant(' + value + ')';
+    e.name = en('constant *' + value + '*');
     return e;
 }
 exports.constant = constant;
-function manualEvent() {
+function manualEvent(name) {
     // manual event emitter should
     // pack impulsed values into event
     // and not allow to emit values
     // it's done by monkey patching ManualEmitter
     var e = manual(eevent.notHappend);
-    e.name = 'manual event emitter';
+    e.name = en('manual event');
     var oldImpulse = e.impulse;
     e.impulse = function (v) { return oldImpulse.apply(e, [eevent.of(v)]); };
     e.emit = function (v) {
         throw Error("can't emit from event emitter, only impulse");
     };
+    e.name = name ? en(name) : e.name;
     // monkey patching requires ugly casting...
     return e;
 }
@@ -402,8 +721,8 @@ var Transformator = (function (_super) {
         if (transform === void 0) { transform = undefined; }
         if (initialValue === void 0) { initialValue = undefined; }
         _super.call(this, initialValue);
+        this.name = '<| transformator |>';
         this._values = Array(emitters.length);
-        ;
         if (transform) {
             this.setTransform(transform);
         }
@@ -420,14 +739,25 @@ var Transformator = (function (_super) {
         this.emit(values[index]);
     };
     Transformator.prototype.plugEmitters = function (emitters) {
-        for (var _i = 0; _i < emitters.length; _i++) {
-            var emitter = emitters[_i];
-            this.wire(emitter);
+        var _this = this;
+        emitters.forEach(function (e) { return _this.wire(e); });
+        for (var i = 0; i < emitters.length; i++) {
+            this._values[i] = emitters[i].dirtyCurrentValue();
         }
     };
     Transformator.prototype.plugEmitter = function (emitter) {
         this.wire(emitter);
+        this._values[this._wires.length - 1] = emitter.dirtyCurrentValue();
         return this._wires.length - 1;
+    };
+    Transformator.prototype.unplugEmitter = function (emitter) {
+        this._wires.filter(function (w) { return w.input === emitter; }).forEach(function (w) { return w.unplug(); });
+    };
+    Transformator.prototype.dropEmitters = function (start) {
+        var wiresToDrop = this._wires.slice(1);
+        wiresToDrop.forEach(function (w) { return w.unplug(); });
+        this._wires.splice(start, this._wires.length);
+        this._values.splice(start, this._values.length);
     };
     Transformator.prototype.wire = function (emitter) {
         var _this = this;
@@ -438,12 +768,12 @@ var Transformator = (function (_super) {
     Transformator.prototype._dirtyGetWireTo = function (emitter) {
         return this._wires.filter(function (w) { return w.input === emitter; })[0];
     };
-    Transformator.prototype.receiveOn = function (x, index) {
-        this._values[index] = x;
+    Transformator.prototype.receiveOn = function (value, index) {
+        this._values[index] = value;
         this._transform(this._values, index);
     };
-    Transformator.prototype.setOn = function (x, index) {
-        this._values[index] = x;
+    Transformator.prototype.setOn = function (value, index) {
+        this._values[index] = value;
     };
     return Transformator;
 })(Emitter);
@@ -451,12 +781,12 @@ exports.Transformator = Transformator;
 function namedTransformator(name, emitters, transform, initialValue) {
     if (transform === void 0) { transform = undefined; }
     var t = new Transformator(emitters, transform, initialValue);
-    t.name = name;
+    t.name = '<| ' + name + ' |>';
     return t;
 }
 exports.namedTransformator = namedTransformator;
 
-},{"./electric-event":3,"./placeholder":6,"./scheduler":8,"./transformator-helpers":9,"./wire":12}],6:[function(require,module,exports){
+},{"./electric-event":5,"./placeholder":8,"./scheduler":10,"./transformator-helpers":11,"./wire":15}],8:[function(require,module,exports){
 // functions that can be simply queued
 var functionsToVoid = [
     'plugReceiver',
@@ -478,7 +808,8 @@ var functionsToEmitter = [
     'transformTime',
     'accumulate',
     'sample',
-    'change'
+    'change',
+    'merge'
 ];
 // function to throw if called before is()
 var functionsToSomething = [];
@@ -486,19 +817,19 @@ var Placeholder = (function () {
     function Placeholder(initialValue) {
         this._actions = [];
         this._initialValue = initialValue;
-        this.name = 'placeholder';
+        this.name = '| placeholder |>';
     }
     Placeholder.prototype.is = function (emitter) {
+        if (this._emitter) {
+            throw Error("placeholder is " + this._emitter.name + " so cannot be " + emitter.name);
+        }
         this._emitter = emitter;
         for (var _i = 0, _a = this._actions; _i < _a.length; _i++) {
             var action = _a[_i];
             action(this._emitter);
         }
         this._actions = undefined;
-        if (this._emitter._dispatchToReceivers) {
-            this._emitter._dispatchToReceivers(this._emitter.dirtyCurrentValue());
-        }
-        this.name = emitter.name;
+        this.name = '| ph ' + emitter.name;
     };
     Placeholder.prototype.dirtyCurrentValue = function () {
         if (this._emitter) {
@@ -562,7 +893,7 @@ function placeholder(initialValue) {
 }
 module.exports = placeholder;
 
-},{}],7:[function(require,module,exports){
+},{}],9:[function(require,module,exports){
 function logReceiver(message) {
     if (!message) {
         message = '<<<';
@@ -574,10 +905,19 @@ function logReceiver(message) {
 exports.logReceiver = logReceiver;
 function log(emitter) {
     emitter.plugReceiver(function (x) {
-        console.log(emitter.name + ' >>> ' + x);
+        console.log(emitter.name, '--', x);
     });
 }
 exports.log = log;
+function logEvents(emitter) {
+    emitter.plugReceiver(function (x) {
+        if (!x.happend) {
+            return;
+        }
+        console.log(emitter.name, '--', x.value);
+    });
+}
+exports.logEvents = logEvents;
 function collect(emitter) {
     var r = [];
     emitter.plugReceiver(function (x) {
@@ -587,7 +927,7 @@ function collect(emitter) {
 }
 exports.collect = collect;
 
-},{}],8:[function(require,module,exports){
+},{}],10:[function(require,module,exports){
 var stopTime = Date.now();
 var callbacks = {};
 var stopped = false;
@@ -684,7 +1024,7 @@ function removeFromCallbacksAtTime(callbacksAtTime, callback) {
     }
 }
 
-},{}],9:[function(require,module,exports){
+},{}],11:[function(require,module,exports){
 var utils = require('./utils');
 var Wire = require('./wire');
 var scheduler = require('./scheduler');
@@ -779,9 +1119,9 @@ function change(switchers) {
                 emit(v[0]);
             }
             else if (v[i].happend) {
+                this._wires[0].unplug();
                 var to = switchers[i - 1].to;
                 var e = utils.callIfFunction(to, v[0], v[i].value);
-                this._wires[0].unplug();
                 this._wires[0] = new Wire(e, this, function (x) { return _this.receiveOn(x, 0); });
             }
         };
@@ -798,6 +1138,22 @@ function when(happend, then) {
     };
 }
 exports.when = when;
+function whenThen(happens) {
+    return function transform(emit, impulse) {
+        var prevHappend;
+        return function whenTransform(v, i) {
+            var happend = happens(v[i]);
+            if (happend && !prevHappend) {
+                impulse(eevent.of(happend));
+                prevHappend = happend;
+            }
+            else if (!happend) {
+                prevHappend = null;
+            }
+        };
+    };
+}
+exports.whenThen = whenThen;
 function cumulateOverTime(delayInMiliseconds) {
     return function transform(emit, impulse) {
         var accumulated = [];
@@ -821,33 +1177,41 @@ function cumulateOverTime(delayInMiliseconds) {
 exports.cumulateOverTime = cumulateOverTime;
 ;
 
-},{"./electric-event":3,"./scheduler":8,"./utils":11,"./wire":12}],10:[function(require,module,exports){
+},{"./electric-event":5,"./scheduler":10,"./utils":14,"./wire":15}],12:[function(require,module,exports){
 var emitter = require('./emitter');
 var namedTransformator = emitter.namedTransformator;
 var transformators = require('./transformator-helpers');
 var eevent = require('../src/electric-event');
 function map(mapping, emitter1, emitter2, emitter3, emitter4, emitter5, emitter6, emitter7) {
     var emitters = Array.prototype.slice.apply(arguments, [1]);
-    return namedTransformator('map<' + emitters.map(function (e) { return e.name; }).join(', ') + '>', emitters, transformators.map(mapping, emitters.length), mapping.apply(null, emitters.map(function (e) { return e.dirtyCurrentValue(); })));
+    return namedTransformator('map', emitters, transformators.map(mapping, emitters.length), mapping.apply(null, emitters.map(function (e) { return e.dirtyCurrentValue(); })));
 }
 exports.map = map;
 ;
+function mapMany(mapping) {
+    var emitters = [];
+    for (var _i = 1; _i < arguments.length; _i++) {
+        emitters[_i - 1] = arguments[_i];
+    }
+    return namedTransformator('map many', emitters, transformators.map(mapping, emitters.length), mapping.apply(null, emitters.map(function (e) { return e.dirtyCurrentValue(); })));
+}
+exports.mapMany = mapMany;
 function filter(initialValue, predicate, emitter1, emitter2, emitter3, emitter4, emitter5, emitter6, emitter7) {
     var emitters = Array.prototype.slice.apply(arguments, [2]);
-    return namedTransformator('filter<' + emitters.map(function (e) { return e.name; }).join(', ') + '>', emitters, transformators.filter(predicate, emitters.length), initialValue);
+    return namedTransformator('filter', emitters, transformators.filter(predicate, emitters.length), initialValue);
 }
 exports.filter = filter;
 ;
 function filterMap(initialValue, filterMapping, emitter1, emitter2, emitter3, emitter4, emitter5, emitter6, emitter7) {
     var emitters = Array.prototype.slice.apply(arguments, [2]);
-    return namedTransformator('filterMap<' + emitters.map(function (e) { return e.name; }).join(', ') + '>', emitters, transformators.filterMap(filterMapping, emitters.length), initialValue);
+    return namedTransformator('filter map', emitters, transformators.filterMap(filterMapping, emitters.length), initialValue);
 }
 exports.filterMap = filterMap;
 ;
 function accumulate(initialValue, accumulator, emitter1, emitter2, emitter3, emitter4, emitter5, emitter6, emitter7) {
     var emitters = Array.prototype.slice.apply(arguments, [2]);
     var acc = accumulator.apply([], [initialValue].concat(emitters.map(function (e) { return e.dirtyCurrentValue(); })));
-    return namedTransformator('accumulate<' + emitters.map(function (e) { return e.name; }).join(', ') + '>', emitters, transformators.accumulate(acc, accumulator), acc);
+    return namedTransformator('accumulate', emitters, transformators.accumulate(acc, accumulator), acc);
 }
 exports.accumulate = accumulate;
 function merge() {
@@ -855,22 +1219,69 @@ function merge() {
     for (var _i = 0; _i < arguments.length; _i++) {
         emitters[_i - 0] = arguments[_i];
     }
-    return namedTransformator('merge<' + emitters.map(function (e) { return e.name; }).join(', ') + '>', emitters, transformators.merge(), emitters[0].dirtyCurrentValue());
+    return namedTransformator('merge', emitters, transformators.merge(), emitters[0].dirtyCurrentValue());
 }
 exports.merge = merge;
 function cumulateOverTime(emitter, overInMs) {
-    return namedTransformator('cumulate<' + emitter + '> over ' + overInMs + 'ms', [emitter], transformators.cumulateOverTime(overInMs), eevent.notHappend);
+    return namedTransformator('cumulate', [emitter], transformators.cumulateOverTime(overInMs), eevent.notHappend);
 }
 exports.cumulateOverTime = cumulateOverTime;
-// what are semantics of flatten!?
+function hold(initialValue, emitter) {
+    function transform(emit) {
+        return function holdTransform(v, i) {
+            if (v[i].happend) {
+                emit(v[i].value);
+            }
+        };
+    }
+    return namedTransformator('hold', [emitter], transform, initialValue);
+}
+exports.hold = hold;
+;
+function changes(emitter) {
+    var previous = emitter.dirtyCurrentValue();
+    function transform(emit, impulse) {
+        return function changesTransform(v, i) {
+            impulse(eevent.of({
+                previous: previous,
+                next: v[i]
+            }));
+            previous = v[i];
+        };
+    }
+    return namedTransformator('changes', [emitter], transform, eevent.notHappend);
+}
+exports.changes = changes;
+function skipFirst(emitter) {
+    function transform(emit, impulse) {
+        var skipped = false;
+        return function skipFirstTransform(v, i) {
+            if (v[i].happend) {
+                if (skipped) {
+                    impulse(v[i]);
+                }
+                else {
+                    skipped = true;
+                }
+            }
+        };
+    }
+    return namedTransformator('skip 1', [emitter], transform, eevent.notHappend);
+}
+exports.skipFirst = skipFirst;
+;
+// semantics:
+// f_a :: t -> (t -> a)
+// flatten(f_a) = f(t)
+// flatten(f_a)(t) = f(t)(t)
 function flatten(emitter) {
-    var transformator = namedTransformator('flatten<' + emitter.name + '>', [emitter, emitter.dirtyCurrentValue()], transform, emitter.dirtyCurrentValue().dirtyCurrentValue());
-    // var transformator = new Transformator([]);
+    var transformator = namedTransformator('flatten', [emitter, emitter.dirtyCurrentValue()], transform, emitter.dirtyCurrentValue().dirtyCurrentValue());
     function transform(emit) {
         return function flattenTransform(v, i) {
             if (i == 0) {
-                transformator.plugEmitter(v[i]);
-                emit(v[i].dirtyCurrentValue());
+                transformator.dropEmitters(1);
+                transformator.plugEmitter(v[0]);
+                emit(v[0].dirtyCurrentValue());
             }
             else {
                 emit(v[i]);
@@ -882,20 +1293,64 @@ function flatten(emitter) {
 }
 exports.flatten = flatten;
 ;
-function hold(initialValue, emitter) {
+// semantics:
+// f_a :: t -> [t -> a]
+// flatten(f_a) = f(t)
+// flatten(f_a)(t) = f(t).map(g => g(t))
+function flattenMany(emitter) {
+    var currentValues = emitter.dirtyCurrentValue().map(function (e) { return e.dirtyCurrentValue(); });
+    var transformator = namedTransformator('flatten many', [emitter].concat(emitter.dirtyCurrentValue()), transform, currentValues);
     function transform(emit) {
-        return function holdTransform(v, i) {
-            if (v[i].happend) {
-                emit(v[i].value);
+        return function flattenTransform(v, i) {
+            if (i == 0) {
+                transformator.dropEmitters(1);
+                v[0].forEach(function (e) { return transformator.plugEmitter(e); });
+                emit(v[0].map(function (e) { return e.dirtyCurrentValue(); }));
+            }
+            else {
+                emit(v.slice(1));
             }
         };
     }
-    return namedTransformator('hold<' + emitter.name + '>', [emitter], transform, initialValue);
+    ;
+    return transformator;
 }
-exports.hold = hold;
-;
+exports.flattenMany = flattenMany;
 
-},{"../src/electric-event":3,"./emitter":5,"./transformator-helpers":9}],11:[function(require,module,exports){
+},{"../src/electric-event":5,"./emitter":7,"./transformator-helpers":11}],13:[function(require,module,exports){
+var __extends = (this && this.__extends) || function (d, b) {
+    for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p];
+    function __() { this.constructor = d; }
+    __.prototype = b.prototype;
+    d.prototype = new __();
+};
+var emitter = require('./emitter');
+var Wire = require('./wire');
+var Transmitter = (function (_super) {
+    __extends(Transmitter, _super);
+    function Transmitter() {
+        _super.apply(this, arguments);
+    }
+    Transmitter.prototype.wire = function (emitter) {
+        var _this = this;
+        var index = this._wires.length;
+        this._wires[index] = new Wire(emitter, this, (function (index) { return function (x) { return _this.receiveOn(x, index); }; })(index));
+        return this._wires[index];
+    };
+    Transmitter.prototype.dropEmitters = function () {
+        this._wires.forEach(function (w) { return w.input.stabilize(); });
+        this._wires = [];
+    };
+    return Transmitter;
+})(emitter.Transformator);
+function transmitter(initialValue) {
+    var t = new Transmitter([], undefined, initialValue);
+    t.name = '?| transmitter |>';
+    return t;
+}
+module.exports = transmitter;
+
+},{"./emitter":7,"./wire":15}],14:[function(require,module,exports){
 function callIfFunction(obj) {
     var args = [];
     for (var _i = 1; _i < arguments.length; _i++) {
@@ -928,11 +1383,12 @@ function all(list) {
 }
 exports.all = all;
 
-},{}],12:[function(require,module,exports){
+},{}],15:[function(require,module,exports){
 var Wire = (function () {
     function Wire(input, output, receive, set) {
         this.input = input;
         this.output = output;
+        this.name = '-w-';
         if (set) {
             this._set = set;
             this._futureReceive = receive;

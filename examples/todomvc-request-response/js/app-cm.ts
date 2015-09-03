@@ -5,7 +5,6 @@ import electric = require('../../../src/electric');
 import eevent = require('../../../src/electric-event');
 import rui = require('../../../src/receivers/ui');
 import eui = require('../../../src/emitters/ui');
-import storage = require('./storage');
 
 
 // Emitters
@@ -54,7 +53,6 @@ electric.transformator.map(
 ).plugReceiver(tasksRendererReceiver(del, retitle, editingStart, check));
 
 //// Other
-tasks.all.plugReceiver(storage.tasksReceiver);
 
 newTask.plugReceiver(clearInput);
 function clearInput(_: any) {

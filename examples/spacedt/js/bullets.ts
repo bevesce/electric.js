@@ -1,9 +1,9 @@
 import inf = require('../../../src/interfaces');
 import electric = require('../../../src/electric');
+import IntegrableAntiderivativeOfTwoNumbers = require('../../../src/calculus/integrable-antiderivative-of-two-numbers');
 
 import c = require('./constants');
 import Point = require('./angled-point');
-import IntegrableAntiderivativeOfTwoNumbers = require('./integrable-antiderivative-of-two-numbers');
 import MovingPoint = require('./moving-point');
 import remove = require('./utils/remove');
 import insert = require('./utils/insert');

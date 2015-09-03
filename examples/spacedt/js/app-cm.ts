@@ -2,9 +2,7 @@ import inf = require('../../../src/interfaces');
 import electric = require('../../../src/electric');
 import eevent = require('../../../src/electric-event');
 import eui = require('../../../src/emitters/ui');
-
-import clock = require('./clock');
-import calculus = require('./calculus');
+import clock = require('../../../src/clock');
 
 import c = require('./constants');
 import Point = require('./angled-point');

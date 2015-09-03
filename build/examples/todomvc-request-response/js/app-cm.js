@@ -2,7 +2,6 @@ var electric = require('../../../src/electric');
 var eevent = require('../../../src/electric-event');
 var rui = require('../../../src/receivers/ui');
 var eui = require('../../../src/emitters/ui');
-var storage = require('./storage');
 // Emitters
 var hash = eui.hash();
 var newTask = eui.fromInputTextEnter('new-task');
@@ -34,7 +33,6 @@ var editingId = electric.emitter.constant(undefined).change({ to: function (_, k
 var tasksRendererReceiver = require('./tasks-receiver');
 electric.transformator.map(function (ts, editingId) { return ({ tasks: ts, editing: editingId }); }, tasks.visible, editingId).plugReceiver(tasksRendererReceiver(del, retitle, editingStart, check));
 //// Other
-tasks.all.plugReceiver(storage.tasksReceiver);
 newTask.plugReceiver(clearInput);
 function clearInput(_) {
     document.getElementById('new-task').value = '';

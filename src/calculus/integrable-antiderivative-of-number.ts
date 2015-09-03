@@ -17,7 +17,7 @@ class IntegrableAntiderivativeOfNumber<K extends calculus.Antiderivative>
 
 	static of<K extends calculus.Antiderivative>(
 		x: number,
-		antiderivative: (x: number) => K,
+		antiderivative?: (x: number) => K,
 		bounds?: Bounds
 		) {
 		return new IntegrableAntiderivativeOfNumber(x, antiderivative, bounds);

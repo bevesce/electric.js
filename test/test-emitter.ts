@@ -11,7 +11,7 @@ import eevent = require('../src/electric-event');
 import inf = require('../src/interfaces');
 
 
-describe('electric emitter', function() {
+describe.only('electric emitter', function() {
     it('should be pluggable', function(done) {
         var emitter = electric.emitter.manual(0);
         var emitted = -1;

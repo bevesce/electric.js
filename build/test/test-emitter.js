@@ -6,7 +6,7 @@ electricKettle.pourAsync(chai);
 var expect = chai.expect;
 var electric = require("../src/electric");
 var eevent = require('../src/electric-event');
-describe('electric emitter', function () {
+describe.only('electric emitter', function () {
     it('should be pluggable', function (done) {
         var emitter = electric.emitter.manual(0);
         var emitted = -1;

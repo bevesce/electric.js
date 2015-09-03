@@ -54,7 +54,7 @@ module.exports = Point;
 var electric = require('../../../src/electric');
 var eevent = require('../../../src/electric-event');
 var eui = require('../../../src/emitters/ui');
-var clock = require('./clock');
+var clock = require('../../../src/clock');
 var c = require('./constants');
 var Point = require('./angled-point');
 var shipDevice = require('./ship');
@@ -166,13 +166,13 @@ gameOver.plugReceiver(function (e) {
 });
 ship.v.plugReceiver(dashboard.speed());
 
-},{"../../../src/electric":21,"../../../src/electric-event":20,"../../../src/emitters/ui":23,"./angled-point":1,"./asteroid-mother":3,"./asteroids":4,"./bullets":5,"./clock":7,"./collisions":8,"./constants":9,"./dashboard":10,"./draw":11,"./score":14,"./ship":15,"./utils/insert":16}],3:[function(require,module,exports){
+},{"../../../src/clock":18,"../../../src/electric":20,"../../../src/electric-event":19,"../../../src/emitters/ui":22,"./angled-point":1,"./asteroid-mother":3,"./asteroids":4,"./bullets":5,"./collisions":6,"./constants":7,"./dashboard":8,"./draw":9,"./score":11,"./ship":12,"./utils/insert":13}],3:[function(require,module,exports){
 var electric = require('../../../src/electric');
-var clock = require('./clock');
-var calculus = require('./calculus');
+var clock = require('../../../src/clock');
+var calculus = require('../../../src/calculus/calculus');
+var IntegrableAntiderivativeOfTwoNumbers = require('../../../src/calculus/integrable-antiderivative-of-two-numbers');
 var c = require('./constants');
 var Point = require('./angled-point');
-var IntegrableAntiderivativeOfTwoNumbers = require('./integrable-antiderivative-of-two-numbers');
 var random = require('./utils/random');
 var cont = electric.emitter.constant;
 function acceleration(x, y) {
@@ -193,7 +193,7 @@ function create(startingPoint) {
 }
 module.exports = create;
 
-},{"../../../src/electric":21,"./angled-point":1,"./calculus":6,"./clock":7,"./constants":9,"./integrable-antiderivative-of-two-numbers":12,"./utils/random":17}],4:[function(require,module,exports){
+},{"../../../src/calculus/calculus":16,"../../../src/calculus/integrable-antiderivative-of-two-numbers":17,"../../../src/clock":18,"../../../src/electric":20,"./angled-point":1,"./constants":7,"./utils/random":14}],4:[function(require,module,exports){
 var electric = require('../../../src/electric');
 var MovingPoint = require('./moving-point');
 var random = require('./utils/random');
@@ -218,7 +218,7 @@ function create(input) {
 }
 module.exports = create;
 
-},{"../../../src/electric":21,"./moving-point":13,"./utils/insert":16,"./utils/random":17,"./utils/remove":18}],5:[function(require,module,exports){
+},{"../../../src/electric":20,"./moving-point":10,"./utils/insert":13,"./utils/random":14,"./utils/remove":15}],5:[function(require,module,exports){
 var electric = require('../../../src/electric');
 var c = require('./constants');
 var MovingPoint = require('./moving-point');
@@ -244,106 +244,7 @@ function create(input) {
 }
 module.exports = create;
 
-},{"../../../src/electric":21,"./constants":9,"./moving-point":13,"./utils/insert":16,"./utils/remove":18}],6:[function(require,module,exports){
-var clock = require('./clock');
-var electric = require('../../../src/electric');
-function integral(initialValue, emitter, options) {
-    var timmed = timeValue(emitter, options);
-    var result = timmed.accumulate({
-        time: electric.scheduler.now(),
-        value: emitter.dirtyCurrentValue(),
-        sum: initialValue
-    }, function (acc, v) {
-        var now = electric.scheduler.now();
-        var dt = now - acc.time;
-        var nv = v.value.add(acc.value).mulT(dt / 2);
-        var sum = acc.sum.addDelta(nv);
-        return {
-            time: now,
-            value: v.value,
-            sum: sum
-        };
-    }).map(function (v) { return v.sum; });
-    result.name = '<| integral |>';
-    result.setEquals(function (x, y) { return x.equals(y); });
-    result.stabilize = function () { return timmed.stabilize(); };
-    return result;
-}
-exports.integral = integral;
-function differential(initialValue, emitter, options) {
-    var timmed = timeValue(emitter, options);
-    var result = timmed.accumulate({
-        time: electric.scheduler.now(),
-        value: emitter.dirtyCurrentValue(),
-        diff: initialValue
-    }, function (acc, v) {
-        var dt = v.time - acc.time;
-        var diff = v.value.sub(acc.value).divT(dt);
-        return {
-            time: v.time,
-            value: v.value,
-            diff: diff
-        };
-    }).map(function (v) { return v.diff; });
-    result.setEquals(function (x, y) { return x.equals(y); });
-    result.name = '<| differential |>';
-    return result;
-}
-exports.differential = differential;
-function timeValue(emitter, options) {
-    var time = clock.time(options);
-    var transformator = electric.transformator.map(function (t, v) { return ({ time: t, value: v }); }, time, emitter);
-    transformator.stabilize = function () { return time.stabilize(); };
-    return transformator;
-}
-
-},{"../../../src/electric":21,"./clock":7}],7:[function(require,module,exports){
-var electric = require('../../../src/electric');
-function interval(options) {
-    var timer = electric.emitter.manualEvent();
-    electric.scheduler.scheduleInterval(function () {
-        timer.impulse(Date.now());
-    }, calculateInterval(options.inMs, options.fps));
-    timer.name = '| interval |>';
-    return timer;
-}
-exports.interval = interval;
-function intervalValue(value, options) {
-    var timer = electric.emitter.manualEvent();
-    electric.scheduler.scheduleInterval(function () {
-        timer.impulse(value);
-    }, calculateInterval(options.inMs, options.fps));
-    timer.name = '| interval |>';
-    return timer;
-}
-exports.intervalValue = intervalValue;
-function time(options) {
-    var interval = calculateInterval(options.intervalInMs, options.fps);
-    var emitter = electric.emitter.manual(electric.scheduler.now());
-    var id = electric.scheduler.scheduleInterval(function () { return emitter.emit((electric.scheduler.now())); }, interval);
-    emitter.setReleaseResources(function () { return electric.scheduler.unscheduleInterval(id); });
-    emitter.name = calculateEmitterName(options);
-    return emitter;
-}
-exports.time = time;
-function calculateInterval(intervalInMs, fps) {
-    if (intervalInMs === undefined) {
-        return 1 / fps * 1000;
-    }
-    else {
-        return intervalInMs;
-    }
-}
-function calculateEmitterName(options) {
-    if (options.intervalInMs === undefined) {
-        return '| fps: ' + options.fps + ' |>';
-    }
-    else {
-        return '| interval: ' + options.intervalInMs + 'ms |>';
-    }
-}
-
-},{"../../../src/electric":21}],8:[function(require,module,exports){
+},{"../../../src/electric":20,"./constants":7,"./moving-point":10,"./utils/insert":13,"./utils/remove":15}],6:[function(require,module,exports){
 var electric = require('../../../src/electric');
 var c = require('./constants');
 var map = electric.transformator.map;
@@ -490,7 +391,7 @@ function checkIfCollidingWithDistance(distance) {
 }
 module.exports = create;
 
-},{"../../../src/electric":21,"./constants":9}],9:[function(require,module,exports){
+},{"../../../src/electric":20,"./constants":7}],7:[function(require,module,exports){
 var BULLET_RADIUS = 3;
 var values = {
     asteroid: {
@@ -538,7 +439,7 @@ var values = {
 };
 module.exports = values;
 
-},{}],10:[function(require,module,exports){
+},{}],8:[function(require,module,exports){
 var rui = require('../../../src/receivers/ui');
 var c = require('./constants');
 function speed() {
@@ -577,7 +478,7 @@ function score() {
 }
 exports.score = score;
 
-},{"../../../src/receivers/ui":27,"./constants":9}],11:[function(require,module,exports){
+},{"../../../src/receivers/ui":26,"./constants":7}],9:[function(require,module,exports){
 var c = require('./constants');
 var random = require('./utils/random');
 var _ctx;
@@ -640,7 +541,151 @@ function gameOver(width, height) {
 }
 exports.gameOver = gameOver;
 
-},{"./constants":9,"./utils/random":17}],12:[function(require,module,exports){
+},{"./constants":7,"./utils/random":14}],10:[function(require,module,exports){
+var electric = require('../../../src/electric');
+var calculus = require('../../../src/calculus/calculus');
+var IntegrableAntiderivativeOfTwoNumbers = require('../../../src/calculus/integrable-antiderivative-of-two-numbers');
+var c = require('./constants');
+var Point = require('./angled-point');
+var cont = electric.emitter.constant;
+function velocity(x, y) {
+    return IntegrableAntiderivativeOfTwoNumbers.of(x, y, Point.of);
+}
+var MovingPoint = (function () {
+    function MovingPoint(speed, x0, y0, angle) {
+        this.v = cont(velocity(0, speed));
+        this.xya = calculus.integral(Point.of(x0, y0, angle), this.v, { fps: c.fps });
+    }
+    MovingPoint.start = function (speed, x0, y0, angle) {
+        return new MovingPoint(speed, x0, y0, angle);
+    };
+    return MovingPoint;
+})();
+module.exports = MovingPoint;
+
+},{"../../../src/calculus/calculus":16,"../../../src/calculus/integrable-antiderivative-of-two-numbers":17,"../../../src/electric":20,"./angled-point":1,"./constants":7}],11:[function(require,module,exports){
+var electric = require('../../../src/electric');
+var c = require('./constants');
+var cont = electric.emitter.constant;
+function score(input) {
+    return cont(0).change({ to: function (s, _) { return cont(s + c.score.forAsteroid); }, when: input.asteroidHit }, { to: function (s, _) { return cont(s + c.score.forMother); }, when: input.motherHit }).change({ to: function (s, _) { return cont(s); }, when: input.gameEnd });
+}
+module.exports = score;
+
+},{"../../../src/electric":20,"./constants":7}],12:[function(require,module,exports){
+var electric = require('../../../src/electric');
+var eevent = require('../../../src/electric-event');
+var eui = require('../../../src/emitters/ui');
+var calculus = require('../../../src/calculus/calculus');
+var IntegrableAntiderivativeOfTwoNumbers = require('../../../src/calculus/integrable-antiderivative-of-two-numbers');
+var c = require('./constants');
+var Point = require('./angled-point');
+var cont = electric.emitter.constant;
+function shipAcceleration(x, y) {
+    return IntegrableAntiderivativeOfTwoNumbers.of(x, y, shipVelocity);
+}
+function shipVelocity(x, y) {
+    return IntegrableAntiderivativeOfTwoNumbers.of(x, y, Point.of, c.ship.vbounds);
+}
+function create(startingPoint, input) {
+    var shipA = cont(shipAcceleration(0, 0)).change({ to: function (a, _) { return cont(a.withX(-c.ship.acceleration.angular)); }, when: input.rotateLeft }, { to: function (a, _) { return cont(a.withX(c.ship.acceleration.angular)); }, when: input.rotateRight }, { to: function (a, _) { return cont(a.withX(0)); }, when: input.stopRotateRight }, { to: function (a, _) { return cont(a.withX(0)); }, when: input.stopRotateLeft }, { to: function (a, _) { return cont(a.withY(-c.ship.acceleration.de)); }, when: input.deccelerate }, { to: function (a, _) { return cont(a.withY(c.ship.acceleration.linear)); }, when: input.accelerate }, { to: function (a, _) { return cont(a.withY(0)); }, when: input.stopAcceleration }, { to: function (a, _) { return cont(a.withY(0)); }, when: input.stopDecceleration });
+    var shipV = calculus.integral(shipVelocity(0, 0), shipA, { fps: c.fps }).change({ to: function (v, _) { return calculus.integral(v.withX(0), shipA, { fps: c.fps }); }, when: input.stopRotateRight.transformTime(eevent.notHappend, function (t) { return t + 10; }) }, { to: function (v, _) { return calculus.integral(v.withX(0), shipA, { fps: c.fps }); }, when: input.stopRotateLeft.transformTime(eevent.notHappend, function (t) { return t + 10; }) });
+    var shipXYA = calculus.integral(startingPoint, shipV, { fps: c.fps });
+    var shot = electric.transformator.map(function (space, xya, v) { return space.map(function (_) { return ({ xya: xya, velocity: v }); }); }, eui.key('space', 'up'), shipXYA, shipV);
+    return {
+        a: shipA,
+        v: shipV,
+        xya: shipXYA,
+        shot: shot
+    };
+}
+module.exports = create;
+
+},{"../../../src/calculus/calculus":16,"../../../src/calculus/integrable-antiderivative-of-two-numbers":17,"../../../src/electric":20,"../../../src/electric-event":19,"../../../src/emitters/ui":22,"./angled-point":1,"./constants":7}],13:[function(require,module,exports){
+var electric = require('../../../../src/electric');
+var cont = electric.emitter.constant;
+function insert(list, item) {
+    var l = list.slice();
+    l.push(item);
+    return cont(l);
+}
+module.exports = insert;
+
+},{"../../../../src/electric":20}],14:[function(require,module,exports){
+function random(min, max) {
+    return Math.random() * (max - min) + min;
+}
+module.exports = random;
+
+},{}],15:[function(require,module,exports){
+var electric = require('../../../../src/electric');
+var cont = electric.emitter.constant;
+function remove(bullets) {
+    var indices = [];
+    for (var _i = 1; _i < arguments.length; _i++) {
+        indices[_i - 1] = arguments[_i];
+    }
+    var bullets = bullets.slice();
+    indices.sort(function (a, b) { return -(a - b); }).forEach(function (i) { return bullets.splice(i, 1); });
+    return cont(bullets);
+}
+module.exports = remove;
+
+},{"../../../../src/electric":20}],16:[function(require,module,exports){
+var clock = require('../clock');
+var scheduler = require('../scheduler');
+var transformator = require('../transformator');
+function integral(initialValue, emitter, options) {
+    var timmed = timeValue(emitter, options);
+    var result = timmed.accumulate({
+        time: scheduler.now(),
+        value: emitter.dirtyCurrentValue(),
+        sum: initialValue
+    }, function (acc, v) {
+        var now = scheduler.now();
+        var dt = now - acc.time;
+        var nv = v.value.add(acc.value).mulT(dt / 2);
+        var sum = acc.sum.addDelta(nv);
+        return {
+            time: now,
+            value: v.value,
+            sum: sum
+        };
+    }).map(function (v) { return v.sum; });
+    result.name = '<| integral |>';
+    result.setEquals(function (x, y) { return x.equals(y); });
+    result.stabilize = function () { return timmed.stabilize(); };
+    return result;
+}
+exports.integral = integral;
+function differential(initialValue, emitter, options) {
+    var timmed = timeValue(emitter, options);
+    var result = timmed.accumulate({
+        time: scheduler.now(),
+        value: emitter.dirtyCurrentValue(),
+        diff: initialValue
+    }, function (acc, v) {
+        var dt = v.time - acc.time;
+        var diff = v.value.sub(acc.value).divT(dt);
+        return {
+            time: v.time,
+            value: v.value,
+            diff: diff
+        };
+    }).map(function (v) { return v.diff; });
+    result.setEquals(function (x, y) { return x.equals(y); });
+    result.name = '<| differential |>';
+    return result;
+}
+exports.differential = differential;
+function timeValue(emitter, options) {
+    var time = clock.time(options);
+    var trans = transformator.map(function (t, v) { return ({ time: t, value: v }); }, time, emitter);
+    trans.stabilize = function () { return time.stabilize(); };
+    return trans;
+}
+
+},{"../clock":18,"../scheduler":28,"../transformator":30}],17:[function(require,module,exports){
 var IntegrableAntiderivativeOfTwoNumbers = (function () {
     function IntegrableAntiderivativeOfTwoNumbers(x, y, antiderivative, bounds) {
         this.bounds = bounds || {};
@@ -689,199 +734,57 @@ function within(v, min, max) {
 }
 module.exports = IntegrableAntiderivativeOfTwoNumbers;
 
-},{}],13:[function(require,module,exports){
-var electric = require('../../../src/electric');
-var calculus = require('./calculus');
-var c = require('./constants');
-var Point = require('./angled-point');
-var IntegrableAntiderivativeOfTwoNumbers = require('./integrable-antiderivative-of-two-numbers');
-var cont = electric.emitter.constant;
-function velocity(x, y) {
-    return IntegrableAntiderivativeOfTwoNumbers.of(x, y, Point.of);
-}
-var MovingPoint = (function () {
-    function MovingPoint(speed, x0, y0, angle) {
-        this.v = cont(velocity(0, speed));
-        this.xya = calculus.integral(Point.of(x0, y0, angle), this.v, { fps: c.fps });
-    }
-    MovingPoint.start = function (speed, x0, y0, angle) {
-        return new MovingPoint(speed, x0, y0, angle);
-    };
-    return MovingPoint;
-})();
-module.exports = MovingPoint;
-
-},{"../../../src/electric":21,"./angled-point":1,"./calculus":6,"./constants":9,"./integrable-antiderivative-of-two-numbers":12}],14:[function(require,module,exports){
-var electric = require('../../../src/electric');
-var c = require('./constants');
-var cont = electric.emitter.constant;
-function score(input) {
-    return cont(0).change({ to: function (s, _) { return cont(s + c.score.forAsteroid); }, when: input.asteroidHit }, { to: function (s, _) { return cont(s + c.score.forMother); }, when: input.motherHit }).change({ to: function (s, _) { return cont(s); }, when: input.gameEnd });
-}
-module.exports = score;
-
-},{"../../../src/electric":21,"./constants":9}],15:[function(require,module,exports){
-var electric = require('../../../src/electric');
-var eevent = require('../../../src/electric-event');
-var eui = require('../../../src/emitters/ui');
-var calculus = require('./calculus');
-var c = require('./constants');
-var IntegrableAntiderivativeOfTwoNumbers = require('./integrable-antiderivative-of-two-numbers');
-var Point = require('./angled-point');
-var cont = electric.emitter.constant;
-function shipAcceleration(x, y) {
-    return IntegrableAntiderivativeOfTwoNumbers.of(x, y, shipVelocity);
-}
-function shipVelocity(x, y) {
-    return IntegrableAntiderivativeOfTwoNumbers.of(x, y, Point.of, c.ship.vbounds);
-}
-function create(startingPoint, input) {
-    var shipA = cont(shipAcceleration(0, 0)).change({ to: function (a, _) { return cont(a.withX(-c.ship.acceleration.angular)); }, when: input.rotateLeft }, { to: function (a, _) { return cont(a.withX(c.ship.acceleration.angular)); }, when: input.rotateRight }, { to: function (a, _) { return cont(a.withX(0)); }, when: input.stopRotateRight }, { to: function (a, _) { return cont(a.withX(0)); }, when: input.stopRotateLeft }, { to: function (a, _) { return cont(a.withY(-c.ship.acceleration.de)); }, when: input.deccelerate }, { to: function (a, _) { return cont(a.withY(c.ship.acceleration.linear)); }, when: input.accelerate }, { to: function (a, _) { return cont(a.withY(0)); }, when: input.stopAcceleration }, { to: function (a, _) { return cont(a.withY(0)); }, when: input.stopDecceleration });
-    var shipV = calculus.integral(shipVelocity(0, 0), shipA, { fps: c.fps }).change({ to: function (v, _) { return calculus.integral(v.withX(0), shipA, { fps: c.fps }); }, when: input.stopRotateRight.transformTime(eevent.notHappend, function (t) { return t + 10; }) }, { to: function (v, _) { return calculus.integral(v.withX(0), shipA, { fps: c.fps }); }, when: input.stopRotateLeft.transformTime(eevent.notHappend, function (t) { return t + 10; }) });
-    var shipXYA = calculus.integral(startingPoint, shipV, { fps: c.fps });
-    var shot = electric.transformator.map(function (space, xya, v) { return space.map(function (_) { return ({ xya: xya, velocity: v }); }); }, eui.key('space', 'up'), shipXYA, shipV);
-    return {
-        a: shipA,
-        v: shipV,
-        xya: shipXYA,
-        shot: shot
-    };
-}
-module.exports = create;
-
-},{"../../../src/electric":21,"../../../src/electric-event":20,"../../../src/emitters/ui":23,"./angled-point":1,"./calculus":6,"./constants":9,"./integrable-antiderivative-of-two-numbers":12}],16:[function(require,module,exports){
-var electric = require('../../../../src/electric');
-var cont = electric.emitter.constant;
-function insert(list, item) {
-    var l = list.slice();
-    l.push(item);
-    return cont(l);
-}
-module.exports = insert;
-
-},{"../../../../src/electric":21}],17:[function(require,module,exports){
-function random(min, max) {
-    return Math.random() * (max - min) + min;
-}
-module.exports = random;
-
 },{}],18:[function(require,module,exports){
-var electric = require('../../../../src/electric');
-var cont = electric.emitter.constant;
-function remove(bullets) {
-    var indices = [];
-    for (var _i = 1; _i < arguments.length; _i++) {
-        indices[_i - 1] = arguments[_i];
-    }
-    var bullets = bullets.slice();
-    indices.sort(function (a, b) { return -(a - b); }).forEach(function (i) { return bullets.splice(i, 1); });
-    return cont(bullets);
-}
-module.exports = remove;
-
-},{"../../../../src/electric":21}],19:[function(require,module,exports){
-exports.scheduler = require('./scheduler');
-exports.emitter = require('./emitter');
-exports.transformator = require('./transformator');
-function interval(intervalInMs) {
-    var timer = exports.emitter.manualEvent();
-    exports.scheduler.scheduleInterval(function () {
+var scheduler = require('./scheduler');
+var emitter = require('./emitter');
+function interval(options) {
+    var timer = emitter.manualEvent();
+    scheduler.scheduleInterval(function () {
         timer.impulse(Date.now());
-    }, intervalInMs);
-    timer.name = '| interval |>';
+    }, calculateInterval(options.inMs, options.fps));
+    timer.name = '| interval ' + calculateEmitterName(options);
     return timer;
 }
 exports.interval = interval;
-var TimeValue = (function () {
-    function TimeValue(time, value) {
-        this.time = time;
-        this.value = value;
-    }
-    TimeValue.of = function (time, value) {
-        if (value === void 0) { value = undefined; }
-        return new TimeValue(time, value);
-    };
-    TimeValue.lift = function (f) {
-        return function () {
-            var vs = [];
-            for (var _i = 0; _i < arguments.length; _i++) {
-                vs[_i - 0] = arguments[_i];
-            }
-            return TimeValue.of(Math.max.apply(Math, vs.map(function (v) { return v.time; })), f.apply(null, vs.map(function (v) { return v.value; })));
-        };
-    };
-    TimeValue.prototype.map = function (f) {
-        return TimeValue.of(this.time, f(this.value));
-    };
-    return TimeValue;
-})();
-exports.TimeValue = TimeValue;
-function _time(args, transform) {
-    var e = exports.emitter.manual(transform(exports.scheduler.now()));
-    var subname;
-    var interval;
-    if (args.intervalInMs === undefined) {
-        subname = 'fps: ' + args.fps;
-        interval = 1 / args.fps * 1000;
-    }
-    else {
-        subname = 'interval: ' + args.intervalInMs + 'ms';
-        interval = args.intervalInMs;
-    }
-    var id = exports.scheduler.scheduleInterval(function () { return e.emit(transform(exports.scheduler.now())); }, interval);
-    e.name = 'clock<' + subname + '>';
-    function releaseResoueces() {
-        exports.scheduler.unscheduleInterval(id);
-    }
-    e.setReleaseResources(releaseResoueces);
-    return e;
+function intervalValue(value, options) {
+    var timer = emitter.manualEvent();
+    scheduler.scheduleInterval(function () {
+        timer.impulse(value);
+    }, calculateInterval(options.inMs, options.fps));
+    timer.name = '| interval of ' + value + calculateEmitterName(options);
+    return timer;
 }
-function time(args) {
-    return _time(args, function (t) { return TimeValue.of(t, undefined); });
+exports.intervalValue = intervalValue;
+function time(options) {
+    var interval = calculateInterval(options.intervalInMs, options.fps);
+    var timeEmitter = emitter.manual(scheduler.now());
+    var id = scheduler.scheduleInterval(function () { return timeEmitter.emit((scheduler.now())); }, interval);
+    timeEmitter.setReleaseResources(function () { return scheduler.unscheduleInterval(id); });
+    timeEmitter.name = '| time ' + calculateEmitterName(options);
+    return timeEmitter;
 }
 exports.time = time;
-function timeFunction(f, args, t0) {
-    if (t0 === void 0) { t0 = 0; }
-    return _time(args, function (t) { return (TimeValue.of(t, f(t - t0))); });
+function calculateInterval(intervalInMs, fps) {
+    if (intervalInMs === undefined) {
+        return 1 / fps * 1000;
+    }
+    else {
+        return intervalInMs;
+    }
 }
-exports.timeFunction = timeFunction;
-function equalsWithTime(x, y) {
-    return x.time === y.time && x.value === y.value;
+function calculateEmitterName(options) {
+    if (options.fps !== undefined) {
+        return ' fps: ' + options.fps + ' |>';
+    }
+    else if (options.inMs !== undefined) {
+        return ' interval: ' + options.inMs + 'ms |>';
+    }
+    else {
+        return ' interval: ' + options.intervalInMs + 'ms |>';
+    }
 }
-function integral(f) {
-    var initialAcc = { time: exports.scheduler.now(), value: 0, integral: 0 };
-    var result = f.accumulate(initialAcc, function (acc, v) {
-        var dt = (v.time - acc.time) / 1000;
-        return {
-            time: v.time,
-            value: v.value,
-            integral: acc.integral + (acc.value + v.value) / 2 * dt
-        };
-    }).map(function (v) { return TimeValue.of(v.time, v.integral); });
-    result.setEquals(equalsWithTime);
-    return result;
-}
-exports.integral = integral;
-function derivative(f) {
-    var initialAcc = { time: exports.scheduler.now(), value: undefined, derivative: 0 };
-    var result = f.accumulate(initialAcc, function (acc, v) {
-        var dt = (v.time - acc.time) / 1000;
-        var diff = 0;
-        if (dt !== 0) {
-            diff = (v.value - acc.value) / dt / 1000;
-        }
-        return {
-            time: v.time,
-            value: v.value,
-            derivative: diff
-        };
-    }).map(function (v) { return TimeValue.of(v.time, v.derivative); });
-    result.setEquals(equalsWithTime);
-    return result;
-}
-exports.derivative = derivative;
 
-},{"./emitter":22,"./scheduler":29,"./transformator":31}],20:[function(require,module,exports){
+},{"./emitter":21,"./scheduler":28}],19:[function(require,module,exports){
 var utils = require('./utils');
 var ElectricEvent = (function () {
     function ElectricEvent() {
@@ -967,19 +870,20 @@ var NotHappend = (function () {
 ElectricEvent.notHappend = new NotHappend();
 module.exports = ElectricEvent;
 
-},{"./utils":33}],21:[function(require,module,exports){
-// export import i = require('./interfaces');
+},{"./utils":32}],20:[function(require,module,exports){
 exports.scheduler = require('./scheduler');
 exports.emitter = require('./emitter');
 exports.transformator = require('./transformator');
 exports.receiver = require('./receiver');
 exports.clock = require('./clock');
 exports.transmitter = require('./transmitter');
+exports.calculus = require('./calculus/calculus');
 exports.e = exports.emitter;
 exports.t = exports.transformator;
 exports.r = exports.receiver;
+exports.c = exports.calculus;
 
-},{"./clock":19,"./emitter":22,"./receiver":26,"./scheduler":29,"./transformator":31,"./transmitter":32}],22:[function(require,module,exports){
+},{"./calculus/calculus":16,"./clock":18,"./emitter":21,"./receiver":25,"./scheduler":28,"./transformator":30,"./transmitter":31}],21:[function(require,module,exports){
 var __extends = (this && this.__extends) || function (d, b) {
     for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p];
     function __() { this.constructor = d; }
@@ -1473,7 +1377,7 @@ function namedTransformator(name, emitters, transform, initialValue) {
 }
 exports.namedTransformator = namedTransformator;
 
-},{"./electric-event":20,"./placeholder":25,"./scheduler":29,"./transformator-helpers":30,"./wire":34}],23:[function(require,module,exports){
+},{"./electric-event":19,"./placeholder":24,"./scheduler":28,"./transformator-helpers":29,"./wire":33}],22:[function(require,module,exports){
 var electric = require('../electric');
 var utils = require('../receivers/utils');
 var transformator = require('../transformator');
@@ -1694,7 +1598,7 @@ function enter(nodeOrId) {
 }
 exports.enter = enter;
 
-},{"../electric":21,"../electric-event":20,"../fp":24,"../receivers/utils":28,"../transformator":31}],24:[function(require,module,exports){
+},{"../electric":20,"../electric-event":19,"../fp":23,"../receivers/utils":27,"../transformator":30}],23:[function(require,module,exports){
 function identity(x) {
     return x;
 }
@@ -1841,7 +1745,7 @@ var either;
     either.left = left;
 })(either = exports.either || (exports.either = {}));
 
-},{}],25:[function(require,module,exports){
+},{}],24:[function(require,module,exports){
 // functions that can be simply queued
 var functionsToVoid = [
     'plugReceiver',
@@ -1948,7 +1852,7 @@ function placeholder(initialValue) {
 }
 module.exports = placeholder;
 
-},{}],26:[function(require,module,exports){
+},{}],25:[function(require,module,exports){
 function logReceiver(message) {
     if (!message) {
         message = '<<<';
@@ -1982,7 +1886,7 @@ function collect(emitter) {
 }
 exports.collect = collect;
 
-},{}],27:[function(require,module,exports){
+},{}],26:[function(require,module,exports){
 function htmlReceiverById(id) {
     var element = document.getElementById(id);
     return function (html) {
@@ -1991,7 +1895,7 @@ function htmlReceiverById(id) {
 }
 exports.htmlReceiverById = htmlReceiverById;
 
-},{}],28:[function(require,module,exports){
+},{}],27:[function(require,module,exports){
 function getNode(nodeOrId) {
     if (typeof nodeOrId === 'string') {
         return document.getElementById(nodeOrId);
@@ -2011,7 +1915,7 @@ function getNodes(nodesOfName) {
 }
 exports.getNodes = getNodes;
 
-},{}],29:[function(require,module,exports){
+},{}],28:[function(require,module,exports){
 var stopTime = Date.now();
 var callbacks = {};
 var stopped = false;
@@ -2108,7 +2012,7 @@ function removeFromCallbacksAtTime(callbacksAtTime, callback) {
     }
 }
 
-},{}],30:[function(require,module,exports){
+},{}],29:[function(require,module,exports){
 var utils = require('./utils');
 var Wire = require('./wire');
 var scheduler = require('./scheduler');
@@ -2261,7 +2165,7 @@ function cumulateOverTime(delayInMiliseconds) {
 exports.cumulateOverTime = cumulateOverTime;
 ;
 
-},{"./electric-event":20,"./scheduler":29,"./utils":33,"./wire":34}],31:[function(require,module,exports){
+},{"./electric-event":19,"./scheduler":28,"./utils":32,"./wire":33}],30:[function(require,module,exports){
 var emitter = require('./emitter');
 var namedTransformator = emitter.namedTransformator;
 var transformators = require('./transformator-helpers');
@@ -2401,7 +2305,7 @@ function flattenMany(emitter) {
 }
 exports.flattenMany = flattenMany;
 
-},{"../src/electric-event":20,"./emitter":22,"./transformator-helpers":30}],32:[function(require,module,exports){
+},{"../src/electric-event":19,"./emitter":21,"./transformator-helpers":29}],31:[function(require,module,exports){
 var __extends = (this && this.__extends) || function (d, b) {
     for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p];
     function __() { this.constructor = d; }
@@ -2434,7 +2338,7 @@ function transmitter(initialValue) {
 }
 module.exports = transmitter;
 
-},{"./emitter":22,"./wire":34}],33:[function(require,module,exports){
+},{"./emitter":21,"./wire":33}],32:[function(require,module,exports){
 function callIfFunction(obj) {
     var args = [];
     for (var _i = 1; _i < arguments.length; _i++) {
@@ -2467,7 +2371,7 @@ function all(list) {
 }
 exports.all = all;
 
-},{}],34:[function(require,module,exports){
+},{}],33:[function(require,module,exports){
 var Wire = (function () {
     function Wire(input, output, receive, set) {
         this.input = input;

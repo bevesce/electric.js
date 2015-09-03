@@ -7,11 +7,11 @@ var diff = vdom.diff;
 var patch = vdom.patch;
 var createElement = vdom.create;
 function renderTime(count) {
-    return h('h1', { className: 'test' }, [count.time]);
+    return h('h1', { className: 'test' }, [count]);
 }
 function renderList(list) {
     return h('ul', {}, list.map(function (item) {
-        return h('li', { key: item.time }, [item.time]);
+        return h('li', { key: item }, [item]);
     }));
 }
 function renderApp(time, list) {

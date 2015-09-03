@@ -1,13 +1,14 @@
-var clock = require('./clock');
-var electric = require('../../../src/electric');
+var clock = require('../clock');
+var scheduler = require('../scheduler');
+var transformator = require('../transformator');
 function integral(initialValue, emitter, options) {
     var timmed = timeValue(emitter, options);
     var result = timmed.accumulate({
-        time: electric.scheduler.now(),
+        time: scheduler.now(),
         value: emitter.dirtyCurrentValue(),
         sum: initialValue
     }, function (acc, v) {
-        var now = electric.scheduler.now();
+        var now = scheduler.now();
         var dt = now - acc.time;
         var nv = v.value.add(acc.value).mulT(dt / 2);
         var sum = acc.sum.addDelta(nv);
@@ -26,7 +27,7 @@ exports.integral = integral;
 function differential(initialValue, emitter, options) {
     var timmed = timeValue(emitter, options);
     var result = timmed.accumulate({
-        time: electric.scheduler.now(),
+        time: scheduler.now(),
         value: emitter.dirtyCurrentValue(),
         diff: initialValue
     }, function (acc, v) {
@@ -45,7 +46,7 @@ function differential(initialValue, emitter, options) {
 exports.differential = differential;
 function timeValue(emitter, options) {
     var time = clock.time(options);
-    var transformator = electric.transformator.map(function (t, v) { return ({ time: t, value: v }); }, time, emitter);
-    transformator.stabilize = function () { return time.stabilize(); };
-    return transformator;
+    var trans = transformator.map(function (t, v) { return ({ time: t, value: v }); }, time, emitter);
+    trans.stabilize = function () { return time.stabilize(); };
+    return trans;
 }

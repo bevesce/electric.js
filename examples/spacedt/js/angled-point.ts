@@ -1,4 +1,4 @@
-import calculus = require('./calculus');
+import calculus = require('../../../src/calculus/calculus');
 
 export = Point
 

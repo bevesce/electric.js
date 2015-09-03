@@ -1,8 +1,8 @@
 import rui = require('../../../src/receivers/ui');
+import IntegrableAntiderivativeOfTwoNumbers = require('../../../src/calculus/integrable-antiderivative-of-two-numbers');
 
 import c = require('./constants');
 import Point = require('./angled-point');
-import IntegrableAntiderivativeOfTwoNumbers = require('./integrable-antiderivative-of-two-numbers');
 
 
 export function speed() {

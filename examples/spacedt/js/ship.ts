@@ -2,10 +2,10 @@ import inf = require('../../../src/interfaces');
 import electric = require('../../../src/electric');
 import eevent = require('../../../src/electric-event');
 import eui = require('../../../src/emitters/ui');
-import calculus = require('./calculus');
+import calculus = require('../../../src/calculus/calculus');
+import IntegrableAntiderivativeOfTwoNumbers = require('../../../src/calculus/integrable-antiderivative-of-two-numbers');
 
 import c = require('./constants');
-import IntegrableAntiderivativeOfTwoNumbers = require('./integrable-antiderivative-of-two-numbers');
 import Point = require('./angled-point');
 
 export = create;
