@@ -10,7 +10,7 @@ export function interval(
 	scheduler.scheduleInterval(() => {
 		timer.impulse(Date.now())
 	}, calculateInterval(options.inMs, options.fps))
-	timer.name = '| interval ' + calculateEmitterName(options);
+	timer.name = `interval(${calculateEmitterName(options)})`;
 	return timer;
 }
 
@@ -21,7 +21,7 @@ export function intervalValue<T>(
 	scheduler.scheduleInterval(() => {
 		timer.impulse(value)
 	}, calculateInterval(options.inMs, options.fps))
-	timer.name = '| interval of ' + value + calculateEmitterName(options);
+	timer.name = `intervalValue(${value}, ${calculateEmitterName(options)})`;
 	return timer;
 }
 
@@ -35,7 +35,7 @@ export function time(
 		interval
 	);
 	timeEmitter.setReleaseResources(() => scheduler.unscheduleInterval(id));
-	timeEmitter.name = '| time ' + calculateEmitterName(options);
+	timeEmitter.name = `time(${calculateEmitterName(options)})`;
 	return timeEmitter;
 }
 
@@ -50,12 +50,12 @@ function calculateInterval(intervalInMs?: number, fps?: number) {
 
 function calculateEmitterName(options: { inMs?: number, intervalInMs?: number, fps?: number }) {
 	if (options.fps !== undefined) {
-		return ' fps: ' + options.fps + ' |>';
+		return 'fps: ' + options.fps;
 	}
 	else if (options.inMs !== undefined) {
-		return ' interval: ' + options.inMs + 'ms |>';
+		return 'interval: ' + options.inMs + 'ms';
 	}
 	else {
-		return ' interval: ' + options.intervalInMs + 'ms |>';
+		return 'interval: ' + options.intervalInMs + 'ms';
 	}
 }

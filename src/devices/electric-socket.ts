@@ -22,7 +22,7 @@ export function emitter(name: string, socket: any, initialValue: any = undefined
 	socket.on(name, function(data: any) {
 		emitter.emit(data);
 	});
-	emitter.name = '| socket: ' + name + ' |>';
+	emitter.name = `socket(${name})`;
 	return emitter;
 };
 
@@ -33,6 +33,6 @@ export function eventEmitter<T>(
 	socket.on(name, function(x) {
 		emitter.impulse(x)
 	});
-	emitter.name = '| event socket: ' + name + ' |>';
+	emitter.name = `eventSocket(${name})`;
 	return emitter;
 };

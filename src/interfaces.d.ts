@@ -314,4 +314,5 @@ export interface ITransformator<In, Out>
 export interface IPlaceholder<Out>
 	extends IEmitter<Out> {
 	is(emitter: IEmitter<Out>): void;
+	initialValue: Out;
 }

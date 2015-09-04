@@ -1,6 +1,6 @@
 function htmlReceiverById(id) {
     var element = document.getElementById(id);
-    return function (html) {
+    return function htmlReceiver(html) {
         element.innerHTML = html;
     };
 }

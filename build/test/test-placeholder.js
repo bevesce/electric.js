@@ -7,7 +7,6 @@ var expect = chai.expect;
 var electric = require('../src/electric');
 var eevent = require('../src/electric-event');
 var placeholder = require('../src/placeholder');
-var clock = require('../src/clock');
 var transformator = require('../src/transformator');
 function double(x) {
     return x * 2;
@@ -131,35 +130,41 @@ describe('placeholder in recursion', function () {
             .to.emit(false)
             .andBe(done);
     });
-    it('should work with integrals', function () {
-        var time = electric.scheduler.stop();
-        function a(t) {
-            return 10;
-        }
-        ;
-        // v = ∫ a - 0.1 * v dt
-        function akv(a, v) {
-            return a - 0.1 * v;
-        }
-        var aT = clock.timeFunction(a, { intervalInMs: 1 });
-        var vTs = placeholder(clock.TimeValue.of(time, 0));
-        var vT = clock.integral(transformator.map(clock.TimeValue.lift(akv), aT, vTs));
-        var now = electric.scheduler.now();
-        vTs.is(vT.transformTime(clock.TimeValue.of(now, 0), function (t) { return t + 1; }));
-        var r = electric.receiver.collect(vT);
-        electric.scheduler.advance(5);
-        var expecteds = [
-            { time: now + 0, value: 0 },
-            { time: now + 1, value: 0.001 * (10) },
-            { time: now + 2, value: 0.001 * (20 - 10 * 0.1) },
-            { time: now + 3, value: 0.001 * (30 - 10 * 0.1 - 0.1 * (20 - 10 * 0.1)) },
-            { time: now + 4, value: 0.001 * (40 - 10 * 0.1 - 0.1 * (20 - 10 * 0.1) - 0.1 * (30 - 10 * 0.1 - 0.1 * (20 - 10 * 0.1))) }
-        ];
-        for (var i in expecteds) {
-            var expected = expecteds[i];
-            var given = r[i];
-            expect(given.time).to.equal(expected.time);
-            expect(given.value).to.be.within(expected.value - 0.01, expected.value + 0.01);
-        }
-    });
+    // it('should work with integrals', function() {
+    //     var time = electric.scheduler.stop();
+    //     function a(t: number) {
+    //         return 10
+    //     };
+    //     // v = ∫ a - 0.1 * v dt
+    //     function akv(a: number, v: number) {
+    //     	return a  - 0.1 * v;
+    //     }
+    //     var aT = clock.timeFunction(a, { intervalInMs: 1 });
+    //     var vTs = placeholder(clock.TimeValue.of(time, 0));
+    //     var vT = clock.integral(
+    //         transformator.map(
+    //             clock.TimeValue.lift(akv),
+    //             aT, vTs
+    //         )
+    //     );
+    //     var now = electric.scheduler.now();
+    //     vTs.is(vT.transformTime(
+    //     	clock.TimeValue.of(now, 0), (t: number) => t + 1)
+    //     );
+    //     var r = electric.receiver.collect(vT);
+    //     electric.scheduler.advance(5)
+    //     var expecteds = [
+    //         { time: now + 0, value: 0 },
+    //         { time: now + 1, value: 0.001 * (10) },
+    //         { time: now + 2, value: 0.001 * (20 - 10 * 0.1) },
+    //         { time: now + 3, value: 0.001 * (30 - 10 * 0.1 - 0.1 * (20 - 10 * 0.1)) },
+    //         { time: now + 4, value: 0.001 * (40 - 10 * 0.1 - 0.1 * (20 - 10 * 0.1) - 0.1 * (30 - 10 * 0.1 - 0.1 * (20 - 10 * 0.1))) }
+    //     ];
+    //     for (var i in expecteds) {
+    //         var expected = expecteds[i];
+    //         var given = r[i];
+    //     	expect(given.time).to.equal(expected.time);
+    //     	expect(given.value).to.be.within(expected.value - 0.01, expected.value + 0.01);
+    //     }
+    // });
 });

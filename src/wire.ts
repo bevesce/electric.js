@@ -19,7 +19,7 @@ class Wire<InOut>
 	) {
 		this.input = input;
 		this.output = output;
-		this.name = '-w-';
+		this.name = 'w';
 		if (set) {
 			this._set = set
 			this._futureReceive = receive;
@@ -28,6 +28,10 @@ class Wire<InOut>
 			this.receive = receive;
 		}
 		this.receiverId = this.input.plugReceiver(this);
+	}
+
+	toString() {
+		return `${this.input.toString()} -${this.name}- ${this.output.toString()}`
 	}
 
 	receive(x: InOut) {

@@ -5,6 +5,7 @@ export import receiver = require('./receiver');
 export import clock = require('./clock');
 export import transmitter = require('./transmitter');
 export import calculus = require('./calculus/calculus');
+export import event = require('./electric-event');
 
 export var e = emitter;
 export var t = transformator;

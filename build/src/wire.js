@@ -2,7 +2,7 @@ var Wire = (function () {
     function Wire(input, output, receive, set) {
         this.input = input;
         this.output = output;
-        this.name = '-w-';
+        this.name = 'w';
         if (set) {
             this._set = set;
             this._futureReceive = receive;
@@ -12,6 +12,9 @@ var Wire = (function () {
         }
         this.receiverId = this.input.plugReceiver(this);
     }
+    Wire.prototype.toString = function () {
+        return this.input.toString() + " -" + this.name + "- " + this.output.toString();
+    };
     Wire.prototype.receive = function (x) {
         this._set(x);
         this._set = undefined;

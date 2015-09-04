@@ -27,9 +27,13 @@ var functionsToSomething = [];
 var Placeholder = (function () {
     function Placeholder(initialValue) {
         this._actions = [];
-        this._initialValue = initialValue;
+        this.initialValue = initialValue;
         this.name = '| placeholder |>';
     }
+    Placeholder.prototype.toString = function () {
+        var subname = this._emitter ? this._emitter.toString() : "| " + this.dirtyCurrentValue() + " |>";
+        return "| placeholder " + subname;
+    };
     Placeholder.prototype.is = function (emitter) {
         if (this._emitter) {
             throw Error("placeholder is " + this._emitter.name + " so cannot be " + emitter.name);
@@ -40,14 +44,14 @@ var Placeholder = (function () {
             action(this._emitter);
         }
         this._actions = undefined;
-        this.name = '| ph ' + emitter.name;
+        this.name = '| placeholder | ' + emitter.name;
     };
     Placeholder.prototype.dirtyCurrentValue = function () {
         if (this._emitter) {
             return this._emitter.dirtyCurrentValue();
         }
-        else if (this._initialValue !== undefined) {
-            return this._initialValue;
+        else if (this.initialValue !== undefined) {
+            return this.initialValue;
         }
         throw Error('called dirtyCurrentValue() on placeholder without initial value');
     };

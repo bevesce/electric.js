@@ -13,7 +13,7 @@ export function logReceiver(message: string) {
 
 export function log(emitter: inf.IEmitter<any>) {
 	emitter.plugReceiver((x: any) => {
-		console.log(emitter.name, '--', x);
+		console.log(emitter.name, '>>>', x);
 	});
 }
 
@@ -22,7 +22,7 @@ export function logEvents(emitter: inf.IEmitter<inf.IElectricEvent<any>>) {
 		if (!x.happend) {
 			return;
 		}
-		console.log(emitter.name, '--', x.value);
+		console.log(emitter.name, '>>>', x.value);
 	});
 }
 

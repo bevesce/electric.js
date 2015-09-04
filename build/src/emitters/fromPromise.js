@@ -1,7 +1,7 @@
 var emitter = require('../emitter');
 function fromPromise(promise) {
     var e = emitter.manual({ status: 'pending' });
-    e.name = 'promise *' + promise + '*';
+    e.name = 'promise';
     promise.then(function (value) {
         e.emit({ status: 'fulfilled', data: value });
         e.stabilize();

@@ -19,7 +19,7 @@ function emitter(name, socket, initialValue) {
     socket.on(name, function (data) {
         emitter.emit(data);
     });
-    emitter.name = '| socket: ' + name + ' |>';
+    emitter.name = "socket(" + name + ")";
     return emitter;
 }
 exports.emitter = emitter;
@@ -29,7 +29,7 @@ function eventEmitter(name, socket) {
     socket.on(name, function (x) {
         emitter.impulse(x);
     });
-    emitter.name = '| event socket: ' + name + ' |>';
+    emitter.name = "eventSocket(" + name + ")";
     return emitter;
 }
 exports.eventEmitter = eventEmitter;

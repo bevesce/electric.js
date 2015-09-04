@@ -5,11 +5,15 @@ var Change = require('./change');
 var ACTIVE = '#/active';
 var COMPLETED = '#/completed';
 function collection(initialTasks, input) {
-    var ac = electric.emitter.placeholder(13);
-    var cc = electric.emitter.placeholder(26);
+    var ac = electric.emitter.placeholder(0);
+    var acShifted = ac.transformTime(0, function (t) { return t + 1; });
+    acShifted.initialValue = 0;
+    var cc = electric.emitter.placeholder(0);
+    var ccShifted = cc.transformTime(0, function (t) { return t + 1; });
+    ccShifted.initialValue = 0;
     var toggleTo = electric.transformator.map(function (a, c, t) {
         return t.map(function (_) { return a !== c; });
-    }, ac, cc, input.toggle);
+    }, acShifted, ccShifted, input.toggle);
     var insert = notEmpty(input.insert);
     var tasks = electric.emitter.placeholder([]);
     var $ = eevent.lift;
@@ -37,7 +41,7 @@ function collection(initialTasks, input) {
     var changesVisibleWithFilter = electric.transformator.map(function (changes, filter, tasks) {
         var r = changes.flattenMap(function (c) { return calculateVisibleChanges(c, filter, tasks); });
         return r;
-    }, changes, input.filter, tasks);
+    }, changes.transformTime(eevent.notHappend, function (t) { return t + 1; }), input.filter, tasks);
     var visibleChanges = electric.transformator.merge(changesVisibleWithFilter, filteringChanges);
     var allCount = tasks.map(function (ts) { return ts.length; });
     ac.is(allCount);

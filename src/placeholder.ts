@@ -34,12 +34,17 @@ var functionsToSomething: string[] = [
 class Placeholder<Out> {
 	private _emitter: inf.IEmitter<Out>;
 	private _actions: Array<((emitter: inf.IEmitter<Out>) => any)> = [];
-	private _initialValue: Out;
+	initialValue: Out;
 	name: string;
 
 	constructor(initialValue: Out) {
-		this._initialValue = initialValue;
+		this.initialValue = initialValue;
 		this.name = '| placeholder |>';
+	}
+
+	toString() {
+		var subname = this._emitter ? this._emitter.toString() : `| ${this.dirtyCurrentValue()} |>`;
+		return `| placeholder ${subname}`
 	}
 
 	is(emitter: inf.IEmitter<Out>) {
@@ -51,15 +56,15 @@ class Placeholder<Out> {
 			action(this._emitter);
 		}
 		this._actions = undefined;
-		this.name = '| ph ' + emitter.name;
+		this.name = '| placeholder | ' + emitter.name;
 	}
 
 	dirtyCurrentValue() {
 		if (this._emitter) {
 			return this._emitter.dirtyCurrentValue();
 		}
-		else if (this._initialValue !== undefined) {
-			return this._initialValue
+		else if (this.initialValue !== undefined) {
+			return this.initialValue
 		}
 		throw Error('called dirtyCurrentValue() on placeholder without initial value');
 	}

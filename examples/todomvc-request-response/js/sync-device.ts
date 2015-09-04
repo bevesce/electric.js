@@ -26,13 +26,13 @@ function sync(userActivated: inf.IEmitter<eevent<any>>, tasks: inf.IEmitter<item
 					return electric.emitter.constant(eevent.notHappend);
 				}
 				else {
-					return userActivated.merge(electric.clock.interval(30 * 1000))
+					return userActivated.merge(electric.clock.interval({ inMs: 30 * 1000 }))
 				}
 			},
 			when: stateChange
 		}
 	);
-
+	electric.r.log(shouldSyncTasks);
 	var tasksToSync = electric.transformator.map(
 		(should, ts) => should.map(_ => ts),
 		shouldSyncTasks, tasks
@@ -44,7 +44,7 @@ function sync(userActivated: inf.IEmitter<eevent<any>>, tasks: inf.IEmitter<item
 			to: (fromState, toState) => {
 				return electric.emitter.constant(toState);
 			}, when: requestsDevice.stateChange
-		}, //,
+		},
 		{ to: electric.emitter.constant('none'), when: tasksChanges }
 	));
 

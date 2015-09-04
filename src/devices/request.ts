@@ -33,13 +33,13 @@ export function requestDevice<T>(
 	encode: (data: T) => string = fp.identity, decode: (data: string) => T = fp.identity
 ) {
 	var state = electric.emitter.manual('none');
-	state.name = '<| state of ' + method + ': ' + url + ' |>';
+	state.name = 'state of ' + method + ': ' + url;
 	var stateChange = <electric.emitter.EventEmitter<string>>electric.emitter.manualEvent();
-	stateChange.name = '<| state change of ' + method + ': ' + url + ' |>';
+	stateChange.name = 'state change of ' + method + ': ' + url;
 	var responseEmitter = electric.emitter.manual(emptyResponse);
-	responseEmitter.name = '<| response on ' + method + ': ' + url + ' |>';
+	responseEmitter.name = 'response on ' + method + ': ' + url;
 
-	input.plugReceiver(data => {
+	input.plugReceiver(function emitStateChangesAndResponses(data) {
 		if (!data.happend) {
 			return;
 		}
@@ -49,7 +49,6 @@ export function requestDevice<T>(
 			method,
 			url,
 			(response: Response<T>) => {
-				console.log('impulse! ' + response.status);
 				electric.scheduler.scheduleTimeout(
 					() => stateChange.impulse(response.status),
 					500

@@ -22,7 +22,7 @@ class IntegrableAntiderivativeOfTwoNumbers<K extends calculus.Antiderivative>
 	static of<K extends calculus.Antiderivative>(
 		x: number,
 		y: number,
-		antiderivative: (x: number, y: number) => K,
+		antiderivative?: (x: number, y: number) => K,
 		bounds?: Bounds
 	) {
 		return new IntegrableAntiderivativeOfTwoNumbers(x, y, antiderivative, bounds);

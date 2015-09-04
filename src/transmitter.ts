@@ -24,7 +24,7 @@ class Transmitter<In>
 
 function transmitter<T>(initialValue: T) {
 	var t = new Transmitter([], undefined, initialValue);
-	t.name = '?| transmitter |>'
+	t.name = '? | transmitter'
 	return t;
 }
 

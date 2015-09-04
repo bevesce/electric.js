@@ -9,7 +9,7 @@ function virtualDomReceiver(nodeOrId: utils.Node | string) {
 	var rootNode = vdom.create(previousTree);
 	node.appendChild(rootNode);
 
-	return function (newTree: any) {
+	return function virtualDomReceiver(newTree: any) {
 		var patches = vdom.diff(previousTree, newTree);
 		rootNode = vdom.patch(rootNode, patches);
 		previousTree = newTree;

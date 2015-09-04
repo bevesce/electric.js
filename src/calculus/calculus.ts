@@ -49,7 +49,7 @@ export function integral<In extends Integrable, Out extends Antiderivative>(
 			}
 		}
 	).map(v => v.sum);
-	result.name = '<| integral |>';
+	result.name = 'integral';
 	result.setEquals((x, y) => x.equals(y));
 	result.stabilize = () => timmed.stabilize();
 	return result;
@@ -88,7 +88,7 @@ export function differential<In extends Differentiable, Out extends Derivative>(
 		}
 	).map(v => v.diff);
 	result.setEquals((x, y) => x.equals(y));
-	result.name = '<| differential |>';
+	result.name = 'differential';
 	return result;
 }
 
@@ -103,5 +103,6 @@ function timeValue<T>(
 		time, emitter
 	);
 	trans.stabilize = () => time.stabilize();
+	trans.name = 'timeValue'
 	return trans;
 }

@@ -17,19 +17,18 @@ function requestDevice(method, url, input, encode, decode) {
     if (encode === void 0) { encode = fp.identity; }
     if (decode === void 0) { decode = fp.identity; }
     var state = electric.emitter.manual('none');
-    state.name = '<| state of ' + method + ': ' + url + ' |>';
+    state.name = 'state of ' + method + ': ' + url;
     var stateChange = electric.emitter.manualEvent();
-    stateChange.name = '<| state change of ' + method + ': ' + url + ' |>';
+    stateChange.name = 'state change of ' + method + ': ' + url;
     var responseEmitter = electric.emitter.manual(emptyResponse);
-    responseEmitter.name = '<| response on ' + method + ': ' + url + ' |>';
-    input.plugReceiver(function (data) {
+    responseEmitter.name = 'response on ' + method + ': ' + url;
+    input.plugReceiver(function emitStateChangesAndResponses(data) {
         if (!data.happend) {
             return;
         }
         stateChange.impulse('waiting');
         state.emit('waiting');
         request(method, url, function (response) {
-            console.log('impulse! ' + response.status);
             electric.scheduler.scheduleTimeout(function () { return stateChange.impulse(response.status); }, 500);
             state.emit(response.status);
             responseEmitter.emit(response);

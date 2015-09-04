@@ -1,4 +1,4 @@
-var utils = require('./utils');
+var all = require('./utils/all');
 var ElectricEvent = (function () {
     function ElectricEvent() {
     }
@@ -17,7 +17,7 @@ var ElectricEvent = (function () {
             for (var _i = 0; _i < arguments.length; _i++) {
                 vs[_i - 0] = arguments[_i];
             }
-            if (utils.all(vs.map(function (v) { return v.happend; }))) {
+            if (all(vs.map(function (v) { return v.happend; }))) {
                 return ElectricEvent.of(f.apply(null, vs.map(function (v) { return v.value; })));
             }
             else {
@@ -59,6 +59,9 @@ var Happend = (function () {
         this.happend = true;
         this.value = value;
     }
+    Happend.prototype.toString = function () {
+        return "Happend: " + this.value.toString();
+    };
     Happend.prototype.map = function (f) {
         return ElectricEvent.of(f(this.value));
     };
@@ -72,6 +75,9 @@ var NotHappend = (function () {
         this.happend = false;
         this.value = undefined;
     }
+    NotHappend.prototype.toString = function () {
+        return 'NotHappend';
+    };
     NotHappend.prototype.map = function (f) {
         return ElectricEvent.notHappend;
     };

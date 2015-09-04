@@ -3,7 +3,6 @@ var electric = require('../../../src/electric');
 var eevent = require('../../../src/electric-event');
 var rui = require('../../../src/receivers/ui');
 var eui = require('../../../src/emitters/ui');
-var storage = require('./storage');
 // Emitters
 var hash = eui.hash();
 var newTask = eui.fromInputTextEnter('new-task');
@@ -35,7 +34,6 @@ var editingId = electric.emitter.constant(undefined).change({ to: function (_, k
 var tasksRendererReceiver = require('./tasks-receiver');
 electric.transformator.map(function (ts, editingId) { return ({ tasks: ts, editing: editingId }); }, tasks.visible, editingId).plugReceiver(tasksRendererReceiver(del, retitle, editingStart, check));
 //// Other
-tasks.all.plugReceiver(storage.tasksReceiver);
 newTask.plugReceiver(clearInput);
 function clearInput(_) {
     document.getElementById('new-task').value = '';
@@ -141,7 +139,7 @@ function enable(element) {
     element.removeAttribute('disabled');
 }
 
-},{"../../../src/electric":10,"../../../src/electric-event":9,"../../../src/emitters/ui":12,"../../../src/receivers/ui":16,"./storage":3,"./sync-device":4,"./tasks-device":5,"./tasks-receiver":6}],2:[function(require,module,exports){
+},{"../../../src/electric":10,"../../../src/electric-event":9,"../../../src/emitters/ui":12,"../../../src/receivers/ui":16,"./sync-device":3,"./tasks-device":4,"./tasks-receiver":5}],2:[function(require,module,exports){
 var Item = (function () {
     function Item(id, title, completed) {
         this._id = id;
@@ -192,22 +190,6 @@ var Item = (function () {
 module.exports = Item;
 
 },{}],3:[function(require,module,exports){
-var item = require('./item');
-var TASK_KEY = 'todos-electric';
-function restoreTasks() {
-    var s = localStorage.getItem(TASK_KEY);
-    if (s) {
-        return JSON.parse(s).map(item.restore);
-    }
-    return [];
-}
-exports.restoreTasks = restoreTasks;
-function tasksReceiver(tasks) {
-    localStorage.setItem(TASK_KEY, JSON.stringify(tasks));
-}
-exports.tasksReceiver = tasksReceiver;
-
-},{"./item":2}],4:[function(require,module,exports){
 var electric = require('../../../src/electric');
 var eevent = require('../../../src/electric-event');
 var item = require('./item');
@@ -228,11 +210,12 @@ function sync(userActivated, tasks) {
                 return electric.emitter.constant(eevent.notHappend);
             }
             else {
-                return userActivated.merge(electric.clock.interval(30 * 1000));
+                return userActivated.merge(electric.clock.interval({ inMs: 30 * 1000 }));
             }
         },
         when: stateChange
     });
+    electric.r.log(shouldSyncTasks);
     var tasksToSync = electric.transformator.map(function (should, ts) { return should.map(function (_) { return ts; }); }, shouldSyncTasks, tasks);
     var requestsDevice = createRequestsDevice(tasksToSync);
     state.is(initialRequestState.change({
@@ -258,7 +241,7 @@ function createRequestsDevice(data) {
 }
 module.exports = sync;
 
-},{"../../../src/devices/request":8,"../../../src/electric":10,"../../../src/electric-event":9,"./item":2}],5:[function(require,module,exports){
+},{"../../../src/devices/request":8,"../../../src/electric":10,"../../../src/electric-event":9,"./item":2}],4:[function(require,module,exports){
 var item = require('./item');
 var electric = require('../../../src/electric');
 var eevent = require('../../../src/electric-event');
@@ -344,7 +327,7 @@ function onlyCompleted(tasks) {
 }
 module.exports = collection;
 
-},{"../../../src/electric":10,"../../../src/electric-event":9,"./item":2}],6:[function(require,module,exports){
+},{"../../../src/electric":10,"../../../src/electric-event":9,"./item":2}],5:[function(require,module,exports){
 var rui = require('../../../src/receivers/ui');
 var check;
 var del;
@@ -437,109 +420,112 @@ function setupTasksEvents(tasks) {
 ;
 module.exports = tasksRendererReceiver;
 
-},{"../../../src/receivers/ui":16}],7:[function(require,module,exports){
-exports.scheduler = require('./scheduler');
-exports.emitter = require('./emitter');
-exports.transformator = require('./transformator');
-function interval(intervalInMs) {
-    var timer = exports.emitter.manualEvent();
-    exports.scheduler.scheduleInterval(function () {
-        timer.impulse(Date.now());
-    }, intervalInMs);
-    timer.name = '| interval |>';
-    return timer;
-}
-exports.interval = interval;
-var TimeValue = (function () {
-    function TimeValue(time, value) {
-        this.time = time;
-        this.value = value;
-    }
-    TimeValue.of = function (time, value) {
-        if (value === void 0) { value = undefined; }
-        return new TimeValue(time, value);
-    };
-    TimeValue.lift = function (f) {
-        return function () {
-            var vs = [];
-            for (var _i = 0; _i < arguments.length; _i++) {
-                vs[_i - 0] = arguments[_i];
-            }
-            return TimeValue.of(Math.max.apply(Math, vs.map(function (v) { return v.time; })), f.apply(null, vs.map(function (v) { return v.value; })));
-        };
-    };
-    TimeValue.prototype.map = function (f) {
-        return TimeValue.of(this.time, f(this.value));
-    };
-    return TimeValue;
-})();
-exports.TimeValue = TimeValue;
-function _time(args, transform) {
-    var e = exports.emitter.manual(transform(exports.scheduler.now()));
-    var subname;
-    var interval;
-    if (args.intervalInMs === undefined) {
-        subname = 'fps: ' + args.fps;
-        interval = 1 / args.fps * 1000;
-    }
-    else {
-        subname = 'interval: ' + args.intervalInMs + 'ms';
-        interval = args.intervalInMs;
-    }
-    var id = exports.scheduler.scheduleInterval(function () { return e.emit(transform(exports.scheduler.now())); }, interval);
-    e.name = 'clock<' + subname + '>';
-    function releaseResoueces() {
-        exports.scheduler.unscheduleInterval(id);
-    }
-    e.setReleaseResources(releaseResoueces);
-    return e;
-}
-function time(args) {
-    return _time(args, function (t) { return TimeValue.of(t, undefined); });
-}
-exports.time = time;
-function timeFunction(f, args, t0) {
-    if (t0 === void 0) { t0 = 0; }
-    return _time(args, function (t) { return (TimeValue.of(t, f(t - t0))); });
-}
-exports.timeFunction = timeFunction;
-function equalsWithTime(x, y) {
-    return x.time === y.time && x.value === y.value;
-}
-function integral(f) {
-    var initialAcc = { time: exports.scheduler.now(), value: 0, integral: 0 };
-    var result = f.accumulate(initialAcc, function (acc, v) {
-        var dt = (v.time - acc.time) / 1000;
+},{"../../../src/receivers/ui":16}],6:[function(require,module,exports){
+var clock = require('../clock');
+var scheduler = require('../scheduler');
+var transformator = require('../transformator');
+function integral(initialValue, emitter, options) {
+    var timmed = timeValue(emitter, options);
+    var result = timmed.accumulate({
+        time: scheduler.now(),
+        value: emitter.dirtyCurrentValue(),
+        sum: initialValue
+    }, function (acc, v) {
+        var now = scheduler.now();
+        var dt = now - acc.time;
+        var nv = v.value.add(acc.value).mulT(dt / 2);
+        var sum = acc.sum.addDelta(nv);
         return {
-            time: v.time,
+            time: now,
             value: v.value,
-            integral: acc.integral + (acc.value + v.value) / 2 * dt
+            sum: sum
         };
-    }).map(function (v) { return TimeValue.of(v.time, v.integral); });
-    result.setEquals(equalsWithTime);
+    }).map(function (v) { return v.sum; });
+    result.name = 'integral';
+    result.setEquals(function (x, y) { return x.equals(y); });
+    result.stabilize = function () { return timmed.stabilize(); };
     return result;
 }
 exports.integral = integral;
-function derivative(f) {
-    var initialAcc = { time: exports.scheduler.now(), value: undefined, derivative: 0 };
-    var result = f.accumulate(initialAcc, function (acc, v) {
-        var dt = (v.time - acc.time) / 1000;
-        var diff = 0;
-        if (dt !== 0) {
-            diff = (v.value - acc.value) / dt / 1000;
-        }
+function differential(initialValue, emitter, options) {
+    var timmed = timeValue(emitter, options);
+    var result = timmed.accumulate({
+        time: scheduler.now(),
+        value: emitter.dirtyCurrentValue(),
+        diff: initialValue
+    }, function (acc, v) {
+        var dt = v.time - acc.time;
+        var diff = v.value.sub(acc.value).divT(dt);
         return {
             time: v.time,
             value: v.value,
-            derivative: diff
+            diff: diff
         };
-    }).map(function (v) { return TimeValue.of(v.time, v.derivative); });
-    result.setEquals(equalsWithTime);
+    }).map(function (v) { return v.diff; });
+    result.setEquals(function (x, y) { return x.equals(y); });
+    result.name = 'differential';
     return result;
 }
-exports.derivative = derivative;
+exports.differential = differential;
+function timeValue(emitter, options) {
+    var time = clock.time(options);
+    var trans = transformator.map(function (t, v) { return ({ time: t, value: v }); }, time, emitter);
+    trans.stabilize = function () { return time.stabilize(); };
+    trans.name = 'timeValue';
+    return trans;
+}
 
-},{"./emitter":11,"./scheduler":18,"./transformator":20}],8:[function(require,module,exports){
+},{"../clock":7,"../scheduler":18,"../transformator":20}],7:[function(require,module,exports){
+var scheduler = require('./scheduler');
+var emitter = require('./emitter');
+function interval(options) {
+    var timer = emitter.manualEvent();
+    scheduler.scheduleInterval(function () {
+        timer.impulse(Date.now());
+    }, calculateInterval(options.inMs, options.fps));
+    timer.name = "interval(" + calculateEmitterName(options) + ")";
+    return timer;
+}
+exports.interval = interval;
+function intervalValue(value, options) {
+    var timer = emitter.manualEvent();
+    scheduler.scheduleInterval(function () {
+        timer.impulse(value);
+    }, calculateInterval(options.inMs, options.fps));
+    timer.name = "intervalValue(" + value + ", " + calculateEmitterName(options) + ")";
+    return timer;
+}
+exports.intervalValue = intervalValue;
+function time(options) {
+    var interval = calculateInterval(options.intervalInMs, options.fps);
+    var timeEmitter = emitter.manual(scheduler.now());
+    var id = scheduler.scheduleInterval(function () { return timeEmitter.emit((scheduler.now())); }, interval);
+    timeEmitter.setReleaseResources(function () { return scheduler.unscheduleInterval(id); });
+    timeEmitter.name = "time(" + calculateEmitterName(options) + ")";
+    return timeEmitter;
+}
+exports.time = time;
+function calculateInterval(intervalInMs, fps) {
+    if (intervalInMs === undefined) {
+        return 1 / fps * 1000;
+    }
+    else {
+        return intervalInMs;
+    }
+}
+function calculateEmitterName(options) {
+    if (options.fps !== undefined) {
+        return 'fps: ' + options.fps;
+    }
+    else if (options.inMs !== undefined) {
+        return 'interval: ' + options.inMs + 'ms';
+    }
+    else {
+        return 'interval: ' + options.intervalInMs + 'ms';
+    }
+}
+
+},{"./emitter":11,"./scheduler":18}],8:[function(require,module,exports){
 var electric = require('../electric');
 var fp = require('../fp');
 var Response = (function () {
@@ -559,19 +545,18 @@ function requestDevice(method, url, input, encode, decode) {
     if (encode === void 0) { encode = fp.identity; }
     if (decode === void 0) { decode = fp.identity; }
     var state = electric.emitter.manual('none');
-    state.name = '<| state of ' + method + ': ' + url + ' |>';
+    state.name = 'state of ' + method + ': ' + url;
     var stateChange = electric.emitter.manualEvent();
-    stateChange.name = '<| state change of ' + method + ': ' + url + ' |>';
+    stateChange.name = 'state change of ' + method + ': ' + url;
     var responseEmitter = electric.emitter.manual(emptyResponse);
-    responseEmitter.name = '<| response on ' + method + ': ' + url + ' |>';
-    input.plugReceiver(function (data) {
+    responseEmitter.name = 'response on ' + method + ': ' + url;
+    input.plugReceiver(function emitStateChangesAndResponses(data) {
         if (!data.happend) {
             return;
         }
         stateChange.impulse('waiting');
         state.emit('waiting');
         request(method, url, function (response) {
-            console.log('impulse! ' + response.status);
             electric.scheduler.scheduleTimeout(function () { return stateChange.impulse(response.status); }, 500);
             state.emit(response.status);
             responseEmitter.emit(response);
@@ -634,10 +619,16 @@ function statusShortDescription(statusCode) {
 }
 
 },{"../electric":10,"../fp":13}],9:[function(require,module,exports){
-var utils = require('./utils');
+var all = require('./utils/all');
 var ElectricEvent = (function () {
     function ElectricEvent() {
     }
+    ElectricEvent.restore = function (e) {
+        if (e.happend) {
+            return ElectricEvent.of(e.value);
+        }
+        return ElectricEvent.notHappend;
+    };
     ElectricEvent.of = function (value) {
         return new Happend(value);
     };
@@ -647,7 +638,7 @@ var ElectricEvent = (function () {
             for (var _i = 0; _i < arguments.length; _i++) {
                 vs[_i - 0] = arguments[_i];
             }
-            if (utils.all(vs.map(function (v) { return v.happend; }))) {
+            if (all(vs.map(function (v) { return v.happend; }))) {
                 return ElectricEvent.of(f.apply(null, vs.map(function (v) { return v.value; })));
             }
             else {
@@ -713,17 +704,20 @@ var NotHappend = (function () {
 ElectricEvent.notHappend = new NotHappend();
 module.exports = ElectricEvent;
 
-},{"./utils":22}],10:[function(require,module,exports){
+},{"./utils/all":22}],10:[function(require,module,exports){
 exports.scheduler = require('./scheduler');
 exports.emitter = require('./emitter');
 exports.transformator = require('./transformator');
 exports.receiver = require('./receiver');
 exports.clock = require('./clock');
 exports.transmitter = require('./transmitter');
-// export import device = require('./device');
-// export import fp = require('./fp');
+exports.calculus = require('./calculus/calculus');
+exports.e = exports.emitter;
+exports.t = exports.transformator;
+exports.r = exports.receiver;
+exports.c = exports.calculus;
 
-},{"./clock":7,"./emitter":11,"./receiver":15,"./scheduler":18,"./transformator":20,"./transmitter":21}],11:[function(require,module,exports){
+},{"./calculus/calculus":6,"./clock":7,"./emitter":11,"./receiver":15,"./scheduler":18,"./transformator":20,"./transmitter":21}],11:[function(require,module,exports){
 var __extends = (this && this.__extends) || function (d, b) {
     for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p];
     function __() { this.constructor = d; }
@@ -734,17 +728,18 @@ var scheduler = require('./scheduler');
 var transformators = require('./transformator-helpers');
 var eevent = require('./electric-event');
 var Wire = require('./wire');
+var fn = require('./utils/fn');
 exports.placeholder = require('./placeholder');
-function en(name) {
-    return '| ' + name + ' |>';
-}
 var Emitter = (function () {
     function Emitter(initialValue) {
         if (initialValue === void 0) { initialValue = undefined; }
         this._receivers = [];
         this._currentValue = initialValue;
-        this.name = en(this.name);
+        this.name = (this.name);
     }
+    Emitter.prototype.toString = function () {
+        return "| " + this.name + " | " + this.dirtyCurrentValue() + " |>";
+    };
     // when reveiver is plugged current value is not emitted to him
     // instantaneously, but instead it's done asynchronously
     Emitter.prototype.plugReceiver = function (receiver) {
@@ -820,7 +815,7 @@ var Emitter = (function () {
         var currentReceivers = this._receivers.slice();
         for (var _i = 0; _i < currentReceivers.length; _i++) {
             var receiver = currentReceivers[_i];
-            this._ayncDispatchToReceiver(receiver, value);
+            this._dispatchToReceiver(receiver, value);
         }
     };
     Emitter.prototype._dispatchToReceiver = function (receiver, value) {
@@ -844,38 +839,41 @@ var Emitter = (function () {
     };
     // transformators
     Emitter.prototype.map = function (mapping) {
-        return namedTransformator('map' + this._enclosedName(), [this], transformators.map(mapping, 1), mapping(this._currentValue));
+        return namedTransformator("map(" + fn(mapping) + ")", [this], transformators.map(mapping, 1), mapping(this._currentValue));
     };
     Emitter.prototype.filter = function (initialValue, predicate) {
-        return namedTransformator('filter' + this._enclosedName(), [this], transformators.filter(predicate), initialValue);
+        return namedTransformator("filter(" + fn(predicate) + ")", [this], transformators.filter(predicate), initialValue);
     };
     Emitter.prototype.filterMap = function (initialValue, mapping) {
-        return namedTransformator('filter' + this._enclosedName(), [this], transformators.filterMap(mapping), initialValue);
+        return namedTransformator("filterMap(" + fn(mapping) + ")", [this], transformators.filterMap(mapping), initialValue);
     };
     Emitter.prototype.transformTime = function (initialValue, timeShift, t0) {
         if (t0 === void 0) { t0 = 0; }
-        var t = namedTransformator('transform time' + this._enclosedName(), [this], transformators.transformTime(timeShift, t0), initialValue);
+        var t = namedTransformator("transformTime(" + fn(timeShift) + ")", [this], transformators.transformTime(timeShift, t0), initialValue);
         this._dispatchToReceiver(t._dirtyGetWireTo(this), this.dirtyCurrentValue());
         return t;
     };
     Emitter.prototype.accumulate = function (initialValue, accumulator) {
         var acc = accumulator(initialValue, this.dirtyCurrentValue());
-        return namedTransformator('accumulate' + this._enclosedName(), [this], transformators.accumulate(acc, accumulator), acc);
+        return namedTransformator("accumulate(" + fn(accumulator) + ")", [this], transformators.accumulate(acc, accumulator), acc);
     };
     Emitter.prototype.merge = function () {
         var emitters = [];
         for (var _i = 0; _i < arguments.length; _i++) {
             emitters[_i - 0] = arguments[_i];
         }
-        return namedTransformator('merge' + this._enclosedName() + ' with ' + emitters.map(function (e) { return e.name; }).join(', '), [this].concat(emitters), transformators.merge(), this.dirtyCurrentValue());
+        return namedTransformator('merge', [this].concat(emitters), transformators.merge(), this.dirtyCurrentValue());
     };
     Emitter.prototype.when = function (switcher) {
-        var currentValue = this.dirtyCurrentValue();
-        var t = namedTransformator('when' + this._enclosedName(), [this], transformators.when(switcher.happens, switcher.then), eevent.notHappend);
+        var t = namedTransformator('whenHappensThen', [this], transformators.when(switcher.happens, switcher.then), eevent.notHappend);
+        return t;
+    };
+    Emitter.prototype.whenThen = function (happens) {
+        var t = namedTransformator('whenThen', [this], transformators.whenThen(happens), eevent.notHappend);
         return t;
     };
     Emitter.prototype.sample = function (initialValue, samplingEvent) {
-        var t = namedTransformator('sample' + this._enclosedName() + ' on ' + this._enclosedName(samplingEvent), [this, samplingEvent], transformators.sample(), initialValue);
+        var t = namedTransformator('sample', [this, samplingEvent], transformators.sample(), initialValue);
         return t;
     };
     Emitter.prototype.change = function () {
@@ -883,11 +881,7 @@ var Emitter = (function () {
         for (var _i = 0; _i < arguments.length; _i++) {
             switchers[_i - 0] = arguments[_i];
         }
-        return namedTransformator('change to when', [this].concat(switchers.map(function (s) { return s.when; })), transformators.change(switchers), this._currentValue);
-    };
-    Emitter.prototype._enclosedName = function (emitter) {
-        if (emitter === void 0) { emitter = null; }
-        return '<' + (emitter ? emitter.name : this.name) + '>';
+        return namedTransformator('changeToWhen', [this].concat(switchers.map(function (s) { return s.when; })), transformators.change(switchers), this._currentValue);
     };
     return Emitter;
 })();
@@ -916,15 +910,15 @@ var ManualEmitter = (function (_super) {
     };
     return ManualEmitter;
 })(Emitter);
-function manual(initialValue) {
+function manual(initialValue, name) {
     var e = new ManualEmitter(initialValue);
-    e.name = en('manual');
+    e.name = name || 'manual';
     return e;
 }
 exports.manual = manual;
 function constant(value) {
     var e = new Emitter(value);
-    e.name = en('constant *' + value + '*');
+    e.name = "constant(" + value + ")";
     return e;
 }
 exports.constant = constant;
@@ -934,13 +928,12 @@ function manualEvent(name) {
     // and not allow to emit values
     // it's done by monkey patching ManualEmitter
     var e = manual(eevent.notHappend);
-    e.name = en('manual event');
     var oldImpulse = e.impulse;
     e.impulse = function (v) { return oldImpulse.apply(e, [eevent.of(v)]); };
     e.emit = function (v) {
         throw Error("can't emit from event emitter, only impulse");
     };
-    e.name = name ? en(name) : e.name;
+    e.name = name || 'manualEvent';
     // monkey patching requires ugly casting...
     return e;
 }
@@ -951,15 +944,17 @@ var Transformator = (function (_super) {
         if (transform === void 0) { transform = undefined; }
         if (initialValue === void 0) { initialValue = undefined; }
         _super.call(this, initialValue);
-        this.name = '<| transformator |>';
+        this.name = 'transformator';
         this._values = Array(emitters.length);
-        ;
         if (transform) {
             this.setTransform(transform);
         }
         this._wires = [];
         this.plugEmitters(emitters);
     }
+    Transformator.prototype.toString = function () {
+        return "<| " + this.name + " | " + this.dirtyCurrentValue() + " |>";
+    };
     Transformator.prototype.setTransform = function (transform) {
         var _this = this;
         this._transform = transform(function (x) { return _this.emit(x); }, function (x) { return _this.impulse(x); });
@@ -980,6 +975,15 @@ var Transformator = (function (_super) {
         this.wire(emitter);
         this._values[this._wires.length - 1] = emitter.dirtyCurrentValue();
         return this._wires.length - 1;
+    };
+    Transformator.prototype.unplugEmitter = function (emitter) {
+        this._wires.filter(function (w) { return w.input === emitter; }).forEach(function (w) { return w.unplug(); });
+    };
+    Transformator.prototype.dropEmitters = function (start) {
+        var wiresToDrop = this._wires.slice(1);
+        wiresToDrop.forEach(function (w) { return w.unplug(); });
+        this._wires.splice(start, this._wires.length);
+        this._values.splice(start, this._values.length);
     };
     Transformator.prototype.wire = function (emitter) {
         var _this = this;
@@ -1003,16 +1007,93 @@ exports.Transformator = Transformator;
 function namedTransformator(name, emitters, transform, initialValue) {
     if (transform === void 0) { transform = undefined; }
     var t = new Transformator(emitters, transform, initialValue);
-    t.name = '<| ' + name + ' |>';
+    t.name = name;
     return t;
 }
 exports.namedTransformator = namedTransformator;
 
-},{"./electric-event":9,"./placeholder":14,"./scheduler":18,"./transformator-helpers":19,"./wire":23}],12:[function(require,module,exports){
+},{"./electric-event":9,"./placeholder":14,"./scheduler":18,"./transformator-helpers":19,"./utils/fn":24,"./wire":25}],12:[function(require,module,exports){
 var electric = require('../electric');
 var utils = require('../receivers/utils');
 var transformator = require('../transformator');
 var eevent = require('../electric-event');
+var fp = require('../fp');
+var keyCodes = {
+    up: 38,
+    down: 40,
+    left: 37,
+    right: 39,
+    w: 87,
+    a: 65,
+    s: 83,
+    d: 68,
+    enter: 13,
+    space: 32
+};
+// NEW
+function clicks(nodeOrId, mapping) {
+    if (mapping === void 0) { mapping = fp.identity; }
+    var button = utils.getNode(nodeOrId);
+    var emitter = electric.emitter.manualEvent();
+    function emitterListener(event) {
+        emitter.impulse(mapping(event));
+    }
+    button.addEventListener('click', emitterListener, false);
+    emitter.setReleaseResources(function () { return button.removeEventListener('click', emitterListener); });
+    emitter.name = '| clicks on ' + nodeOrId + ' |>';
+    return emitter;
+}
+exports.clicks = clicks;
+function arrows(layout, nodeOrId, type) {
+    if (layout === void 0) { layout = 'arrows'; }
+    if (nodeOrId === void 0) { nodeOrId = document; }
+    if (type === void 0) { type = 'keydown'; }
+    var layouts = {
+        'arrows': {
+            38: 'up', 40: 'down', 37: 'left', 39: 'right'
+        },
+        'wasd': {
+            87: 'up', 83: 'down', 65: 'left', 68: 'right'
+        },
+        'hjkl': {
+            75: 'up', 74: 'down', 72: 'left', 76: 'right'
+        },
+        'ijkl': {
+            73: 'up', 75: 'down', 74: 'left', 76: 'right'
+        }
+    };
+    var keyCodes = layouts[layout];
+    var target = utils.getNode(nodeOrId);
+    var emitter = electric.emitter.manualEvent();
+    function emitterListener(event) {
+        var direction = keyCodes[event.keyCode];
+        if (direction) {
+            event.preventDefault();
+            emitter.impulse(direction);
+        }
+    }
+    target.addEventListener(type, emitterListener);
+    emitter.name = '| arrows |>';
+    return emitter;
+}
+exports.arrows = arrows;
+function key(name, type, nodeOrId) {
+    if (nodeOrId === void 0) { nodeOrId = document; }
+    var target = utils.getNode(nodeOrId);
+    var emitter = electric.emitter.manualEvent();
+    var keyCode = keyCodes[name];
+    function emitterListener(event) {
+        if (event.keyCode === keyCode) {
+            event.preventDefault();
+            emitter.impulse(name);
+        }
+    }
+    target.addEventListener('key' + type, emitterListener);
+    emitter.name = '| key ' + name + ' on ' + type + ' |>';
+    return emitter;
+}
+exports.key = key;
+// OLD
 function em(text) {
     return '`' + text + '`';
 }
@@ -1030,21 +1111,6 @@ function fromEvent(target, type, name, useCapture) {
     return emitter;
 }
 exports.fromEvent = fromEvent;
-function identity(x) {
-    return x;
-}
-function clicks(nodeOrId, mapping) {
-    if (mapping === void 0) { mapping = identity; }
-    var button = utils.getNode(nodeOrId);
-    var emitter = electric.emitter.manualEvent();
-    function emitterListener(event) {
-        emitter.impulse(mapping(event));
-    }
-    button.addEventListener('click', emitterListener, false);
-    emitter.name = '| clicks on ' + nodeOrId + ' |>';
-    return emitter;
-}
-exports.clicks = clicks;
 function fromButton(nodeOrId) {
     var button = utils.getNode(nodeOrId);
     return fromEvent(button, 'click', 'button clicks on ' + em(nodeOrId));
@@ -1167,7 +1233,7 @@ function enter(nodeOrId) {
 }
 exports.enter = enter;
 
-},{"../electric":10,"../electric-event":9,"../receivers/utils":17,"../transformator":20}],13:[function(require,module,exports){
+},{"../electric":10,"../electric-event":9,"../fp":13,"../receivers/utils":17,"../transformator":20}],13:[function(require,module,exports){
 function identity(x) {
     return x;
 }
@@ -1336,16 +1402,21 @@ var functionsToEmitter = [
     'transformTime',
     'accumulate',
     'sample',
-    'change'
+    'change',
+    'merge'
 ];
 // function to throw if called before is()
 var functionsToSomething = [];
 var Placeholder = (function () {
     function Placeholder(initialValue) {
         this._actions = [];
-        this._initialValue = initialValue;
+        this.initialValue = initialValue;
         this.name = '| placeholder |>';
     }
+    Placeholder.prototype.toString = function () {
+        var subname = this._emitter ? this._emitter.toString() : "| " + this.dirtyCurrentValue() + " |>";
+        return "| placeholder " + subname;
+    };
     Placeholder.prototype.is = function (emitter) {
         if (this._emitter) {
             throw Error("placeholder is " + this._emitter.name + " so cannot be " + emitter.name);
@@ -1356,14 +1427,14 @@ var Placeholder = (function () {
             action(this._emitter);
         }
         this._actions = undefined;
-        this.name = '| ph ' + emitter.name;
+        this.name = '| placeholder | ' + emitter.name;
     };
     Placeholder.prototype.dirtyCurrentValue = function () {
         if (this._emitter) {
             return this._emitter.dirtyCurrentValue();
         }
-        else if (this._initialValue !== undefined) {
-            return this._initialValue;
+        else if (this.initialValue !== undefined) {
+            return this.initialValue;
         }
         throw Error('called dirtyCurrentValue() on placeholder without initial value');
     };
@@ -1432,7 +1503,7 @@ function logReceiver(message) {
 exports.logReceiver = logReceiver;
 function log(emitter) {
     emitter.plugReceiver(function (x) {
-        console.log(emitter.name, '--', x);
+        console.log(emitter.name, '>>>', x);
     });
 }
 exports.log = log;
@@ -1441,7 +1512,7 @@ function logEvents(emitter) {
         if (!x.happend) {
             return;
         }
-        console.log(emitter.name, '--', x.value);
+        console.log(emitter.name, '>>>', x.value);
     });
 }
 exports.logEvents = logEvents;
@@ -1457,7 +1528,7 @@ exports.collect = collect;
 },{}],16:[function(require,module,exports){
 function htmlReceiverById(id) {
     var element = document.getElementById(id);
-    return function (html) {
+    return function htmlReceiver(html) {
         element.innerHTML = html;
     };
 }
@@ -1581,7 +1652,7 @@ function removeFromCallbacksAtTime(callbacksAtTime, callback) {
 }
 
 },{}],19:[function(require,module,exports){
-var utils = require('./utils');
+var callIfFunction = require('./utils/call-if-function');
 var Wire = require('./wire');
 var scheduler = require('./scheduler');
 var eevent = require('./electric-event');
@@ -1677,7 +1748,7 @@ function change(switchers) {
             else if (v[i].happend) {
                 this._wires[0].unplug();
                 var to = switchers[i - 1].to;
-                var e = utils.callIfFunction(to, v[0], v[i].value);
+                var e = callIfFunction(to, v[0], v[i].value);
                 this._wires[0] = new Wire(e, this, function (x) { return _this.receiveOn(x, 0); });
             }
         };
@@ -1694,6 +1765,22 @@ function when(happend, then) {
     };
 }
 exports.when = when;
+function whenThen(happens) {
+    return function transform(emit, impulse) {
+        var prevHappend;
+        return function whenTransform(v, i) {
+            var happend = happens(v[i]);
+            if (happend && !prevHappend) {
+                impulse(eevent.of(happend));
+                prevHappend = happend;
+            }
+            else if (!happend) {
+                prevHappend = null;
+            }
+        };
+    };
+}
+exports.whenThen = whenThen;
 function cumulateOverTime(delayInMiliseconds) {
     return function transform(emit, impulse) {
         var accumulated = [];
@@ -1717,14 +1804,15 @@ function cumulateOverTime(delayInMiliseconds) {
 exports.cumulateOverTime = cumulateOverTime;
 ;
 
-},{"./electric-event":9,"./scheduler":18,"./utils":22,"./wire":23}],20:[function(require,module,exports){
+},{"./electric-event":9,"./scheduler":18,"./utils/call-if-function":23,"./wire":25}],20:[function(require,module,exports){
 var emitter = require('./emitter');
 var namedTransformator = emitter.namedTransformator;
 var transformators = require('./transformator-helpers');
 var eevent = require('../src/electric-event');
+var fn = require('./utils/fn');
 function map(mapping, emitter1, emitter2, emitter3, emitter4, emitter5, emitter6, emitter7) {
     var emitters = Array.prototype.slice.apply(arguments, [1]);
-    return namedTransformator('map', emitters, transformators.map(mapping, emitters.length), mapping.apply(null, emitters.map(function (e) { return e.dirtyCurrentValue(); })));
+    return namedTransformator("map(" + fn(mapping) + ")", emitters, transformators.map(mapping, emitters.length), mapping.apply(null, emitters.map(function (e) { return e.dirtyCurrentValue(); })));
 }
 exports.map = map;
 ;
@@ -1733,25 +1821,25 @@ function mapMany(mapping) {
     for (var _i = 1; _i < arguments.length; _i++) {
         emitters[_i - 1] = arguments[_i];
     }
-    return namedTransformator('map many', emitters, transformators.map(mapping, emitters.length), mapping.apply(null, emitters.map(function (e) { return e.dirtyCurrentValue(); })));
+    return namedTransformator("mapMany(" + fn(mapping) + ")", emitters, transformators.map(mapping, emitters.length), mapping.apply(null, emitters.map(function (e) { return e.dirtyCurrentValue(); })));
 }
 exports.mapMany = mapMany;
 function filter(initialValue, predicate, emitter1, emitter2, emitter3, emitter4, emitter5, emitter6, emitter7) {
     var emitters = Array.prototype.slice.apply(arguments, [2]);
-    return namedTransformator('filter', emitters, transformators.filter(predicate, emitters.length), initialValue);
+    return namedTransformator("filter(" + fn(predicate) + ")", emitters, transformators.filter(predicate, emitters.length), initialValue);
 }
 exports.filter = filter;
 ;
 function filterMap(initialValue, filterMapping, emitter1, emitter2, emitter3, emitter4, emitter5, emitter6, emitter7) {
     var emitters = Array.prototype.slice.apply(arguments, [2]);
-    return namedTransformator('filter map', emitters, transformators.filterMap(filterMapping, emitters.length), initialValue);
+    return namedTransformator("filterMap(" + fn(filterMapping) + ")", emitters, transformators.filterMap(filterMapping, emitters.length), initialValue);
 }
 exports.filterMap = filterMap;
 ;
 function accumulate(initialValue, accumulator, emitter1, emitter2, emitter3, emitter4, emitter5, emitter6, emitter7) {
     var emitters = Array.prototype.slice.apply(arguments, [2]);
     var acc = accumulator.apply([], [initialValue].concat(emitters.map(function (e) { return e.dirtyCurrentValue(); })));
-    return namedTransformator('accumulate', emitters, transformators.accumulate(acc, accumulator), acc);
+    return namedTransformator("accumulate(" + fn(accumulator) + ")", emitters, transformators.accumulate(acc, accumulator), acc);
 }
 exports.accumulate = accumulate;
 function merge() {
@@ -1763,29 +1851,9 @@ function merge() {
 }
 exports.merge = merge;
 function cumulateOverTime(emitter, overInMs) {
-    return namedTransformator('cumulate', [emitter], transformators.cumulateOverTime(overInMs), eevent.notHappend);
+    return namedTransformator("cumulateOverTime(" + overInMs + "ms)", [emitter], transformators.cumulateOverTime(overInMs), eevent.notHappend);
 }
 exports.cumulateOverTime = cumulateOverTime;
-// what are semantics of flatten!?
-function flatten(emitter) {
-    var transformator = namedTransformator('flatten', [emitter, emitter.dirtyCurrentValue()], transform, emitter.dirtyCurrentValue().dirtyCurrentValue());
-    // var transformator = new Transformator([]);
-    function transform(emit) {
-        return function flattenTransform(v, i) {
-            if (i == 0) {
-                transformator.plugEmitter(v[i]);
-                emit(v[i].dirtyCurrentValue());
-            }
-            else {
-                emit(v[i]);
-            }
-        };
-    }
-    ;
-    return transformator;
-}
-exports.flatten = flatten;
-;
 function hold(initialValue, emitter) {
     function transform(emit) {
         return function holdTransform(v, i) {
@@ -1826,12 +1894,58 @@ function skipFirst(emitter) {
             }
         };
     }
-    return namedTransformator('skip 1', [emitter], transform, eevent.notHappend);
+    return namedTransformator('skip(1)', [emitter], transform, eevent.notHappend);
 }
 exports.skipFirst = skipFirst;
 ;
+// semantics:
+// f_a :: t -> (t -> a)
+// flatten(f_a) = f(t)
+// flatten(f_a)(t) = f(t)(t)
+function flatten(emitter) {
+    var transformator = namedTransformator('flatten', [emitter, emitter.dirtyCurrentValue()], transform, emitter.dirtyCurrentValue().dirtyCurrentValue());
+    function transform(emit) {
+        return function flattenTransform(v, i) {
+            if (i == 0) {
+                transformator.dropEmitters(1);
+                transformator.plugEmitter(v[0]);
+                emit(v[0].dirtyCurrentValue());
+            }
+            else {
+                emit(v[i]);
+            }
+        };
+    }
+    ;
+    return transformator;
+}
+exports.flatten = flatten;
+;
+// semantics:
+// f_a :: t -> [t -> a]
+// flatten(f_a) = f(t)
+// flatten(f_a)(t) = f(t).map(g => g(t))
+function flattenMany(emitter) {
+    var currentValues = emitter.dirtyCurrentValue().map(function (e) { return e.dirtyCurrentValue(); });
+    var transformator = namedTransformator('flattenMany', [emitter].concat(emitter.dirtyCurrentValue()), transform, currentValues);
+    function transform(emit) {
+        return function flattenTransform(v, i) {
+            if (i == 0) {
+                transformator.dropEmitters(1);
+                v[0].forEach(function (e) { return transformator.plugEmitter(e); });
+                emit(v[0].map(function (e) { return e.dirtyCurrentValue(); }));
+            }
+            else {
+                emit(v.slice(1));
+            }
+        };
+    }
+    ;
+    return transformator;
+}
+exports.flattenMany = flattenMany;
 
-},{"../src/electric-event":9,"./emitter":11,"./transformator-helpers":19}],21:[function(require,module,exports){
+},{"../src/electric-event":9,"./emitter":11,"./transformator-helpers":19,"./utils/fn":24}],21:[function(require,module,exports){
 var __extends = (this && this.__extends) || function (d, b) {
     for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p];
     function __() { this.constructor = d; }
@@ -1859,12 +1973,23 @@ var Transmitter = (function (_super) {
 })(emitter.Transformator);
 function transmitter(initialValue) {
     var t = new Transmitter([], undefined, initialValue);
-    t.name = '?| transmitter |>';
+    t.name = '? | transmitter';
     return t;
 }
 module.exports = transmitter;
 
-},{"./emitter":11,"./wire":23}],22:[function(require,module,exports){
+},{"./emitter":11,"./wire":25}],22:[function(require,module,exports){
+function all(list) {
+    for (var i = 0; i < list.length; i++) {
+        if (!list[i]) {
+            return false;
+        }
+    }
+    return true;
+}
+module.exports = all;
+
+},{}],23:[function(require,module,exports){
 function callIfFunction(obj) {
     var args = [];
     for (var _i = 1; _i < arguments.length; _i++) {
@@ -1877,32 +2002,20 @@ function callIfFunction(obj) {
         return obj;
     }
 }
-exports.callIfFunction = callIfFunction;
-function any(list) {
-    for (var i = 0; i < list.length; i++) {
-        if (list[i]) {
-            return true;
-        }
-    }
-    return false;
-}
-exports.any = any;
-function all(list) {
-    for (var i = 0; i < list.length; i++) {
-        if (!list[i]) {
-            return false;
-        }
-    }
-    return true;
-}
-exports.all = all;
+module.exports = callIfFunction;
 
-},{}],23:[function(require,module,exports){
+},{}],24:[function(require,module,exports){
+function fn(f) {
+    return f.name || '=>';
+}
+module.exports = fn;
+
+},{}],25:[function(require,module,exports){
 var Wire = (function () {
     function Wire(input, output, receive, set) {
         this.input = input;
         this.output = output;
-        this.name = '-w-';
+        this.name = 'w';
         if (set) {
             this._set = set;
             this._futureReceive = receive;
@@ -1912,6 +2025,9 @@ var Wire = (function () {
         }
         this.receiverId = this.input.plugReceiver(this);
     }
+    Wire.prototype.toString = function () {
+        return this.input.toString() + " -" + this.name + "- " + this.output.toString();
+    };
     Wire.prototype.receive = function (x) {
         this._set(x);
         this._set = undefined;

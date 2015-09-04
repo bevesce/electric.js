@@ -2,9 +2,10 @@ var emitter = require('./emitter');
 var namedTransformator = emitter.namedTransformator;
 var transformators = require('./transformator-helpers');
 var eevent = require('../src/electric-event');
+var fn = require('./utils/fn');
 function map(mapping, emitter1, emitter2, emitter3, emitter4, emitter5, emitter6, emitter7) {
     var emitters = Array.prototype.slice.apply(arguments, [1]);
-    return namedTransformator('map', emitters, transformators.map(mapping, emitters.length), mapping.apply(null, emitters.map(function (e) { return e.dirtyCurrentValue(); })));
+    return namedTransformator("map(" + fn(mapping) + ")", emitters, transformators.map(mapping, emitters.length), mapping.apply(null, emitters.map(function (e) { return e.dirtyCurrentValue(); })));
 }
 exports.map = map;
 ;
@@ -13,25 +14,25 @@ function mapMany(mapping) {
     for (var _i = 1; _i < arguments.length; _i++) {
         emitters[_i - 1] = arguments[_i];
     }
-    return namedTransformator('map many', emitters, transformators.map(mapping, emitters.length), mapping.apply(null, emitters.map(function (e) { return e.dirtyCurrentValue(); })));
+    return namedTransformator("mapMany(" + fn(mapping) + ")", emitters, transformators.map(mapping, emitters.length), mapping.apply(null, emitters.map(function (e) { return e.dirtyCurrentValue(); })));
 }
 exports.mapMany = mapMany;
 function filter(initialValue, predicate, emitter1, emitter2, emitter3, emitter4, emitter5, emitter6, emitter7) {
     var emitters = Array.prototype.slice.apply(arguments, [2]);
-    return namedTransformator('filter', emitters, transformators.filter(predicate, emitters.length), initialValue);
+    return namedTransformator("filter(" + fn(predicate) + ")", emitters, transformators.filter(predicate, emitters.length), initialValue);
 }
 exports.filter = filter;
 ;
 function filterMap(initialValue, filterMapping, emitter1, emitter2, emitter3, emitter4, emitter5, emitter6, emitter7) {
     var emitters = Array.prototype.slice.apply(arguments, [2]);
-    return namedTransformator('filter map', emitters, transformators.filterMap(filterMapping, emitters.length), initialValue);
+    return namedTransformator("filterMap(" + fn(filterMapping) + ")", emitters, transformators.filterMap(filterMapping, emitters.length), initialValue);
 }
 exports.filterMap = filterMap;
 ;
 function accumulate(initialValue, accumulator, emitter1, emitter2, emitter3, emitter4, emitter5, emitter6, emitter7) {
     var emitters = Array.prototype.slice.apply(arguments, [2]);
     var acc = accumulator.apply([], [initialValue].concat(emitters.map(function (e) { return e.dirtyCurrentValue(); })));
-    return namedTransformator('accumulate', emitters, transformators.accumulate(acc, accumulator), acc);
+    return namedTransformator("accumulate(" + fn(accumulator) + ")", emitters, transformators.accumulate(acc, accumulator), acc);
 }
 exports.accumulate = accumulate;
 function merge() {
@@ -43,7 +44,7 @@ function merge() {
 }
 exports.merge = merge;
 function cumulateOverTime(emitter, overInMs) {
-    return namedTransformator('cumulate', [emitter], transformators.cumulateOverTime(overInMs), eevent.notHappend);
+    return namedTransformator("cumulateOverTime(" + overInMs + "ms)", [emitter], transformators.cumulateOverTime(overInMs), eevent.notHappend);
 }
 exports.cumulateOverTime = cumulateOverTime;
 function hold(initialValue, emitter) {
@@ -86,7 +87,7 @@ function skipFirst(emitter) {
             }
         };
     }
-    return namedTransformator('skip 1', [emitter], transform, eevent.notHappend);
+    return namedTransformator('skip(1)', [emitter], transform, eevent.notHappend);
 }
 exports.skipFirst = skipFirst;
 ;
@@ -119,7 +120,7 @@ exports.flatten = flatten;
 // flatten(f_a)(t) = f(t).map(g => g(t))
 function flattenMany(emitter) {
     var currentValues = emitter.dirtyCurrentValue().map(function (e) { return e.dirtyCurrentValue(); });
-    var transformator = namedTransformator('flatten many', [emitter].concat(emitter.dirtyCurrentValue()), transform, currentValues);
+    var transformator = namedTransformator('flattenMany', [emitter].concat(emitter.dirtyCurrentValue()), transform, currentValues);
     function transform(emit) {
         return function flattenTransform(v, i) {
             if (i == 0) {

@@ -10,7 +10,7 @@ interface Promise<Of, Err> {
 
 function fromPromise<Of, Err>(promise: Promise<Of, Err>) {
 	var e = emitter.manual({ status: 'pending' });
-	e.name = 'promise *' + promise + '*';
+	e.name = 'promise';
 	promise.then(
 		(value: Of) => {
 			e.emit({ status: 'fulfilled', data: value });

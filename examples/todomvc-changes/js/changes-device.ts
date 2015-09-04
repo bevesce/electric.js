@@ -24,13 +24,17 @@ function collection(
 		filter: inf.IEmitter<string>
 	}
 ) {
-	var ac = electric.emitter.placeholder(13);
-	var cc = electric.emitter.placeholder(26);
+	var ac = electric.emitter.placeholder(0);
+	var acShifted = <inf.IPlaceholder<number>>ac.transformTime(0, t => t + 1);
+	acShifted.initialValue = 0;
+	var cc = electric.emitter.placeholder(0);
+	var ccShifted = <inf.IPlaceholder<number>>cc.transformTime(0, t => t + 1);
+	ccShifted.initialValue = 0;
 	var toggleTo = electric.transformator.map(
 		(a, c, t) => {
 			return t.map(_ => a !== c);
 		},
-		ac, cc, input.toggle
+		acShifted, ccShifted, input.toggle
 	);
 	var insert: inf.IEmitter<eevent<item>> = notEmpty(input.insert);
 
@@ -84,7 +88,7 @@ function collection(
 			var r = changes.flattenMap(c => calculateVisibleChanges(c, filter, tasks));
 			return r;
 		},
-		changes, input.filter, tasks
+		changes.transformTime(eevent.notHappend, t => t + 1), input.filter, tasks
 	);
 
 	var visibleChanges = electric.transformator.merge(

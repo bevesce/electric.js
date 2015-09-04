@@ -3,6 +3,7 @@ import emitter = require('./emitter');
 var namedTransformator = emitter.namedTransformator;
 import transformators = require('./transformator-helpers');
 import eevent = require('../src/electric-event');
+import fn = require('./utils/fn');
 
 
 export function map<In1, Out>(
@@ -46,7 +47,7 @@ export function map<In1, In2, In3, In4, In5, In6, In7, Out>(
 ): inf.IEmitter<Out> {
     var emitters = <inf.IEmitter<any>[]>Array.prototype.slice.apply(arguments, [1]);
     return namedTransformator(
-		'map',
+		`map(${fn(mapping)})`,
 		emitters,
 		transformators.map(mapping, emitters.length),
 		mapping.apply(null, emitters.map(e => e.dirtyCurrentValue()))
@@ -58,7 +59,7 @@ export function mapMany<Out>(
     ...emitters: inf.IEmitter<any>[]
 ): inf.IEmitter<Out> {
     return namedTransformator(
-        'map many',
+        `mapMany(${fn(mapping)})`,
         emitters,
         transformators.map(mapping, emitters.length),
         mapping.apply(null, emitters.map(e => e.dirtyCurrentValue()))
@@ -114,7 +115,7 @@ export function filter<InOut> (
 ): inf.IEmitter<InOut> {
     var emitters = <inf.IEmitter<any>[]>Array.prototype.slice.apply(arguments, [2]);
     return namedTransformator(
-		'filter',
+        `filter(${fn(predicate)})`,
 		emitters,
 		transformators.filter(predicate, emitters.length),
 		initialValue
@@ -170,7 +171,7 @@ export function filterMap<In1, In2, In3, In4, In5, In6, In7, Out>(
 ): inf.IEmitter<Out> {
     var emitters = <inf.IEmitter<any>[]>Array.prototype.slice.apply(arguments, [2]);
     return namedTransformator(
-		'filter map',
+		`filterMap(${fn(filterMapping)})`,
 		emitters,
 		transformators.filterMap(filterMapping, emitters.length),
 		initialValue
@@ -228,7 +229,7 @@ export function accumulate<In1, In2, In3, In4, In5, In6, In7, Out>(
     var emitters = <inf.IEmitter<any>[]>Array.prototype.slice.apply(arguments, [2]);
     var acc = accumulator.apply([], [initialValue].concat(emitters.map(e => e.dirtyCurrentValue())));
     return namedTransformator(
-        'accumulate',
+        `accumulate(${fn(accumulator)})`,
         emitters,
         transformators.accumulate(acc, accumulator),
         acc
@@ -250,7 +251,7 @@ export function cumulateOverTime<T>(
     overInMs: number
 ): inf.IEmitter <eevent<T[]>> {
     return namedTransformator(
-        'cumulate',
+        `cumulateOverTime(${overInMs}ms)`,
         [emitter],
         transformators.cumulateOverTime(overInMs),
         eevent.notHappend
@@ -320,7 +321,7 @@ export function skipFirst<InOut>(
         }
     }
     return namedTransformator(
-        'skip 1',
+        'skip(1)',
         [emitter],
         transform,
         eevent.notHappend
@@ -364,7 +365,7 @@ export function flattenMany<InOut>(
 ): inf.IEmitter<InOut[]> {
     var currentValues = emitter.dirtyCurrentValue().map(e => e.dirtyCurrentValue());
     var transformator = namedTransformator(
-        'flatten many',
+        'flattenMany',
         [<inf.IEmitter<any>>emitter].concat(emitter.dirtyCurrentValue()),
         transform,
         currentValues

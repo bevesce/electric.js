@@ -18,11 +18,12 @@ function sync(userActivated, tasks) {
                 return electric.emitter.constant(eevent.notHappend);
             }
             else {
-                return userActivated.merge(electric.clock.interval(30 * 1000));
+                return userActivated.merge(electric.clock.interval({ inMs: 30 * 1000 }));
             }
         },
         when: stateChange
     });
+    electric.r.log(shouldSyncTasks);
     var tasksToSync = electric.transformator.map(function (should, ts) { return should.map(function (_) { return ts; }); }, shouldSyncTasks, tasks);
     var requestsDevice = createRequestsDevice(tasksToSync);
     state.is(initialRequestState.change({

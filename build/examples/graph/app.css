@@ -1,0 +1,24 @@
+.link {
+  fill: none;
+  stroke: silver;
+  stroke-width: 1.5px;
+}
+
+.link.emitter {
+	stroke: #E13464;
+}
+
+.link.receiver {
+	stroke: #348AE0;
+}
+
+circle {
+  fill: #ccc;
+  /*stroke: #333;*/
+  /*stroke-width: 1.5px;*/
+}
+
+text {
+  font: 1em sans-serif;
+  pointer-events: none;
+}

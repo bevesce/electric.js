@@ -1,4 +1,4 @@
-var utils = require('./utils');
+var callIfFunction = require('./utils/call-if-function');
 var Wire = require('./wire');
 var scheduler = require('./scheduler');
 var eevent = require('./electric-event');
@@ -94,7 +94,7 @@ function change(switchers) {
             else if (v[i].happend) {
                 this._wires[0].unplug();
                 var to = switchers[i - 1].to;
-                var e = utils.callIfFunction(to, v[0], v[i].value);
+                var e = callIfFunction(to, v[0], v[i].value);
                 this._wires[0] = new Wire(e, this, function (x) { return _this.receiveOn(x, 0); });
             }
         };
