@@ -165,14 +165,8 @@ gameOver.plugReceiver(function (e) {
     }
 });
 ship.v.plugReceiver(dashboard.speed());
-var v = require('../../../src/visualize');
-var g = v.Graph.of(bullets.xy);
-var nodes = g.nodes;
-var links = g.links;
-// console.log(JSON.stringify(nodes));
-console.log(JSON.stringify(links));
 
-},{"../../../src/clock":18,"../../../src/electric":20,"../../../src/electric-event":19,"../../../src/emitters/ui":22,"../../../src/visualize":35,"./angled-point":1,"./asteroid-mother":3,"./asteroids":4,"./bullets":5,"./collisions":6,"./constants":7,"./dashboard":8,"./draw":9,"./score":11,"./ship":12,"./utils/insert":13}],3:[function(require,module,exports){
+},{"../../../src/clock":18,"../../../src/electric":20,"../../../src/electric-event":19,"../../../src/emitters/ui":22,"./angled-point":1,"./asteroid-mother":3,"./asteroids":4,"./bullets":5,"./collisions":6,"./constants":7,"./dashboard":8,"./draw":9,"./score":11,"./ship":12,"./utils/insert":13}],3:[function(require,module,exports){
 var electric = require('../../../src/electric');
 var clock = require('../../../src/clock');
 var calculus = require('../../../src/calculus/calculus');
@@ -595,8 +589,11 @@ function shipVelocity(x, y) {
 }
 function create(startingPoint, input) {
     var shipA = cont(shipAcceleration(0, 0)).change({ to: function (a, _) { return cont(a.withX(-c.ship.acceleration.angular)); }, when: input.rotateLeft }, { to: function (a, _) { return cont(a.withX(c.ship.acceleration.angular)); }, when: input.rotateRight }, { to: function (a, _) { return cont(a.withX(0)); }, when: input.stopRotateRight }, { to: function (a, _) { return cont(a.withX(0)); }, when: input.stopRotateLeft }, { to: function (a, _) { return cont(a.withY(-c.ship.acceleration.de)); }, when: input.deccelerate }, { to: function (a, _) { return cont(a.withY(c.ship.acceleration.linear)); }, when: input.accelerate }, { to: function (a, _) { return cont(a.withY(0)); }, when: input.stopAcceleration }, { to: function (a, _) { return cont(a.withY(0)); }, when: input.stopDecceleration });
+    shipA.name = 'ship acceleration';
     var shipV = calculus.integral(shipVelocity(0, 0), shipA, { fps: c.fps }).change({ to: function (v, _) { return calculus.integral(v.withX(0), shipA, { fps: c.fps }); }, when: input.stopRotateRight.transformTime(eevent.notHappend, function (t) { return t + 10; }) }, { to: function (v, _) { return calculus.integral(v.withX(0), shipA, { fps: c.fps }); }, when: input.stopRotateLeft.transformTime(eevent.notHappend, function (t) { return t + 10; }) });
+    shipV.name = 'ship velocity';
     var shipXYA = calculus.integral(startingPoint, shipV, { fps: c.fps });
+    shipXYA.name = 'ship position';
     var shot = electric.transformator.map(function (space, xya, v) { return space.map(function (_) { return ({ xya: xya, velocity: v }); }); }, eui.key('space', 'up'), shipXYA, shipV);
     return {
         a: shipA,
@@ -643,7 +640,7 @@ var scheduler = require('../scheduler');
 var transformator = require('../transformator');
 function integral(initialValue, emitter, options) {
     var timmed = timeValue(emitter, options);
-    var result = timmed.accumulate({
+    var acc = timmed.accumulate({
         time: scheduler.now(),
         value: emitter.dirtyCurrentValue(),
         sum: initialValue
@@ -657,7 +654,9 @@ function integral(initialValue, emitter, options) {
             value: v.value,
             sum: sum
         };
-    }).map(function (v) { return v.sum; });
+    });
+    acc.name = 'internal integral accumulator';
+    var result = acc.map(function (v) { return v.sum; });
     result.name = 'integral';
     result.setEquals(function (x, y) { return x.equals(y); });
     result.stabilize = function () { return timmed.stabilize(); };
@@ -688,7 +687,7 @@ function timeValue(emitter, options) {
     var time = clock.time(options);
     var trans = transformator.map(function (t, v) { return ({ time: t, value: v }); }, time, emitter);
     trans.stabilize = function () { return time.stabilize(); };
-    trans.name = 'timeValue';
+    trans.name = 'calculus timer';
     return trans;
 }
 
@@ -918,7 +917,7 @@ var Emitter = (function () {
         this.name = (this.name);
     }
     Emitter.prototype.toString = function () {
-        return "| " + this.name + " | " + this.dirtyCurrentValue().toString() + " |>";
+        return "| " + this.name + " = " + this.dirtyCurrentValue().toString() + " >";
     };
     // when reveiver is plugged current value is not emitted to him
     // instantaneously, but instead it's done asynchronously
@@ -1134,7 +1133,7 @@ var Transformator = (function (_super) {
         this.plugEmitters(emitters);
     }
     Transformator.prototype.toString = function () {
-        return "<| " + this.name + " | " + this.dirtyCurrentValue().toString() + " |>";
+        return "< " + this.name + " = " + this.dirtyCurrentValue().toString() + " >";
     };
     Transformator.prototype.setTransform = function (transform) {
         var _this = this;
@@ -1193,7 +1192,7 @@ function namedTransformator(name, emitters, transform, initialValue) {
 }
 exports.namedTransformator = namedTransformator;
 
-},{"./electric-event":19,"./placeholder":24,"./scheduler":28,"./transformator-helpers":29,"./utils/fn":34,"./wire":36}],22:[function(require,module,exports){
+},{"./electric-event":19,"./placeholder":24,"./scheduler":28,"./transformator-helpers":29,"./utils/fn":34,"./wire":35}],22:[function(require,module,exports){
 var electric = require('../electric');
 var utils = require('../receivers/utils');
 var transformator = require('../transformator');
@@ -1221,7 +1220,7 @@ function clicks(nodeOrId, mapping) {
     }
     button.addEventListener('click', emitterListener, false);
     emitter.setReleaseResources(function () { return button.removeEventListener('click', emitterListener); });
-    emitter.name = '| clicks on ' + nodeOrId + ' |>';
+    emitter.name = 'clicks on ' + nodeOrId;
     return emitter;
 }
 exports.clicks = clicks;
@@ -1254,7 +1253,7 @@ function arrows(layout, nodeOrId, type) {
         }
     }
     target.addEventListener(type, emitterListener);
-    emitter.name = '| arrows |>';
+    emitter.name = 'arrows';
     return emitter;
 }
 exports.arrows = arrows;
@@ -1270,7 +1269,7 @@ function key(name, type, nodeOrId) {
         }
     }
     target.addEventListener('key' + type, emitterListener);
-    emitter.name = '| key ' + name + ' on ' + type + ' |>';
+    emitter.name = "key \"" + name + "\" " + type;
     return emitter;
 }
 exports.key = key;
@@ -1592,11 +1591,11 @@ var Placeholder = (function () {
     function Placeholder(initialValue) {
         this._actions = [];
         this.initialValue = initialValue;
-        this.name = '| placeholder |>';
+        this.name = '| placeholder >';
     }
     Placeholder.prototype.toString = function () {
-        var subname = this._emitter ? this._emitter.toString() : "| " + this.dirtyCurrentValue() + " |>";
-        return "| placeholder " + subname;
+        var subname = this._emitter ? this._emitter.toString() : "| ? = " + this.dirtyCurrentValue() + " >";
+        return "placeholder: " + subname;
     };
     Placeholder.prototype.is = function (emitter) {
         if (this._emitter) {
@@ -1608,7 +1607,6 @@ var Placeholder = (function () {
             action(this._emitter);
         }
         this._actions = undefined;
-        this.name = '| placeholder | ' + emitter.name;
     };
     Placeholder.prototype.dirtyCurrentValue = function () {
         if (this._emitter) {
@@ -1985,7 +1983,7 @@ function cumulateOverTime(delayInMiliseconds) {
 exports.cumulateOverTime = cumulateOverTime;
 ;
 
-},{"./electric-event":19,"./scheduler":28,"./utils/call-if-function":33,"./wire":36}],30:[function(require,module,exports){
+},{"./electric-event":19,"./scheduler":28,"./utils/call-if-function":33,"./wire":35}],30:[function(require,module,exports){
 var emitter = require('./emitter');
 var namedTransformator = emitter.namedTransformator;
 var transformators = require('./transformator-helpers');
@@ -2159,7 +2157,7 @@ function transmitter(initialValue) {
 }
 module.exports = transmitter;
 
-},{"./emitter":21,"./wire":36}],32:[function(require,module,exports){
+},{"./emitter":21,"./wire":35}],32:[function(require,module,exports){
 function all(list) {
     for (var i = 0; i < list.length; i++) {
         if (!list[i]) {
@@ -2192,154 +2190,6 @@ function fn(f) {
 module.exports = fn;
 
 },{}],35:[function(require,module,exports){
-function rn(name) {
-    return "<| " + name + " |";
-}
-var inspector;
-(function (inspector) {
-    function getReceivers(emitter) {
-        if (emitter._receivers === undefined) {
-            return null;
-        }
-        return emitter._receivers.map(function (r) { return inspector.describeReceiver(r, emitter); });
-    }
-    inspector.getReceivers = getReceivers;
-    function describeReceiver(receiver, ofEmitter) {
-        // function
-        if (typeof receiver === 'function') {
-            return {
-                name: rn(receiver.name),
-                value: receiver
-            };
-        }
-        else if (receiver.input = ofEmitter && receiver.output !== undefined) {
-            return {
-                name: receiver.output.toString(),
-                value: receiver.output
-            };
-        }
-        // wire without in/out
-        return {
-            name: receiver.toString(),
-            value: receiver
-        };
-    }
-    inspector.describeReceiver = describeReceiver;
-    function getEmitters(transformator) {
-        if (transformator._wires === undefined) {
-            return null;
-        }
-        return transformator._wires.map(function (w) { return ({
-            name: w.input.toString(),
-            value: w.input
-        }); });
-    }
-    inspector.getEmitters = getEmitters;
-})(inspector = exports.inspector || (exports.inspector = {}));
-var Graph = (function () {
-    function Graph(source) {
-        this.nodesById = {};
-        this.id = 0;
-        this._sources = [];
-        var lastSourceId = this.insert(source);
-        this.makeNodesList();
-        this.clean();
-    }
-    Graph.of = function (source) {
-        return new Graph(source);
-    };
-    Graph.prototype.makeNodesList = function () {
-        var _this = this;
-        this.nodes = [];
-        this.links = [];
-        for (var i = 0; i < this.id; i++) {
-            var node = this.nodesById[i];
-            this.nodes.push(node);
-            var type = 'transformator';
-            if (node.emitters.length == 0) {
-                type = 'emitter';
-            }
-            node.receivers.forEach(function (e, j) {
-                var rec = _this.nodesById[e];
-                if (rec.emitters.length === 0) {
-                    type = 'receiver';
-                }
-                _this.links.push({
-                    source: i,
-                    target: e,
-                    type: type
-                });
-            });
-            node.emitters.forEach(function (e, j) {
-                _this.links.push({
-                    source: e,
-                    target: i,
-                    type: 'transformator'
-                });
-            });
-        }
-    };
-    Graph.prototype.insert = function (source) {
-        if (source.__$visualize_visited_id$ !== undefined) {
-            return source.__$visualize_visited_id$;
-        }
-        this._sources.push(source);
-        var sourceId = this.id++;
-        source.__$visualize_visited_id$ = sourceId;
-        this.nodesById[sourceId] = {
-            id: sourceId,
-            name: this.name(source),
-            receivers: [],
-            emitters: []
-        };
-        this.goBackwards(source);
-        this.goForwards(source);
-        return sourceId;
-    };
-    Graph.prototype.goBackwards = function (source) {
-        var _this = this;
-        if (source._wires === undefined) {
-            return;
-        }
-        source._wires.forEach(function (w) {
-            var e = w.input;
-            if (e._emitter !== undefined) {
-                e = e._emitter;
-            }
-            var wId = _this.insert(e);
-            _this.nodesById[source.__$visualize_visited_id$].emitters.push(wId);
-        });
-    };
-    Graph.prototype.goForwards = function (source) {
-        var _this = this;
-        if (source._receivers === undefined) {
-            return;
-        }
-        source._receivers.forEach(function (r) {
-            if (r.input !== undefined && r.output !== undefined) {
-                r = r.output;
-            }
-            if (r._emitter !== undefined) {
-                r = r._emitter;
-            }
-            var rId = _this.insert(r);
-            _this.nodesById[source.__$visualize_visited_id$].receivers.push(rId);
-        });
-    };
-    Graph.prototype.name = function (source) {
-        if (typeof source === 'function') {
-            return "<| " + source.name + "() |";
-        }
-        return source.toString();
-    };
-    Graph.prototype.clean = function () {
-        this._sources.forEach(function (s) { return s.__$visualize_visited_id$ = undefined; });
-    };
-    return Graph;
-})();
-exports.Graph = Graph;
-
-},{}],36:[function(require,module,exports){
 var Wire = (function () {
     function Wire(input, output, receive, set) {
         this.input = input;

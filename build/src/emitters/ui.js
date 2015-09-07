@@ -25,7 +25,7 @@ function clicks(nodeOrId, mapping) {
     }
     button.addEventListener('click', emitterListener, false);
     emitter.setReleaseResources(function () { return button.removeEventListener('click', emitterListener); });
-    emitter.name = '| clicks on ' + nodeOrId + ' |>';
+    emitter.name = 'clicks on ' + nodeOrId;
     return emitter;
 }
 exports.clicks = clicks;
@@ -58,7 +58,7 @@ function arrows(layout, nodeOrId, type) {
         }
     }
     target.addEventListener(type, emitterListener);
-    emitter.name = '| arrows |>';
+    emitter.name = 'arrows';
     return emitter;
 }
 exports.arrows = arrows;
@@ -74,7 +74,7 @@ function key(name, type, nodeOrId) {
         }
     }
     target.addEventListener('key' + type, emitterListener);
-    emitter.name = '| key ' + name + ' on ' + type + ' |>';
+    emitter.name = "key \"" + name + "\" " + type;
     return emitter;
 }
 exports.key = key;

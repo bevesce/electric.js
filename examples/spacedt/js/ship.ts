@@ -49,12 +49,14 @@ function create(
 		{ to: (a, _) => cont(a.withY(0)), when: input.stopAcceleration },
 		{ to: (a, _) => cont(a.withY(0)), when: input.stopDecceleration }
 	);
+	shipA.name = 'ship acceleration';
 	var shipV = calculus.integral(shipVelocity(0, 0), shipA, { fps: c.fps }).change(
 		{ to: (v, _) => calculus.integral(v.withX(0), shipA, { fps: c.fps }), when: input.stopRotateRight.transformTime(eevent.notHappend, t => t + 10) },
 		{ to: (v, _) => calculus.integral(v.withX(0), shipA, { fps: c.fps }), when: input.stopRotateLeft.transformTime(eevent.notHappend, t => t + 10) }
 	);
+	shipV.name = 'ship velocity';
 	var shipXYA = calculus.integral(startingPoint, shipV, { fps: c.fps });
-
+	shipXYA.name = 'ship position'
 	var shot = electric.transformator.map(
 		(space, xya, v) => space.map(_ => ({ xya: xya, velocity: v })),
 		eui.key('space', 'up'), shipXYA, shipV

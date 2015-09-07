@@ -158,11 +158,3 @@ gameOver.plugReceiver(e => {
 });
 
 ship.v.plugReceiver(dashboard.speed());
-
-
-import v = require('../../../src/visualize');
-var g = v.Graph.of(bullets.xy);
-var nodes = g.nodes;
-var links = g.links;
-// console.log(JSON.stringify(nodes));
-console.log(JSON.stringify(links));

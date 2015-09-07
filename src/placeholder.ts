@@ -39,12 +39,12 @@ class Placeholder<Out> {
 
 	constructor(initialValue: Out) {
 		this.initialValue = initialValue;
-		this.name = '| placeholder |>';
+		this.name = '| placeholder >';
 	}
 
 	toString() {
-		var subname = this._emitter ? this._emitter.toString() : `| ${this.dirtyCurrentValue()} |>`;
-		return `| placeholder ${subname}`
+		var subname = this._emitter ? this._emitter.toString() : `| ? = ${this.dirtyCurrentValue()} >`;
+		return `placeholder: ${subname}`
 	}
 
 	is(emitter: inf.IEmitter<Out>) {
@@ -56,7 +56,6 @@ class Placeholder<Out> {
 			action(this._emitter);
 		}
 		this._actions = undefined;
-		this.name = '| placeholder | ' + emitter.name;
 	}
 
 	dirtyCurrentValue() {

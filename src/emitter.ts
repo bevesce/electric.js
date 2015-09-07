@@ -23,7 +23,7 @@ export class Emitter<T>
 	}
 
 	toString() {
-		return `| ${this.name} | ${this.dirtyCurrentValue().toString()} |>`;
+		return `| ${this.name} = ${this.dirtyCurrentValue().toString()} >`;
 	}
 
 	// when reveiver is plugged current value is not emitted to him
@@ -592,7 +592,7 @@ export class Transformator<In>
 	}
 
 	toString() {
-		return `<| ${this.name} | ${this.dirtyCurrentValue().toString()} |>`;
+		return `< ${this.name} = ${this.dirtyCurrentValue().toString()} >`;
 	}
 
 	setTransform(transform: ITransformGeneratorFunction<In>) {

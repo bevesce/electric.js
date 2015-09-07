@@ -18,7 +18,7 @@ var Emitter = (function () {
         this.name = (this.name);
     }
     Emitter.prototype.toString = function () {
-        return "| " + this.name + " | " + this.dirtyCurrentValue().toString() + " |>";
+        return "| " + this.name + " = " + this.dirtyCurrentValue().toString() + " >";
     };
     // when reveiver is plugged current value is not emitted to him
     // instantaneously, but instead it's done asynchronously
@@ -234,7 +234,7 @@ var Transformator = (function (_super) {
         this.plugEmitters(emitters);
     }
     Transformator.prototype.toString = function () {
-        return "<| " + this.name + " | " + this.dirtyCurrentValue().toString() + " |>";
+        return "< " + this.name + " = " + this.dirtyCurrentValue().toString() + " >";
     };
     Transformator.prototype.setTransform = function (transform) {
         var _this = this;

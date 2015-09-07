@@ -31,7 +31,7 @@ export function integral<In extends Integrable, Out extends Antiderivative>(
 	options: TimeOptions
 ): inf.IEmitter<Out> {
 	var timmed = timeValue(emitter, options);
-	var result = timmed.accumulate(
+	var acc = timmed.accumulate(
 		{
 			time: scheduler.now(),
 			value: emitter.dirtyCurrentValue(),
@@ -48,7 +48,9 @@ export function integral<In extends Integrable, Out extends Antiderivative>(
 				sum: sum
 			}
 		}
-	).map(v => v.sum);
+	)
+	acc.name = 'internal integral accumulator'
+	var result = acc.map(v => v.sum);
 	result.name = 'integral';
 	result.setEquals((x, y) => x.equals(y));
 	result.stabilize = () => timmed.stabilize();
@@ -103,6 +105,6 @@ function timeValue<T>(
 		time, emitter
 	);
 	trans.stabilize = () => time.stabilize();
-	trans.name = 'timeValue'
+	trans.name = 'calculus timer'
 	return trans;
 }

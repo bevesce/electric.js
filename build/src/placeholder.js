@@ -28,11 +28,11 @@ var Placeholder = (function () {
     function Placeholder(initialValue) {
         this._actions = [];
         this.initialValue = initialValue;
-        this.name = '| placeholder |>';
+        this.name = '| placeholder >';
     }
     Placeholder.prototype.toString = function () {
-        var subname = this._emitter ? this._emitter.toString() : "| " + this.dirtyCurrentValue() + " |>";
-        return "| placeholder " + subname;
+        var subname = this._emitter ? this._emitter.toString() : "| ? = " + this.dirtyCurrentValue() + " >";
+        return "placeholder: " + subname;
     };
     Placeholder.prototype.is = function (emitter) {
         if (this._emitter) {
@@ -44,7 +44,6 @@ var Placeholder = (function () {
             action(this._emitter);
         }
         this._actions = undefined;
-        this.name = '| placeholder | ' + emitter.name;
     };
     Placeholder.prototype.dirtyCurrentValue = function () {
         if (this._emitter) {

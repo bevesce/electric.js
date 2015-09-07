@@ -29,7 +29,7 @@ export function clicks<T>(nodeOrId: utils.NodeOrId, mapping: (event: Event) => T
 	}
 	button.addEventListener('click', emitterListener, false);
 	emitter.setReleaseResources(() => button.removeEventListener('click', emitterListener));
-	emitter.name = '| clicks on ' + nodeOrId + ' |>';
+	emitter.name = 'clicks on ' + nodeOrId;
 	return emitter;
 }
 
@@ -61,7 +61,7 @@ export function arrows(
 		}
 	}
 	target.addEventListener(type, emitterListener);
-	emitter.name = '| arrows |>';
+	emitter.name = 'arrows';
 	return emitter;
 }
 
@@ -76,7 +76,7 @@ export function key(name: string, type: string, nodeOrId: utils.NodeOrId = docum
 		}
 	}
 	target.addEventListener('key' + type, emitterListener);
-	emitter.name = '| key '+ name + ' on ' + type + ' |>';
+	emitter.name = `key "${name}" ${type}`;
 	return emitter;
 }
 

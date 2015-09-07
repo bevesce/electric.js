@@ -1,53 +1,12 @@
 function rn(name) {
     return "<| " + name + " |";
 }
-var inspector;
-(function (inspector) {
-    function getReceivers(emitter) {
-        if (emitter._receivers === undefined) {
-            return null;
-        }
-        return emitter._receivers.map(function (r) { return inspector.describeReceiver(r, emitter); });
-    }
-    inspector.getReceivers = getReceivers;
-    function describeReceiver(receiver, ofEmitter) {
-        // function
-        if (typeof receiver === 'function') {
-            return {
-                name: rn(receiver.name),
-                value: receiver
-            };
-        }
-        else if (receiver.input = ofEmitter && receiver.output !== undefined) {
-            return {
-                name: receiver.output.toString(),
-                value: receiver.output
-            };
-        }
-        // wire without in/out
-        return {
-            name: receiver.toString(),
-            value: receiver
-        };
-    }
-    inspector.describeReceiver = describeReceiver;
-    function getEmitters(transformator) {
-        if (transformator._wires === undefined) {
-            return null;
-        }
-        return transformator._wires.map(function (w) { return ({
-            name: w.input.toString(),
-            value: w.input
-        }); });
-    }
-    inspector.getEmitters = getEmitters;
-})(inspector = exports.inspector || (exports.inspector = {}));
 var Graph = (function () {
     function Graph(source) {
         this.nodesById = {};
         this.id = 0;
         this._sources = [];
-        var lastSourceId = this.insert(source);
+        var lastSourceId = this.makeNodesIdMap(source);
         this.makeNodesList();
         this.clean();
     }
@@ -85,7 +44,7 @@ var Graph = (function () {
             });
         }
     };
-    Graph.prototype.insert = function (source) {
+    Graph.prototype.makeNodesIdMap = function (source) {
         if (source.__$visualize_visited_id$ !== undefined) {
             return source.__$visualize_visited_id$;
         }
@@ -109,9 +68,7 @@ var Graph = (function () {
         }
         source._wires.forEach(function (w) {
             var e = w.input;
-            if (e._emitter !== undefined) {
-                e = e._emitter;
-            }
+            e = _this._maybeUnpackPlaceholder(e);
             var wId = _this.insert(e);
             _this.nodesById[source.__$visualize_visited_id$].emitters.push(wId);
         });
@@ -125,12 +82,16 @@ var Graph = (function () {
             if (r.input !== undefined && r.output !== undefined) {
                 r = r.output;
             }
-            if (r._emitter !== undefined) {
-                r = r._emitter;
-            }
+            r = _this._maybeUnpackPlaceholder(r);
             var rId = _this.insert(r);
             _this.nodesById[source.__$visualize_visited_id$].receivers.push(rId);
         });
+    };
+    Graph.prototype._maybeUnpackPlaceholder = function (e) {
+        if (e._emitter !== undefined) {
+            return e._emitter;
+        }
+        return e;
     };
     Graph.prototype.name = function (source) {
         if (typeof source === 'function') {
@@ -143,4 +104,4 @@ var Graph = (function () {
     };
     return Graph;
 })();
-exports.Graph = Graph;
+module.exports = Graph;
