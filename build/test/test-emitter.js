@@ -136,37 +136,6 @@ describe('emitter', function () {
         var emitter = electric.emitter.emitter(0);
         emitter.plugReceiver(double);
     });
-    // it('should emit initial value asynchronously', function(done) {
-    //     var emitter = electric.emitter.emitter(0);
-    //     expect(
-    //         electric.receiver.collect(emitter)
-    //         ).to.deep.equal([]);
-    //     // it's emty bacause value will be emitted after
-    //     // current event in event loop is processed
-    //     expect(emitter)
-    //         .to.emit(0)
-    //         .andBe(done)
-    // });
-    // it('should emit values asynchronously', function(done) {
-    //     var emitter = electric.emitter.emitter(0);
-    //     var collected = electric.receiver.collect(emitter);
-    //     emitter.emit(1);
-    //     emitter.emit(2);
-    //     expect(collected).to.eql([]);
-    //     expect(emitter)
-    //         .to.emit(2)
-    //         .andBe(done);
-    // });
-    // it('should impulse values asynchronously', function(done) {
-    //     var emitter = electric.emitter.emitter(0);
-    //     var collected = electric.receiver.collect(emitter);
-    //     emitter.impulse(1);
-    //     emitter.impulse(2);
-    //     expect(collected).to.eql([]);
-    //     expect(emitter)
-    //         .to.emit(0)
-    //         .andBe(done);
-    // });
     it('should be unpluggable', function (done) {
         var emitter = electric.emitter.emitter(0);
         var emitted = -1;
@@ -316,9 +285,43 @@ describe('emitter', function () {
             .then.after(function () { return emitter.emit(3); })
             .to.emit(eevent.of('3!'))
             .to.emit(eevent.notHappend)
+            .then.after(function () { return emitter.emit(4); })
             .then.after(function () { return emitter.emit(1); })
-            .and.after(function () { return emitter.emit(4); })
-            .to.emit(eevent.of('4!'))
+            .and.after(function () { return emitter.emit(5); })
+            .to.emit(eevent.of('5!'))
+            .to.emit(eevent.notHappend)
+            .andBe(done);
+    });
+    it('should be whenThenable', function (done) {
+        var emitter = electric.emitter.manual(0);
+        var whened = emitter.whenThen(function (x) {
+            if (x > 2) {
+                return x + '!';
+            }
+        });
+        expect(whened)
+            .to.emit(eevent.notHappend)
+            .then.after(function () { return emitter.emit(1); })
+            .then.after(function () { return emitter.emit(3); })
+            .to.emit(eevent.of('3!'))
+            .to.emit(eevent.notHappend)
+            .then.after(function () { return emitter.emit(4); })
+            .then.after(function () { return emitter.emit(1); })
+            .and.after(function () { return emitter.emit(5); })
+            .to.emit(eevent.of('5!'))
+            .to.emit(eevent.notHappend)
+            .andBe(done);
+    });
+    it('should produce changes', function (done) {
+        var emitter = electric.emitter.manual(0);
+        var changes = emitter.changes();
+        expect(changes)
+            .to.emit(eevent.notHappend)
+            .then.after(function () { return emitter.emit(1); })
+            .to.emit(eevent.of({ previous: 0, next: 1 }))
+            .to.emit(eevent.notHappend)
+            .then.after(function () { return emitter.emit(2); })
+            .to.emit(eevent.of({ previous: 1, next: 2 }))
             .to.emit(eevent.notHappend)
             .andBe(done);
     });

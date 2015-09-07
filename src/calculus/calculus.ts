@@ -38,7 +38,7 @@ export function integral<In extends Integrable, Out extends Antiderivative>(
 			sum: initialValue
 		},
 		(acc, v) => {
-			var now = scheduler.now()
+			var now = scheduler.now();
 			var dt = now - acc.time;
 			var nv = <Out>v.value.add(acc.value).mulT(dt / 2);
 			var sum = <Out>acc.sum.addDelta(nv);
@@ -58,12 +58,12 @@ export function integral<In extends Integrable, Out extends Antiderivative>(
 }
 
 
-interface Differentiable {
+export interface Differentiable {
 	sub(other: Differentiable): Differentiable;
 	divT(dt: number): Derivative;
 }
 
-interface Derivative {
+export interface Derivative {
 	equals(other: Derivative): boolean;
 }
 
@@ -71,7 +71,7 @@ export function differential<In extends Differentiable, Out extends Derivative>(
 	initialValue: Out,
 	emitter: inf.IEmitter<In>,
 	options: TimeOptions
-) {
+): inf.IEmitter<Out>{
 	var timmed = timeValue(emitter, options);
 	var result = timmed.accumulate(
 		{
@@ -80,10 +80,14 @@ export function differential<In extends Differentiable, Out extends Derivative>(
 			diff: initialValue
 		},
 		(acc, v) => {
-			var dt = v.time - acc.time;
-			var diff = <Out>v.value.sub(acc.value).divT(dt);
+			var now = scheduler.now();
+			var dt = now - acc.time;
+			var diff = acc.diff;
+			if (dt !== 0) {
+				diff = <Out>v.value.sub(acc.value).divT(dt);
+			}
 			return {
-				time: v.time,
+				time: now,
 				value: v.value,
 				diff: diff
 			}

@@ -27,9 +27,6 @@ var IntegrableAntiderivativeOfNumber = (function () {
     IntegrableAntiderivativeOfNumber.prototype.withX = function (x) {
         return IntegrableAntiderivativeOfNumber.of(x, this.antiderivative, this.bounds);
     };
-    IntegrableAntiderivativeOfNumber.prototype.withY = function (y) {
-        return IntegrableAntiderivativeOfNumber.of(this.x, this.antiderivative, this.bounds);
-    };
     return IntegrableAntiderivativeOfNumber;
 })();
 function within(v, min, max) {

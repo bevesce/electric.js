@@ -121,11 +121,17 @@ export function change<Out>(
 	}
 }
 
-export function when<In, Out>(happend: (value: In) => boolean, then: (value: In) => Out) {
+export function when<In, Out>(happens: (value: In) => boolean, then: (value: In) => Out) {
 	return function transform(emit: inf.IEmitterFunction<eevent<Out>>, impulse: inf.IEmitterFunction<eevent<Out>>) {
+		var prevHappend = false;
 		return function whenTransform(v: any[], i: Index) {
-			if (happend(v[i])) {
+			var happend = happens(v[i]);
+			if (happend && !prevHappend) {
 				impulse(eevent.of(then(v[i])));
+				prevHappend = true;
+			}
+			else if (!happend) {
+				prevHappend = false;
 			}
 		}
 	}
@@ -173,3 +179,20 @@ export function cumulateOverTime<InOut>(
 	};
 };
 
+export function changes<InOut>(
+	initialValue: InOut
+) {
+	return function transform(
+	    emit: inf.IEmitterFunction<eevent<{ previous: InOut, next: InOut }>>,
+	    impulse: inf.IEmitterFunction<eevent<{ previous: InOut, next: InOut }>>
+	) {
+	    var previous = initialValue;
+	    return function changesTransform(v: InOut[], i: number) {
+	        impulse(eevent.of({
+	            previous: previous,
+	            next: v[i]
+	        }));
+	        previous = v[i];
+	    }
+	}
+}

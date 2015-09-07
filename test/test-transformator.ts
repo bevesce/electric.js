@@ -4,6 +4,8 @@ import chai = require('chai');
 import electricKettle = require('./electric-kettle');
 electricKettle.pourAsync(chai);
 var expect = chai.expect;
+
+import inf = require('../src/interfaces');
 import electric = require('../src/electric');
 import t = require('../src/transformator');
 import eevent = require('../src/electric-event');
@@ -262,6 +264,39 @@ describe('flattens', function() {
 				.to.emit(['0b'])
 				.after(() => e0.emit('0c'))
 				.to.emit(['0c'])
+				.andBe(done);
+		});
+	});
+
+	describe.only('flattenNamed', function() {
+		it('should work on f_a :: t -> {name: t -> a}', function(done) {
+			var e0 = electric.emitter.manual('0a');
+			var e1 = electric.emitter.manual('1a');
+			var e2 = electric.emitter.manual('2a');
+			var emitters = electric.emitter.manual(
+				<{ [name: string]: inf.IEmitter<string> }>{
+					'0': e0, '1': e1
+				}
+			);
+
+			expect(t.flattenNamed(emitters))
+				.to.emit({'0': '0a', '1': '1a' })
+				.after(() => e0.emit('0b'))
+				.to.emit({'0': '0b', '1': '1a' })
+				.after(() => e1.emit('1b'))
+				.to.emit({'0': '0b', '1': '1b' })
+				.after(() => e1.emit('1c'))
+				.to.emit({'0': '0b', '1': '1c' })
+				.after(() => emitters.emit({'1': e1, '2': e2}))
+				.to.emit({'1': '1c', '2': '2a'})
+				.after(() => e2.emit('2b'))
+				.to.emit({'1': '1c', '2': '2b'})
+				.after(() => e1.emit('1d'))
+				.to.emit({'1': '1d', '2': '2b'})
+				.after(() => emitters.emit({'0': e0}))
+				.to.emit({'0': '0b'})
+				.after(() => e0.emit('0c'))
+				.to.emit({'0': '0c'})
 				.andBe(done);
 		});
 	});

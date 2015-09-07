@@ -17,6 +17,7 @@ circle.emitter {
 }
 
 text {
-  font: 1em sans-serif;
+  font-size: 1em;
+  font-family: "DejavuSansMono" "Monaco" monospace;
   pointer-events: none;
 }

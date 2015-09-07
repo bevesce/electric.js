@@ -2,19 +2,21 @@ var scheduler = require('./scheduler');
 var emitter = require('./emitter');
 function interval(options) {
     var timer = emitter.manualEvent();
-    scheduler.scheduleInterval(function () {
-        timer.impulse(Date.now());
+    var id = scheduler.scheduleInterval(function () {
+        timer.impulse(scheduler.now());
     }, calculateInterval(options.inMs, options.fps));
     timer.name = "interval(" + calculateEmitterName(options) + ")";
+    timer.setReleaseResources(function () { return scheduler.unscheduleInterval(id); });
     return timer;
 }
 exports.interval = interval;
 function intervalValue(value, options) {
     var timer = emitter.manualEvent();
-    scheduler.scheduleInterval(function () {
+    var id = scheduler.scheduleInterval(function () {
         timer.impulse(value);
     }, calculateInterval(options.inMs, options.fps));
     timer.name = "intervalValue(" + value + ", " + calculateEmitterName(options) + ")";
+    timer.setReleaseResources(function () { return scheduler.unscheduleInterval(id); });
     return timer;
 }
 exports.intervalValue = intervalValue;

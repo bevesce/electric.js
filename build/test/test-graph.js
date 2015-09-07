@@ -18,7 +18,7 @@ describe('toString', function () {
         expect(e.toString()).to.equal('| test = 0 >');
     });
 });
-describe.only('walk', function () {
+describe('walk', function () {
     it('should construct graph with single node', function () {
         var e = electric.e.manual(0);
         var g = graph.of(e);

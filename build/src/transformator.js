@@ -3,6 +3,8 @@ var namedTransformator = emitter.namedTransformator;
 var transformators = require('./transformator-helpers');
 var eevent = require('../src/electric-event');
 var fn = require('./utils/fn');
+var mapObj = require('./utils/map-obj');
+var objKeys = require('./utils/objKeys');
 function map(mapping, emitter1, emitter2, emitter3, emitter4, emitter5, emitter6, emitter7) {
     var emitters = Array.prototype.slice.apply(arguments, [1]);
     return namedTransformator("map(" + fn(mapping) + ")", emitters, transformators.map(mapping, emitters.length), mapping.apply(null, emitters.map(function (e) { return e.dirtyCurrentValue(); })));
@@ -60,17 +62,7 @@ function hold(initialValue, emitter) {
 exports.hold = hold;
 ;
 function changes(emitter) {
-    var previous = emitter.dirtyCurrentValue();
-    function transform(emit, impulse) {
-        return function changesTransform(v, i) {
-            impulse(eevent.of({
-                previous: previous,
-                next: v[i]
-            }));
-            previous = v[i];
-        };
-    }
-    return namedTransformator('changes', [emitter], transform, eevent.notHappend);
+    return namedTransformator('changes', [emitter], transformators.changes(emitter.dirtyCurrentValue()), eevent.notHappend);
 }
 exports.changes = changes;
 function skipFirst(emitter) {
@@ -122,7 +114,7 @@ function flattenMany(emitter) {
     var currentValues = emitter.dirtyCurrentValue().map(function (e) { return e.dirtyCurrentValue(); });
     var transformator = namedTransformator('flattenMany', [emitter].concat(emitter.dirtyCurrentValue()), transform, currentValues);
     function transform(emit) {
-        return function flattenTransform(v, i) {
+        return function flattenManyTransform(v, i) {
             if (i == 0) {
                 transformator.dropEmitters(1);
                 v[0].forEach(function (e) { return transformator.plugEmitter(e); });
@@ -137,3 +129,32 @@ function flattenMany(emitter) {
     return transformator;
 }
 exports.flattenMany = flattenMany;
+function flattenNamed(emitter) {
+    var currentValue = emitter.dirtyCurrentValue();
+    var currentValues = mapObj(currentValue, function (e) { return e.dirtyCurrentValue(); });
+    var currentKeys = objKeys(currentValue);
+    var transformator = namedTransformator('flattenNamed', [emitter].concat(currentKeys.map(function (k) { return currentValue[k]; })), transform, currentValues);
+    function transform(emit) {
+        var keys = currentKeys;
+        return function flattenNamedTransform(v, i) {
+            if (i == 0) {
+                transformator.dropEmitters(1);
+                keys = objKeys(v[0]);
+                keys.forEach(function (k) {
+                    transformator.plugEmitter(v[0][k]);
+                });
+                emit(mapObj(v[0], function (e) { return e.dirtyCurrentValue(); }));
+            }
+            else {
+                var r = {};
+                keys.forEach(function (k, i) {
+                    r[k] = v[i + 1];
+                });
+                emit(r);
+            }
+        };
+    }
+    ;
+    return transformator;
+}
+exports.flattenNamed = flattenNamed;

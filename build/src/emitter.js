@@ -145,6 +145,9 @@ var Emitter = (function () {
         }
         return namedTransformator('merge', [this].concat(emitters), transformators.merge(), this.dirtyCurrentValue());
     };
+    Emitter.prototype.changes = function () {
+        return namedTransformator('changes', [this], transformators.changes(this.dirtyCurrentValue()), eevent.notHappend);
+    };
     Emitter.prototype.when = function (switcher) {
         var t = namedTransformator('whenHappensThen', [this], transformators.when(switcher.happens, switcher.then), eevent.notHappend);
         return t;

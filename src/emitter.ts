@@ -205,6 +205,15 @@ export class Emitter<T>
 		);
 	}
 
+	changes<InOut>(): inf.IEmitter<eevent<{ previous: InOut, next: InOut }>> {
+	    return namedTransformator(
+	        'changes',
+	        [this],
+	        transformators.changes(this.dirtyCurrentValue()),
+	        eevent.notHappend
+	    )
+	}
+
 	when<NewT>(switcher: {
 		happens: (value: T) => boolean,
 		then: (value: T) => NewT

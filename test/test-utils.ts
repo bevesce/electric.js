@@ -5,6 +5,7 @@ var expect = chai.expect;
 
 import all = require('../src/utils/all');
 import any = require('../src/utils/any');
+import mapObj = require('../src/utils/map-obj');
 
 describe('any', function() {
 	it('should return true if any element of on list is truthy', function() {
@@ -35,4 +36,19 @@ describe('all', function() {
 		expect(all([]))
 			.to.be.true;
 	})
+});
+
+describe('mapObj', function() {
+	it('should map dict-like objects', function() {
+		var obj: { [key: string]: number } = {
+			test1: 1,
+			test2: 2,
+			test3: 3
+		}
+		expect(mapObj(obj, (x: number) => x + '!')).to.eql({
+			test1: '1!',
+			test2: '2!',
+			test3: '3!'
+		});
+	});
 });

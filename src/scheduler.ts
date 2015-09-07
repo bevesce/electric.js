@@ -26,8 +26,9 @@ export function advance(timeShiftInMiliseconds: number = 1): number {
 		return;
 	}
 	var newTime = stopTime + timeShiftInMiliseconds;
-	for (; stopTime < newTime; stopTime++){
+	while (stopTime < newTime) {
 		executeCallbacksForTime(stopTime)
+		stopTime++;
 	}
 	return stopTime;
 }

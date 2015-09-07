@@ -101,11 +101,17 @@ function change(switchers) {
     };
 }
 exports.change = change;
-function when(happend, then) {
+function when(happens, then) {
     return function transform(emit, impulse) {
+        var prevHappend = false;
         return function whenTransform(v, i) {
-            if (happend(v[i])) {
+            var happend = happens(v[i]);
+            if (happend && !prevHappend) {
                 impulse(eevent.of(then(v[i])));
+                prevHappend = true;
+            }
+            else if (!happend) {
+                prevHappend = false;
             }
         };
     };
@@ -149,3 +155,16 @@ function cumulateOverTime(delayInMiliseconds) {
 }
 exports.cumulateOverTime = cumulateOverTime;
 ;
+function changes(initialValue) {
+    return function transform(emit, impulse) {
+        var previous = initialValue;
+        return function changesTransform(v, i) {
+            impulse(eevent.of({
+                previous: previous,
+                next: v[i]
+            }));
+            previous = v[i];
+        };
+    };
+}
+exports.changes = changes;

@@ -18,8 +18,9 @@ function advance(timeShiftInMiliseconds) {
         return;
     }
     var newTime = stopTime + timeShiftInMiliseconds;
-    for (; stopTime < newTime; stopTime++) {
+    while (stopTime < newTime) {
         executeCallbacksForTime(stopTime);
+        stopTime++;
     }
     return stopTime;
 }

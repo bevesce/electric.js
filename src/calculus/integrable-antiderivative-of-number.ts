@@ -58,10 +58,6 @@ class IntegrableAntiderivativeOfNumber<K extends calculus.Antiderivative>
 	withX(x: number) {
 		return IntegrableAntiderivativeOfNumber.of(x, this.antiderivative, this.bounds);
 	}
-
-	withY(y: number) {
-		return IntegrableAntiderivativeOfNumber.of(this.x, this.antiderivative, this.bounds);
-	}
 }
 
 

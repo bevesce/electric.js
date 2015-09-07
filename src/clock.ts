@@ -7,10 +7,11 @@ export function interval(
 	options: { inMs?: number, fps?: number }
 ) {
 	var timer = emitter.manualEvent();
-	scheduler.scheduleInterval(() => {
-		timer.impulse(Date.now())
+	var id = scheduler.scheduleInterval(() => {
+		timer.impulse(scheduler.now())
 	}, calculateInterval(options.inMs, options.fps))
 	timer.name = `interval(${calculateEmitterName(options)})`;
+	timer.setReleaseResources(() => scheduler.unscheduleInterval(id));
 	return timer;
 }
 
@@ -18,10 +19,11 @@ export function intervalValue<T>(
 	value: T, options: { inMs?: number, fps?: number }
 ) {
 	var timer = emitter.manualEvent();
-	scheduler.scheduleInterval(() => {
+	var id = scheduler.scheduleInterval(() => {
 		timer.impulse(value)
 	}, calculateInterval(options.inMs, options.fps))
 	timer.name = `intervalValue(${value}, ${calculateEmitterName(options)})`;
+	timer.setReleaseResources(() => scheduler.unscheduleInterval(id));
 	return timer;
 }
 

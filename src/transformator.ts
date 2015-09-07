@@ -4,6 +4,8 @@ var namedTransformator = emitter.namedTransformator;
 import transformators = require('./transformator-helpers');
 import eevent = require('../src/electric-event');
 import fn = require('./utils/fn');
+import mapObj = require('./utils/map-obj');
+import objKeys = require('./utils/objKeys');
 
 
 export function map<In1, Out>(
@@ -282,23 +284,10 @@ export function hold<InOut>(
 export function changes<InOut>(
     emitter: inf.IEmitter<InOut>
 ): inf.IEmitter<eevent<{ previous: InOut, next: InOut }>> {
-    var previous = emitter.dirtyCurrentValue();
-    function transform(
-        emit: inf.IEmitterFunction<eevent<{ previous: InOut, next: InOut }>>,
-        impulse: inf.IEmitterFunction<eevent<{ previous: InOut, next: InOut }>>
-    ) {
-        return function changesTransform(v: InOut[], i: number) {
-            impulse(eevent.of({
-                previous: previous,
-                next: v[i]
-            }));
-            previous = v[i];
-        }
-    }
     return namedTransformator(
         'changes',
         [emitter],
-        transform,
+        transformators.changes(emitter.dirtyCurrentValue()),
         eevent.notHappend
     )
 }
@@ -371,7 +360,7 @@ export function flattenMany<InOut>(
         currentValues
     );
     function transform(emit: inf.IEmitterFunction<InOut[]>) {
-        return function flattenTransform(v: any[], i: number) {
+        return function flattenManyTransform(v: any[], i: number) {
             if (i == 0) {
                 transformator.dropEmitters(1);
                 v[0].forEach((e: any) => transformator.plugEmitter(e));
@@ -382,6 +371,49 @@ export function flattenMany<InOut>(
             }
         }
     };
+    return transformator;
+}
 
+
+export function flattenNamed<InOut>(
+    emitter: inf.IEmitter<{ [name: string]: inf.IEmitter<InOut> }>
+): inf.IEmitter<{ [name: string]: InOut }> {
+    var currentValue = emitter.dirtyCurrentValue()
+    var currentValues = mapObj(
+        currentValue,
+        e => e.dirtyCurrentValue()
+    );
+    var currentKeys = objKeys(currentValue);
+    var transformator = namedTransformator(
+        'flattenNamed',
+        [<inf.IEmitter<any>>emitter].concat(
+            currentKeys.map(k => currentValue[k])
+        ),
+        transform,
+        currentValues
+    );
+    function transform(emit: inf.IEmitterFunction<{ [name: string]: InOut}>) {
+        var keys = currentKeys;
+        return function flattenNamedTransform(v: any[], i: number) {
+            if (i == 0) {
+                transformator.dropEmitters(1);
+                keys = objKeys(v[0]);
+                keys.forEach(k => {
+                    transformator.plugEmitter(v[0][k])
+                })
+                emit(mapObj(
+                    v[0],
+                    (e: any) => e.dirtyCurrentValue()
+                ));
+            }
+            else {
+                var r: { [name: string]: InOut } = {};
+                keys.forEach((k: string, i: number) => {
+                    r[k] =  v[i + 1];
+                });
+                emit(r);
+            }
+        }
+    };
     return transformator;
 }

@@ -670,10 +670,14 @@ function differential(initialValue, emitter, options) {
         value: emitter.dirtyCurrentValue(),
         diff: initialValue
     }, function (acc, v) {
-        var dt = v.time - acc.time;
-        var diff = v.value.sub(acc.value).divT(dt);
+        var now = scheduler.now();
+        var dt = now - acc.time;
+        var diff = acc.diff;
+        if (dt !== 0) {
+            diff = v.value.sub(acc.value).divT(dt);
+        }
         return {
-            time: v.time,
+            time: now,
             value: v.value,
             diff: diff
         };
@@ -745,19 +749,21 @@ var scheduler = require('./scheduler');
 var emitter = require('./emitter');
 function interval(options) {
     var timer = emitter.manualEvent();
-    scheduler.scheduleInterval(function () {
-        timer.impulse(Date.now());
+    var id = scheduler.scheduleInterval(function () {
+        timer.impulse(scheduler.now());
     }, calculateInterval(options.inMs, options.fps));
     timer.name = "interval(" + calculateEmitterName(options) + ")";
+    timer.setReleaseResources(function () { return scheduler.unscheduleInterval(id); });
     return timer;
 }
 exports.interval = interval;
 function intervalValue(value, options) {
     var timer = emitter.manualEvent();
-    scheduler.scheduleInterval(function () {
+    var id = scheduler.scheduleInterval(function () {
         timer.impulse(value);
     }, calculateInterval(options.inMs, options.fps));
     timer.name = "intervalValue(" + value + ", " + calculateEmitterName(options) + ")";
+    timer.setReleaseResources(function () { return scheduler.unscheduleInterval(id); });
     return timer;
 }
 exports.intervalValue = intervalValue;
@@ -1754,8 +1760,9 @@ function advance(timeShiftInMiliseconds) {
         return;
     }
     var newTime = stopTime + timeShiftInMiliseconds;
-    for (; stopTime < newTime; stopTime++) {
+    while (stopTime < newTime) {
         executeCallbacksForTime(stopTime);
+        stopTime++;
     }
     return stopTime;
 }
@@ -1934,11 +1941,17 @@ function change(switchers) {
     };
 }
 exports.change = change;
-function when(happend, then) {
+function when(happens, then) {
     return function transform(emit, impulse) {
+        var prevHappend = false;
         return function whenTransform(v, i) {
-            if (happend(v[i])) {
+            var happend = happens(v[i]);
+            if (happend && !prevHappend) {
                 impulse(eevent.of(then(v[i])));
+                prevHappend = true;
+            }
+            else if (!happend) {
+                prevHappend = false;
             }
         };
     };

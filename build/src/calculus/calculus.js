@@ -33,10 +33,14 @@ function differential(initialValue, emitter, options) {
         value: emitter.dirtyCurrentValue(),
         diff: initialValue
     }, function (acc, v) {
-        var dt = v.time - acc.time;
-        var diff = v.value.sub(acc.value).divT(dt);
+        var now = scheduler.now();
+        var dt = now - acc.time;
+        var diff = acc.diff;
+        if (dt !== 0) {
+            diff = v.value.sub(acc.value).divT(dt);
+        }
         return {
-            time: v.time,
+            time: now,
             value: v.value,
             diff: diff
         };

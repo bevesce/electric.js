@@ -37,6 +37,7 @@ export interface IEmitter<T> {
 	transformTime(initialValue: T, timeShift: (t: number) => number, t0?: number): IEmitter<T>;
 	accumulate<NewT>(initialValue: NewT, accumulator: (acc: NewT, value: T) => NewT): IEmitter<NewT>;
 	merge(...emitters: IEmitter<T>[]): IEmitter<T>;
+	changes<InOut>(): IEmitter<IElectricEvent<{ previous: InOut, next: InOut }>>
 	sample(initialValue: T, samplingEvent: IEmitter<IElectricEvent<any>>): IEmitter<T>;
 	when<NewT>(switcher: {
 		happens: (value: T) => boolean,
