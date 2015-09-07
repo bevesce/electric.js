@@ -12,11 +12,11 @@ import dom = require('./dom');
 
 // Emitters
 var hash = eui.hash();
-var newTask = eui.fromInputTextEnter('new-task');
-var clear = eui.fromButton('clear-button');
+var newTask = eui.enteredText('new-task');
+var clear = eui.clicks('clear-button');
 var check = <electric.emitter.EventEmitter<{ id: number, completed: boolean }>>electric.emitter.manualEvent('check');
 var del = <electric.emitter.EventEmitter<number>>electric.emitter.manualEvent('delete');
-var toggle = eui.fromCheckboxEvent('toggle');
+var toggle = eui.checkboxClicks('toggle');
 var editingStart = <electric.emitter.EventEmitter<number>>electric.emitter.manualEvent('editing start');
 var retitle = <electric.emitter.EventEmitter<{ id: number, title: string }>>electric.emitter.manualEvent('retitle');
 

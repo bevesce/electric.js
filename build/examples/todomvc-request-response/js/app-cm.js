@@ -4,11 +4,11 @@ var rui = require('../../../src/receivers/ui');
 var eui = require('../../../src/emitters/ui');
 // Emitters
 var hash = eui.hash();
-var newTask = eui.fromInputTextEnter('new-task');
-var clear = eui.fromButton('clear-button');
+var newTask = eui.enteredText('new-task');
+var clear = eui.clicks('clear-button');
 var check = electric.emitter.manualEvent('check');
 var del = electric.emitter.manualEvent('delete');
-var toggle = eui.fromCheckboxEvent('toggle');
+var toggle = eui.checkboxClicks('toggle');
 var editingStart = electric.emitter.manualEvent('editing start');
 var retitle = electric.emitter.manualEvent('retitle');
 var syncButtonClick = eui.clicks('sync-button');
