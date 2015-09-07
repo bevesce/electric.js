@@ -10,7 +10,7 @@
 <body>
 
 <div class="container">
-	<div class="box left-box" id="clicker">
+	<div class="box left-box no-touch" id="clicker">
 		click me
 	</div>
 	<div class="box right-box" id="clicked">
@@ -29,6 +29,24 @@
 </div>
 
 <div class="container">
+	<div class="box left-box no-touch" id="keyer">
+		press W, A, S or D
+	</div>
+	<div class="box right-box" id="keyed">
+		no key
+	</div>
+</div>
+
+<div class="container">
+	<div class="box left-box no-touch" id="hash">
+		change page hash
+	</div>
+	<div class="box right-box" id="hashed">
+
+	</div>
+</div>
+
+<div class="container">
 	<div class="box left-box">
 		<input type="text" id="text" placeholder="type in me" />
 	</div>
@@ -39,9 +57,9 @@
 
 <div class="container">
 	<div class="box left-box">
-		<textarea id="textarea" name="textarea" rows="2" cols="50" placeholder="write in me"></textarea>
+		<input type="text" id="enter" placeholder="type in me and press enter" />
 	</div>
-	<div class="box right-box" id="written">
+	<div class="box right-box" id="entered">
 
 	</div>
 </div>
@@ -57,10 +75,10 @@
 
 <div class="container">
 	<div class="box left-box">
-		0 <input type="checkbox" id="checkbox0" />
-		1 <input type="checkbox" id="checkbox1" />
-		2 <input type="checkbox" id="checkbox2" />
-		3 <input type="checkbox" id="checkbox3" />
+		0 <input name="checkboxes" type="checkbox" id="c0" />
+		1 <input name="checkboxes" type="checkbox" id="c1" />
+		2 <input name="checkboxes" type="checkbox" id="c2" />
+		3 <input name="checkboxes" type="checkbox" id="c3" />
 	</div>
 	<div class="box right-box" id="checkers">
 
@@ -69,10 +87,10 @@
 
 <div class="container">
 	<div class="box left-box">
-		0 <input type="radio" name="radio" id="radio0" />
-		1 <input type="radio" name="radio" id="radio1" />
-		2 <input type="radio" name="radio" id="radio2" />
-		3 <input type="radio" name="radio" id="radio3" />
+		0 <input type="radio" name="radio" id="r0" checked="true" />
+		1 <input type="radio" name="radio" id="r1" />
+		2 <input type="radio" name="radio" id="r2" />
+		3 <input type="radio" name="radio" id="r3" />
 	</div>
 	<div class="box right-box" id="radioed">
 
@@ -96,8 +114,9 @@
 	</div>
 </div>
 
+
 <div class="container">
-	<div class="box left-box trackpad" style="height: 200px" id="mouse">
+	<div class="box left-box trackpad no-touch" style="height: 200px" id="mouse">
 		mouse on me
 	</div>
 	<div class="box right-box" id="moused">
@@ -106,10 +125,10 @@
 </div>
 
 <div class="container">
-	<div class="box left-box trackpad" style="height: 200px" id="trackpad">
-		drag on me
+	<div class="box left-box trackpad no-touch" style="height: 200px" id="trackpad">
+		draw on me
 	</div>
-	<div class="box right-box no-padding">
+	<div class="box right-box">
 		<canvas id="canvas" class="canvas" style="width: 100%; height: 200px;"></canvas>
 	</div>
 </div>

@@ -1,33 +1,41 @@
 body {
 	font-family: "Avenir", sans-serif;
 	color: #202020;
-	padding: 0;
+	padding: 20px;
 	margin: 0;
+	background-color: rgb(240, 240, 240);
 }
 
 .container {
 	margin: 10px 0;
+	padding: 0;
 	width: 100%;
-	overflow: hidden;
+	background-color: red;
+	display: -webkit-inline-flex;
+	display: flex;
+	-webkit-align-items: stretch;
+	align-items: stretch;
 }
 
 .box {
-	display: inline-block;
+	min-height: 200px;
 	width: 50%;
-	float: left;
-	padding: 50px;
-	text-align: center;
-	box-sizing: border-box;
+	display: -webkit-flex;
+	display: flex;
+	-webkit-align-items: center;
+	align-items: center;
+	-webkit-justify-content: center;
+	justify-content: center;
 }
 
 .left-box {
-	color: white;
-	background: black;
+	color: rgb(253, 253, 253);
+	background: rgb(10, 10, 10);
 }
 
 .right-box {
-	background: white;
-
+	color: rgb(10, 10, 10);
+	background: rgb(253, 253, 253);
 }
 
 .big-text {
@@ -38,16 +46,15 @@ body {
 
 }
 
-.no-padding {
-	padding: 0;
-}
-
-.trackpad {
+.no-touch {
 	-webkit-touch-callout: none;
     -webkit-user-select: none;
     -khtml-user-select: none;
     -moz-user-select: none;
     -ms-user-select: none;
     user-select: none;
+}
+
+.trackpad {
     cursor: crosshair;
 }

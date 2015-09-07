@@ -3,7 +3,7 @@ import vdom = require('virtual-dom');
 import utils = require('./utils');
 
 
-function virtualDomReceiver(nodeOrId: utils.Node | string) {
+function virtualDomReceiver(nodeOrId: utils.NodeOrId | string) {
 	var node = utils.getNode(nodeOrId);
 	var previousTree = vdom.h();
 	var rootNode = vdom.create(previousTree);

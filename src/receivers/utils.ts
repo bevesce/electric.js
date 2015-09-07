@@ -2,33 +2,24 @@ interface AddEventListenerFunction {
 	(type: string, listener: (event: any) => void, useCapture?: boolean): void
 }
 
-export interface Node {
-	appendChild(child: any): void;
-	addEventListener: AddEventListenerFunction;
-	removeEventListener: AddEventListenerFunction;
-	value?: string | boolean;
-	id?: string;
-	checked?: boolean;
-}
+export type NodeOrId = HTMLElement | string;
 
-export type NodeOrId = Node | string;
-
-export function getNode(nodeOrId: NodeOrId): Node {
+export function getNode(nodeOrId: NodeOrId): HTMLElement {
 	if (typeof nodeOrId === 'string'){
 		return document.getElementById(nodeOrId);
 	}
 	else {
-		return <Node>nodeOrId;
+		return <HTMLElement>nodeOrId;
 	}
 }
 
-export type NodesOrName = Node[]| string;
+export type NodesOrName = HTMLElement[] | string;
 
-export function getNodes(nodesOfName: NodesOrName): Node[] {
+export function getNodes(nodesOfName: NodesOrName): HTMLElement[] {
 	if (typeof nodesOfName === 'string') {
 		return Array.prototype.slice.call(document.getElementsByName(nodesOfName));
 	}
 	else {
-		return <Node[]>nodesOfName;
+		return <HTMLElement[]>nodesOfName;
 	}
 }
