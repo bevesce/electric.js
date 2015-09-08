@@ -13,7 +13,7 @@ var Response = (function () {
 })();
 exports.Response = Response;
 var emptyResponse = new Response(null, -1, 'No request was yet made and response was not yet provided');
-function requestDevice(method, url, input, encode, decode) {
+function device(method, url, input, encode, decode) {
     if (encode === void 0) { encode = fp.identity; }
     if (decode === void 0) { decode = fp.identity; }
     var state = electric.emitter.manual('none');
@@ -44,11 +44,11 @@ function requestDevice(method, url, input, encode, decode) {
         response: responseEmitter
     };
 }
-exports.requestDevice = requestDevice;
-function JSONRequestDevice(method, url, input) {
-    return requestDevice(method, url, input, JSON.stringify, JSON.parse);
+exports.device = device;
+function JSONDevice(method, url, input) {
+    return device(method, url, input, JSON.stringify, JSON.parse);
 }
-exports.JSONRequestDevice = JSONRequestDevice;
+exports.JSONDevice = JSONDevice;
 function request(method, url, callback, args) {
     args.encode = args.encode || fp.identity;
     args.decode = args.decode || fp.identity;

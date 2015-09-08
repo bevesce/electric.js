@@ -1,3 +1,6 @@
+/// <reference path="../d/http.d.ts" />
+/// <reference path="../d/fs.d.ts" />
+/// <reference path="../d/socket.io.d.ts" />
 import http = require('http');
 import socketIO = require('socket.io');
 import fs = require('fs');
@@ -6,42 +9,25 @@ import electric = require('../src/electric');
 import electricSocker = require('../src/devices/electric-socket');
 
 var server = http.createServer(handler);
-
 var io = socketIO(server);
 
 server.listen(8002);
 
-function handler(req, res) {
-	fs.readFile(__dirname + '/index.html',
-		function(err, data) {
-			if (err) {
-				res.writeHead(500);
-				return res.end('Error loading index.html');
-			}
-
-			res.writeHead(200);
-			res.end(data);
-		}
-	);
+function handler(req: any, res: any) {
+	res.writeHead(200);
+	res.end();
 }
 
 
-var d = electricSocker.socketServerDevice(io, ['fromserver', 'feedback'], ['toserver']);
-var e = electric.emitter.manual('e1');
-var f = electric.emitter.manual('f1');
-var r = electric.receiver.hanging();
-d.plug({
-	ins: { fromserver: e, feedback: f }, outs: { toserver: r }
-});
-// f.emit('f2');
-r.plugReceiver(x => {
-	if (x){
-		f.emit('s: ' + x + ' ' + Date.now())
-	}
-});
-io.on('connection', function(socket) {
+io.on('connection', function(socket: any) {
 	console.log('connected');
-	socket.on('y', function(data) {
-		console.log('Y', data);
+	socket.on('test', function(data: any) {
+		console.log('test', data);
+		socket.emit('test-response', 2 * data);
+	});
+
+	socket.on('test-event', function(data: any) {
+		console.log('test-event', data);
+		socket.emit('test-event-response', 2 * data);
 	});
 });

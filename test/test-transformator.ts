@@ -268,7 +268,7 @@ describe('flattens', function() {
 		});
 	});
 
-	describe.only('flattenNamed', function() {
+	describe('flattenNamed', function() {
 		it('should work on f_a :: t -> {name: t -> a}', function(done) {
 			var e0 = electric.emitter.manual('0a');
 			var e1 = electric.emitter.manual('1a');

@@ -73,7 +73,7 @@ function makeInitialRequest(
 }
 
 function createRequestsDevice(data: inf.IEmitter<eevent<any>>) {
-	return request.JSONRequestDevice(
+	return request.JSONDevice(
 		POST, URL, data
 	);
 }

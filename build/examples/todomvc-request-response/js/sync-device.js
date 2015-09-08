@@ -45,6 +45,6 @@ function makeInitialRequest(initialRequestState, initialTasks) {
     }, { decode: JSON.parse });
 }
 function createRequestsDevice(data) {
-    return request.JSONRequestDevice(POST, URL, data);
+    return request.JSONDevice(POST, URL, data);
 }
 module.exports = sync;

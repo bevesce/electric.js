@@ -25,10 +25,12 @@ export class Response<T> {
 	}
 }
 
-var emptyResponse = new Response(null, -1, 'No request was yet made and response was not yet provided');
+var emptyResponse = new Response(
+	null, -1, 'No request was yet made and response was not yet provided'
+);
 
 
-export function requestDevice<T>(
+export function device<T>(
 	method: string, url: string, input: inf.IEmitter<eevent<T>>,
 	encode: (data: T) => string = fp.identity, decode: (data: string) => T = fp.identity
 ) {
@@ -71,10 +73,10 @@ export function requestDevice<T>(
 	}
 }
 
-export function JSONRequestDevice<T>(
+export function JSONDevice<T>(
 	method: string, url: string, input: inf.IEmitter<eevent<T>>
 ) {
-	return requestDevice(method, url, input, JSON.stringify, JSON.parse);
+	return device(method, url, input, JSON.stringify, JSON.parse);
 }
 
 export function request<T>(

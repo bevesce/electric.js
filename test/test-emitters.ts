@@ -41,7 +41,10 @@ describe('emitter from event', function() {
     });
 
     it('should impulse events', function(done) {
-        expect(ui.fromEvent(<any>mockTarget, 'click'))
+        expect(ui.fromEvent({
+            target: <any>mockTarget,
+            type: 'click'
+        }))
             .to.emit(eevent.notHappend)
             .after(() => mockTarget.event(1))
             .to.emit(eevent.of(1), eevent.notHappend)
@@ -50,8 +53,12 @@ describe('emitter from event', function() {
             .andBe(done);
         expect(mockTarget.listeners['click']).to.not.be.undefined;
     });
+
     it('should remove listener on stabilize', function() {
-        var mouse = ui.fromEvent(<any>mockTarget, 'mouse');
+        var mouse = ui.fromEvent({
+            target: <any>mockTarget,
+            type: 'mouse'
+        });
         expect(mockTarget.listeners['mouse']).to.not.be.undefined;
         mouse.stabilize();
         expect(mockTarget.listeners['mouse']).to.be.undefined;
