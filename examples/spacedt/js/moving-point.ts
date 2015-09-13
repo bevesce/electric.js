@@ -1,4 +1,3 @@
-import inf = require('../../../src/interfaces');
 import electric = require('../../../src/electric');
 import calculus = require('../../../src/calculus/calculus');
 import IntegrableAntiderivativeOfTwoNumbers = require('../../../src/calculus/integrable-antiderivative-of-two-numbers');
@@ -21,8 +20,8 @@ function velocity(x: number, y: number) {
 
 
 class MovingPoint {
-	v: inf.IEmitter<Velocity>;
-	xya: inf.IEmitter<Point>;
+	v: electric.emitter.Emitter<Velocity>;
+	xya: electric.emitter.Emitter<Point>;
 
 	static start(speed: number, x0: number, y0: number, angle: number) {
 		return new MovingPoint(speed, x0, y0, angle);
@@ -30,8 +29,10 @@ class MovingPoint {
 
 	constructor(speed: number, x0: number, y0: number, angle: number) {
 		this.v = cont(velocity(0, speed));
+		this.v = 'velocity';
 		this.xya = calculus.integral(
 			Point.of(x0, y0, angle), this.v, { fps: c.fps }
 		);
+		this.xya = 'position';
 	}
 }

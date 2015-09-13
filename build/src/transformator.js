@@ -1,10 +1,10 @@
 var emitter = require('./emitter');
-var namedTransformator = emitter.namedTransformator;
 var transformators = require('./transformator-helpers');
 var eevent = require('../src/electric-event');
 var fn = require('./utils/fn');
 var mapObj = require('./utils/map-obj');
 var objKeys = require('./utils/objKeys');
+var namedTransformator = emitter.namedTransformator;
 function map(mapping, emitter1, emitter2, emitter3, emitter4, emitter5, emitter6, emitter7) {
     var emitters = Array.prototype.slice.apply(arguments, [1]);
     return namedTransformator("map(" + fn(mapping) + ")", emitters, transformators.map(mapping, emitters.length), mapping.apply(null, emitters.map(function (e) { return e.dirtyCurrentValue(); })));

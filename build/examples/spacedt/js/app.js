@@ -52,7 +52,6 @@ module.exports = Point;
 
 },{}],2:[function(require,module,exports){
 var electric = require('../../../src/electric');
-var eevent = require('../../../src/electric-event');
 var eui = require('../../../src/emitters/ui');
 var clock = require('../../../src/clock');
 var c = require('./constants');
@@ -81,8 +80,7 @@ var shipInput = {
     stopDecceleration: eui.key('s', 'up'),
     rotateLeft: eui.key('a', 'down'),
     rotateRight: eui.key('d', 'down'),
-    stopRotateLeft: eui.key('a', 'up'),
-    stopRotateRight: eui.key('d', 'up'),
+    stopRotation: electric.transformator.merge(eui.key('a', 'up'), eui.key('d', 'up')),
     shoot: eui.key('space', 'up')
 };
 // transformators
@@ -91,19 +89,20 @@ var shipStartingPoint = Point.of(window.innerWidth / 4, window.innerHeight / 2, 
 var ship = shipDevice(shipStartingPoint, shipInput);
 //// mother
 var asteroidMotherStartingPoint = Point.of(3 * window.innerWidth / 4, window.innerHeight / 2, -Math.PI / 2);
-var asteroidMother = motherDevice(asteroidMotherStartingPoint);
+var asteroidMother = motherDevice(asteroidMotherStartingPoint, clock.intervalOfRandom(-1, 1, { inMs: c.asteroidMother.velocityShangeInterval }));
 //// bullets, asteroids & collisions
-var bulletBulletCollision = electric.emitter.placeholder(eevent.notHappend);
-var bulletAsteroidCollision = electric.emitter.placeholder(eevent.notHappend);
-var bulletMotherCollision = electric.emitter.placeholder(eevent.notHappend);
-var bulletShipCollision = electric.emitter.placeholder(eevent.notHappend);
+var bulletBulletCollision = electric.emitter.placeholder(electric.event.notHappend);
+var bulletAsteroidCollision = electric.emitter.placeholder(electric.event.notHappend);
+var bulletMotherCollision = electric.emitter.placeholder(electric.event.notHappend);
+var bulletShipCollision = electric.emitter.placeholder(electric.event.notHappend);
 var bullets = bulletsDevice({
     shoot: ship.shot,
     removeBoth: bulletBulletCollision,
     removeFirst: electric.transformator.merge(bulletMotherCollision, bulletAsteroidCollision)
 });
+var birth = electric.transformator.map(function (xy, t) { return t.map(function (v) { return Point.of(xy.x, xy.y, v); }); }, asteroidMother.xya, clock.intervalOfRandom(-Math.PI, +Math.PI, { inMs: c.asteroidMother.birthIntervalInMs }));
 var asteroids = asteroidsDevice({
-    birth: asteroidMother.birth,
+    createNew: birth,
     removeSecond: bulletAsteroidCollision
 });
 var collisions = collisionsDevice({
@@ -128,13 +127,16 @@ var dashboard = require('./dashboard');
 score.plugReceiver(dashboard.score());
 var collisionsToDraw = cont([]).change({ to: function (cs, c) { return insert(cs, c); }, when: collisions.all }, {
     to: function (cs, _) { return cont([]); },
-    when: collisions.all.transformTime(eevent.notHappend, function (t) { return t + c.collision.duration; })
+    when: collisions.all.transformTime(electric.event.notHappend, function (t) { return t + c.collision.duration; })
 });
+collisionsToDraw.name = 'visible collisions';
 var allToDraw = electric.transformator.map(function (s, bs, ms, ebs, cs) { return ({
     ship: s, bullets: bs, mothership: ms, asteroids: ebs, collisions: cs, state: 'ok'
 }); }, ship.xya, bullets.xy, asteroidMother.xya, asteroids.xy, collisionsToDraw);
-var gameEnd = collisions.gameEnding.transformTime(eevent.notHappend, function (t) { return t + 10; });
-var drawingState = allToDraw.change({
+allToDraw.name = 'objects positions';
+var gameEnd = collisions.gameEnding.transformTime(electric.event.notHappend, function (t) { return t + 10; });
+gameEnd.name = 'game over';
+var spaceState = allToDraw.change({
     to: function (s, _) {
         return cont({
             ship: s.ship,
@@ -147,7 +149,8 @@ var drawingState = allToDraw.change({
     },
     when: gameEnd
 });
-drawingState.plugReceiver(function (a) {
+spaceState.name = 'space state';
+spaceState.plugReceiver(function renderOnCanvas(a) {
     if (a.state === 'game over') {
         return;
     }
@@ -158,22 +161,22 @@ drawingState.plugReceiver(function (a) {
     draw.asteroidMother(a.mothership);
     draw.ship(a.ship);
 });
-var gameOver = cont(eevent.notHappend).change({ to: clock.intervalValue(true, { inMs: c.gameover.interval }), when: gameEnd });
+var gameOver = cont(electric.event.notHappend).change({ to: clock.intervalValue(true, { inMs: c.gameover.interval }), when: gameEnd });
 gameOver.plugReceiver(function (e) {
     if (e.happend) {
         draw.gameOver(width, height);
     }
 });
 ship.v.plugReceiver(dashboard.speed());
+var g = electric.graph.of(spaceState);
+console.log(g.stringify());
 
-},{"../../../src/clock":18,"../../../src/electric":20,"../../../src/electric-event":19,"../../../src/emitters/ui":22,"./angled-point":1,"./asteroid-mother":3,"./asteroids":4,"./bullets":5,"./collisions":6,"./constants":7,"./dashboard":8,"./draw":9,"./score":11,"./ship":12,"./utils/insert":13}],3:[function(require,module,exports){
+},{"../../../src/clock":18,"../../../src/electric":20,"../../../src/emitters/ui":22,"./angled-point":1,"./asteroid-mother":3,"./asteroids":4,"./bullets":5,"./collisions":6,"./constants":7,"./dashboard":8,"./draw":9,"./score":11,"./ship":12,"./utils/insert":13}],3:[function(require,module,exports){
 var electric = require('../../../src/electric');
-var clock = require('../../../src/clock');
 var calculus = require('../../../src/calculus/calculus');
 var IntegrableAntiderivativeOfTwoNumbers = require('../../../src/calculus/integrable-antiderivative-of-two-numbers');
 var c = require('./constants');
 var Point = require('./angled-point');
-var random = require('./utils/random');
 var cont = electric.emitter.constant;
 function acceleration(x, y) {
     return IntegrableAntiderivativeOfTwoNumbers.of(x, y, velocity);
@@ -181,36 +184,41 @@ function acceleration(x, y) {
 function velocity(x, y) {
     return IntegrableAntiderivativeOfTwoNumbers.of(x, y, Point.of);
 }
-function create(startingPoint) {
-    var v = cont(velocity(-Math.PI / 2, 100)).change({ to: function (a, _) { return cont(a.withX(random(-1, 1))); }, when: clock.interval({ inMs: 2000 }) });
+function create(startingPoint, changeVelocity) {
+    var v = cont(velocity(-Math.PI / 2, 100)).change({
+        to: function (a, v) { return cont(a.withX(v)); },
+        when: changeVelocity
+    });
+    v.name = 'asteroid mother velocity';
     var xya = calculus.integral(startingPoint, v, { fps: c.fps });
-    var birth = electric.transformator.map(function (time, xya) { return time.map(function (_) { return xya; }); }, clock.interval({ inMs: c.asteroidMother.birthIntervalInMs }), xya);
+    xya.name = 'asteroid mother position';
     return {
         v: v,
-        xya: xya,
-        birth: birth
+        xya: xya
     };
 }
 module.exports = create;
 
-},{"../../../src/calculus/calculus":16,"../../../src/calculus/integrable-antiderivative-of-two-numbers":17,"../../../src/clock":18,"../../../src/electric":20,"./angled-point":1,"./constants":7,"./utils/random":14}],4:[function(require,module,exports){
+},{"../../../src/calculus/calculus":16,"../../../src/calculus/integrable-antiderivative-of-two-numbers":17,"../../../src/electric":20,"./angled-point":1,"./constants":7}],4:[function(require,module,exports){
 var electric = require('../../../src/electric');
 var MovingPoint = require('./moving-point');
-var random = require('./utils/random');
 var remove = require('./utils/remove');
 var insert = require('./utils/insert');
+var c = require('./constants');
 var cont = electric.emitter.constant;
-function bearAsteroid(asteroids, xya) {
-    var speed = 100;
-    var angle = random(-Math.PI, Math.PI);
+function createAsteroid(asteroids, xya) {
+    var speed = c.asteroid.speed;
+    var angle = xya.angle;
     var x = xya.x;
     var y = xya.y;
-    var newBullet = MovingPoint.start(speed, x, y, angle);
-    return insert(asteroids, newBullet);
+    var newAsteroid = MovingPoint.start(speed, x, y, angle);
+    return insert(asteroids, newAsteroid);
 }
 function create(input) {
-    var asteroids = cont([]).change({ to: function (as, xya) { return bearAsteroid(as, xya); }, when: input.birth }, { to: function (as, c) { return remove(as, c.index2); }, when: input.removeSecond });
-    var asteroidsXY = electric.transformator.flattenMany(asteroids.map(function (bs) { return bs.map(function (b) { return b.xya; }); }));
+    var asteroids = cont([]).change({ to: function (as, xya) { return createAsteroid(as, xya); }, when: input.createNew }, { to: function (as, c) { return remove(as, c.index2); }, when: input.removeSecond });
+    asteroids.name = 'asteroids';
+    var asteroidsXY = electric.transformator.flattenMany(asteroids.map(function (as) { return as.map(function (a) { return a.xya; }); }));
+    asteroidsXY.name = 'asteroids positions';
     return {
         all: asteroids,
         xy: asteroidsXY
@@ -218,7 +226,7 @@ function create(input) {
 }
 module.exports = create;
 
-},{"../../../src/electric":20,"./moving-point":10,"./utils/insert":13,"./utils/random":14,"./utils/remove":15}],5:[function(require,module,exports){
+},{"../../../src/electric":20,"./constants":7,"./moving-point":10,"./utils/insert":13,"./utils/remove":15}],5:[function(require,module,exports){
 var electric = require('../../../src/electric');
 var c = require('./constants');
 var MovingPoint = require('./moving-point');
@@ -235,8 +243,12 @@ function shootBullet(bullets, xya, velocity) {
     return insert(bullets, newBullet);
 }
 function create(input) {
+    input.removeBoth.name = 'bullets collisions';
+    input.removeFirst.name = 'bullet collisions';
     var bullets = cont([]).change({ to: function (bs, s) { return shootBullet(bs, s.xya, s.velocity); }, when: input.shoot }, { to: function (bs, c) { return remove(bs, c.index1, c.index2); }, when: input.removeBoth }, { to: function (bs, c) { return remove(bs, c.index1); }, when: input.removeFirst });
+    bullets.name = 'bullets';
     var bulletsXY = electric.transformator.flattenMany(bullets.map(function (bs) { return bs.map(function (b) { return b.xya; }); }));
+    bulletsXY.name = 'bullets positions';
     return {
         all: bullets,
         xy: bulletsXY
@@ -250,24 +262,36 @@ var c = require('./constants');
 var map = electric.transformator.map;
 function create(input) {
     var checkBulletBullet = checkIfCollidingWithDistance(c.bullet.radius + c.bullet.radius);
-    var bulletBullet = input.bulletsXY.whenThen(function (bullets) { return collisionCenterMiddle(checkIfCollidingInOneArray(checkBulletBullet, bullets)); });
+    var bulletBullet = input.bulletsXY.whenThen(function (bullets) { return collisionCenterInMiddle(checkIfCollidingInOneArray(checkBulletBullet, bullets)); });
+    bulletBullet.name = 'bullet-bullet colission';
     var checkBulletShip = checkIfCollidingWithDistance(c.bullet.radius + c.ship.radius);
     var bulletsXYshipXY = map(function (bs, s) { return ({ points: bs, point: s }); }, input.bulletsXY, input.shipXY);
-    var bulletShip = bulletsXYshipXY.whenThen(function (a) { return collisionCenterFirstPoint(checkIfCollidingInArrayVsPoint(checkBulletShip, a.points, a.point)); });
+    var bulletShip = bulletsXYshipXY.whenThen(function (a) { return collisionCenterAtFirstPoint(checkIfCollidingInArrayVsPoint(checkBulletShip, a.points, a.point)); });
+    bulletBullet.name = 'bullet-ship colission';
     var checkShipAsteroid = checkIfCollidingWithDistance(c.ship.radius + c.asteroid.radius);
     var shipXYasteroidsXY = map(function (s, as) { return ({ point: s, points: as }); }, input.shipXY, input.asteroidsXY);
-    var shipAsteroid = shipXYasteroidsXY.whenThen(function (a) { return collisionCenterMiddle(checkIfCollidingInArrayVsPoint(checkShipAsteroid, a.points, a.point)); });
+    var shipAsteroid = shipXYasteroidsXY.whenThen(function (a) { return collisionCenterInMiddle(checkIfCollidingInArrayVsPoint(checkShipAsteroid, a.points, a.point)); });
     var checkBulletAsteroid = checkIfCollidingWithDistance(c.bullet.radius + c.asteroid.radius);
     var bulletsXYasteroidsXY = electric.transformator.map(function (bs, as) { return ({ points1: bs, points2: as }); }, input.bulletsXY, input.asteroidsXY);
-    var bulletAsteroid = bulletsXYasteroidsXY.whenThen(function (a) { return collisionCenterSecondPoint(checkIfCollidingBetweenTwoArrays(checkBulletAsteroid, a.points1, a.points2)); });
+    var bulletAsteroid = bulletsXYasteroidsXY.whenThen(function (a) { return collisionCenterAtSecondPoint(checkIfCollidingBetweenTwoArrays(checkBulletAsteroid, a.points1, a.points2)); });
+    bulletBullet.name = 'bullet-asteroid colission';
     var checkBulletMother = checkIfCollidingWithDistance(c.bullet.radius + c.asteroidMother.radius);
     var bulletsXYmotherXY = electric.transformator.map(function (bs, m) { return ({ points: bs, point: m }); }, input.bulletsXY, input.motherXY);
-    var bulletMother = bulletsXYmotherXY.whenThen(function (a) { return collisionCenterFirstPoint(checkIfCollidingInArrayVsPoint(checkBulletMother, a.points, a.point)); });
+    var bulletMother = bulletsXYmotherXY.whenThen(function (a) { return collisionCenterAtFirstPoint(checkIfCollidingInArrayVsPoint(checkBulletMother, a.points, a.point)); });
+    bulletBullet.name = 'bullet-mother colission';
     var checkShipMother = checkIfCollidingWithDistance(c.ship.radius + c.asteroidMother.radius);
     var shipXYmotherXY = electric.transformator.map(function (s, m) { return ({ point1: s, point2: m }); }, input.shipXY, input.motherXY);
-    var shipMother = shipXYmotherXY.whenThen(function (a) { return collisionCenterFirstPoint(checkIfCollidingPoints(checkShipMother, a.point1, a.point2)); });
+    var shipMother = shipXYmotherXY.whenThen(function (a) { return collisionCenterAtFirstPoint(checkIfCollidingPoints(checkShipMother, a.point1, a.point2)); });
+    bulletBullet.name = 'bullet-bullet collisions';
+    bulletAsteroid.name = 'bullet-asteroid collisions';
+    bulletMother.name = 'bullet-mother collisions';
+    shipMother.name = 'ship-mother collisions';
+    bulletShip.name = 'bullet-ship collisions';
+    shipAsteroid.name = 'ship-asteroid collisions';
     var all = electric.transformator.merge(bulletBullet, bulletAsteroid, bulletMother, shipMother, bulletShip, shipAsteroid);
+    all.name = 'all collisions';
     var gameEnding = electric.transformator.merge(shipMother, shipAsteroid, bulletShip);
+    gameEnding.name = 'game ending collisions';
     return {
         all: all,
         asteroid: {
@@ -347,7 +371,7 @@ function checkIfCollidingBetweenTwoArrays(check, points1, points2) {
         }
     }
 }
-function collisionCenterFirstPoint(collision) {
+function collisionCenterAtFirstPoint(collision) {
     if (collision === undefined) {
         return;
     }
@@ -358,7 +382,7 @@ function collisionCenterFirstPoint(collision) {
         y: collision.point1.y
     };
 }
-function collisionCenterSecondPoint(collision) {
+function collisionCenterAtSecondPoint(collision) {
     if (collision === undefined) {
         return;
     }
@@ -369,7 +393,7 @@ function collisionCenterSecondPoint(collision) {
         y: collision.point2.y
     };
 }
-function collisionCenterMiddle(collision) {
+function collisionCenterInMiddle(collision) {
     if (collision === undefined) {
         return;
     }
@@ -396,12 +420,14 @@ var BULLET_RADIUS = 3;
 var values = {
     asteroid: {
         color: '#BCACFA',
-        radius: 20
+        radius: 20,
+        speed: 100
     },
     asteroidMother: {
         birthIntervalInMs: 2000,
         color: '#A691FA',
-        radius: 50
+        radius: 50,
+        velocityShangeInterval: 2000
     },
     collision: {
         color: '#FA4141',
@@ -429,6 +455,7 @@ var values = {
         },
         color: 'white',
         radius: 5,
+        rotationStopDelay: 1,
         vbounds: {
             maxX: 5,
             maxY: 2000,
@@ -449,7 +476,7 @@ function speed() {
     var aSpeedLeft = document.getElementById('angular-speed-left');
     var aSpeedCurrent = document.getElementById('angular-speed-current');
     var aSpeedRight = document.getElementById('angular-speed-right');
-    return function (s) {
+    return function speedometer(s) {
         var speed = Math.abs(s.y);
         var w = speedBar.offsetWidth;
         var wh = w / 2;
@@ -474,7 +501,9 @@ function speed() {
 }
 exports.speed = speed;
 function score() {
-    return rui.htmlReceiverById('score');
+    var r = rui.htmlReceiverById('score');
+    r.name = 'show score';
+    return r;
 }
 exports.score = score;
 
@@ -537,7 +566,7 @@ function gameOver(width, height) {
     _ctx.beginPath();
     _ctx.font = 'bold 48px Avenir, sans-serif';
     _ctx.fillStyle = c.collision.color;
-    _ctx.fillText('∫GAME OVERdt', random(0, width - 300), random(50, height - 50));
+    _ctx.fillText('GAME OVER', random(0, width - 300), random(50, height - 50));
 }
 exports.gameOver = gameOver;
 
@@ -554,7 +583,9 @@ function velocity(x, y) {
 var MovingPoint = (function () {
     function MovingPoint(speed, x0, y0, angle) {
         this.v = cont(velocity(0, speed));
+        this.v = 'velocity';
         this.xya = calculus.integral(Point.of(x0, y0, angle), this.v, { fps: c.fps });
+        this.xya = 'position';
     }
     MovingPoint.start = function (speed, x0, y0, angle) {
         return new MovingPoint(speed, x0, y0, angle);
@@ -568,14 +599,15 @@ var electric = require('../../../src/electric');
 var c = require('./constants');
 var cont = electric.emitter.constant;
 function score(input) {
-    return cont(0).change({ to: function (s, _) { return cont(s + c.score.forAsteroid); }, when: input.asteroidHit }, { to: function (s, _) { return cont(s + c.score.forMother); }, when: input.motherHit }).change({ to: function (s, _) { return cont(s); }, when: input.gameEnd });
+    var t = cont(0).change({ to: function (s, _) { return cont(s + c.score.forAsteroid); }, when: input.asteroidHit }, { to: function (s, _) { return cont(s + c.score.forMother); }, when: input.motherHit }).change({ to: function (s, _) { return cont(s); }, when: input.gameEnd });
+    t.name = 'score';
+    return t;
 }
 module.exports = score;
 
 },{"../../../src/electric":20,"./constants":7}],12:[function(require,module,exports){
 var electric = require('../../../src/electric');
 var eevent = require('../../../src/electric-event');
-var eui = require('../../../src/emitters/ui');
 var calculus = require('../../../src/calculus/calculus');
 var IntegrableAntiderivativeOfTwoNumbers = require('../../../src/calculus/integrable-antiderivative-of-two-numbers');
 var c = require('./constants');
@@ -588,23 +620,35 @@ function shipVelocity(x, y) {
     return IntegrableAntiderivativeOfTwoNumbers.of(x, y, Point.of, c.ship.vbounds);
 }
 function create(startingPoint, input) {
-    var shipA = cont(shipAcceleration(0, 0)).change({ to: function (a, _) { return cont(a.withX(-c.ship.acceleration.angular)); }, when: input.rotateLeft }, { to: function (a, _) { return cont(a.withX(c.ship.acceleration.angular)); }, when: input.rotateRight }, { to: function (a, _) { return cont(a.withX(0)); }, when: input.stopRotateRight }, { to: function (a, _) { return cont(a.withX(0)); }, when: input.stopRotateLeft }, { to: function (a, _) { return cont(a.withY(-c.ship.acceleration.de)); }, when: input.deccelerate }, { to: function (a, _) { return cont(a.withY(c.ship.acceleration.linear)); }, when: input.accelerate }, { to: function (a, _) { return cont(a.withY(0)); }, when: input.stopAcceleration }, { to: function (a, _) { return cont(a.withY(0)); }, when: input.stopDecceleration });
-    shipA.name = 'ship acceleration';
-    var shipV = calculus.integral(shipVelocity(0, 0), shipA, { fps: c.fps }).change({ to: function (v, _) { return calculus.integral(v.withX(0), shipA, { fps: c.fps }); }, when: input.stopRotateRight.transformTime(eevent.notHappend, function (t) { return t + 10; }) }, { to: function (v, _) { return calculus.integral(v.withX(0), shipA, { fps: c.fps }); }, when: input.stopRotateLeft.transformTime(eevent.notHappend, function (t) { return t + 10; }) });
-    shipV.name = 'ship velocity';
-    var shipXYA = calculus.integral(startingPoint, shipV, { fps: c.fps });
-    shipXYA.name = 'ship position';
-    var shot = electric.transformator.map(function (space, xya, v) { return space.map(function (_) { return ({ xya: xya, velocity: v }); }); }, eui.key('space', 'up'), shipXYA, shipV);
+    var fps = { fps: c.fps };
+    var acceleration = cont(shipAcceleration(0, 0)).change({ to: function (a, _) { return cont(a.withX(-c.ship.acceleration.angular)); },
+        when: input.rotateLeft }, { to: function (a, _) { return cont(a.withX(c.ship.acceleration.angular)); },
+        when: input.rotateRight }, { to: function (a, _) { return cont(a.withY(c.ship.acceleration.linear)); },
+        when: input.accelerate }, { to: function (a, _) { return cont(a.withY(-c.ship.acceleration.de)); },
+        when: input.deccelerate }, { to: function (a, _) { return cont(a.withY(0)); },
+        when: input.stopAcceleration }, { to: function (a, _) { return cont(a.withY(0)); },
+        when: input.stopDecceleration }, { to: function (a, _) { return cont(a.withX(0)); },
+        when: input.stopRotation });
+    acceleration.name = 'ship acceleration';
+    var velocity = calculus.integral(shipVelocity(0, 0), acceleration, fps).change({
+        to: function (v, _) { return calculus.integral(v.withX(0), acceleration, fps); },
+        when: input.stopRotation.transformTime(eevent.notHappend, function (t) { return t + c.ship.rotationStopDelay; })
+    });
+    velocity.name = 'ship velocity';
+    var position = calculus.integral(startingPoint, velocity, fps);
+    position.name = 'ship position';
+    var shot = electric.transformator.map(function (space, xya, v) { return space.map(function (_) { return ({ xya: xya, velocity: v }); }); }, input.shoot, position, velocity);
+    shot.name = 'shot';
     return {
-        a: shipA,
-        v: shipV,
-        xya: shipXYA,
+        a: acceleration,
+        v: velocity,
+        xya: position,
         shot: shot
     };
 }
 module.exports = create;
 
-},{"../../../src/calculus/calculus":16,"../../../src/calculus/integrable-antiderivative-of-two-numbers":17,"../../../src/electric":20,"../../../src/electric-event":19,"../../../src/emitters/ui":22,"./angled-point":1,"./constants":7}],13:[function(require,module,exports){
+},{"../../../src/calculus/calculus":16,"../../../src/calculus/integrable-antiderivative-of-two-numbers":17,"../../../src/electric":20,"../../../src/electric-event":19,"./angled-point":1,"./constants":7}],13:[function(require,module,exports){
 var electric = require('../../../../src/electric');
 var cont = electric.emitter.constant;
 function insert(list, item) {
@@ -695,7 +739,7 @@ function timeValue(emitter, options) {
     return trans;
 }
 
-},{"../clock":18,"../scheduler":28,"../transformator":30}],17:[function(require,module,exports){
+},{"../clock":18,"../scheduler":27,"../transformator":29}],17:[function(require,module,exports){
 var IntegrableAntiderivativeOfTwoNumbers = (function () {
     function IntegrableAntiderivativeOfTwoNumbers(x, y, antiderivative, bounds) {
         this.bounds = bounds || {};
@@ -758,7 +802,7 @@ function interval(options) {
 }
 exports.interval = interval;
 function intervalValue(value, options) {
-    var timer = emitter.manualEvent();
+    var timer = emitter.manualEvent(null);
     var id = scheduler.scheduleInterval(function () {
         timer.impulse(value);
     }, calculateInterval(options.inMs, options.fps));
@@ -767,6 +811,16 @@ function intervalValue(value, options) {
     return timer;
 }
 exports.intervalValue = intervalValue;
+function intervalOfRandom(min, max, options) {
+    var timer = emitter.manualEvent(null);
+    var id = scheduler.scheduleInterval(function () {
+        timer.impulse(random(min, max));
+    }, calculateInterval(options.inMs, options.fps));
+    timer.name = "intervalOfRandom(" + min + "-" + max + ", " + calculateEmitterName(options) + ")";
+    timer.setReleaseResources(function () { return scheduler.unscheduleInterval(id); });
+    return timer;
+}
+exports.intervalOfRandom = intervalOfRandom;
 function time(options) {
     var interval = calculateInterval(options.intervalInMs, options.fps);
     var timeEmitter = emitter.manual(scheduler.now());
@@ -795,8 +849,11 @@ function calculateEmitterName(options) {
         return 'interval: ' + options.intervalInMs + 'ms';
     }
 }
+function random(min, max) {
+    return Math.random() * (max - min) + min;
+}
 
-},{"./emitter":21,"./scheduler":28}],19:[function(require,module,exports){
+},{"./emitter":21,"./scheduler":27}],19:[function(require,module,exports){
 var all = require('./utils/all');
 var ElectricEvent = (function () {
     function ElectricEvent() {
@@ -888,7 +945,7 @@ var NotHappend = (function () {
 ElectricEvent.notHappend = new NotHappend();
 module.exports = ElectricEvent;
 
-},{"./utils/all":32}],20:[function(require,module,exports){
+},{"./utils/all":31}],20:[function(require,module,exports){
 exports.scheduler = require('./scheduler');
 exports.emitter = require('./emitter');
 exports.transformator = require('./transformator');
@@ -897,12 +954,13 @@ exports.clock = require('./clock');
 exports.transmitter = require('./transmitter');
 exports.calculus = require('./calculus/calculus');
 exports.event = require('./electric-event');
+exports.graph = require('./graph');
 exports.e = exports.emitter;
 exports.t = exports.transformator;
 exports.r = exports.receiver;
 exports.c = exports.calculus;
 
-},{"./calculus/calculus":16,"./clock":18,"./electric-event":19,"./emitter":21,"./receiver":25,"./scheduler":28,"./transformator":30,"./transmitter":31}],21:[function(require,module,exports){
+},{"./calculus/calculus":16,"./clock":18,"./electric-event":19,"./emitter":21,"./graph":23,"./receiver":25,"./scheduler":27,"./transformator":29,"./transmitter":30}],21:[function(require,module,exports){
 var __extends = (this && this.__extends) || function (d, b) {
     for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p];
     function __() { this.constructor = d; }
@@ -911,23 +969,27 @@ var __extends = (this && this.__extends) || function (d, b) {
 };
 var scheduler = require('./scheduler');
 var transformators = require('./transformator-helpers');
-var eevent = require('./electric-event');
+var ElectricEvent = require('./electric-event');
 var Wire = require('./wire');
 var fn = require('./utils/fn');
 exports.placeholder = require('./placeholder');
-var Emitter = (function () {
-    function Emitter(initialValue) {
+var ConcreteEmitter = (function () {
+    function ConcreteEmitter(initialValue) {
         if (initialValue === void 0) { initialValue = undefined; }
         this._receivers = [];
         this._currentValue = initialValue;
         this.name = (this.name);
     }
-    Emitter.prototype.toString = function () {
-        return "| " + this.name + " = " + this.dirtyCurrentValue().toString() + " >";
+    ConcreteEmitter.prototype.toString = function (includeCurrentValue) {
+        if (includeCurrentValue === void 0) { includeCurrentValue = false; }
+        if (includeCurrentValue) {
+            return "| " + this.name + " = " + this.dirtyCurrentValue().toString() + " >";
+        }
+        return "| " + this.name + " >";
     };
     // when reveiver is plugged current value is not emitted to him
     // instantaneously, but instead it's done asynchronously
-    Emitter.prototype.plugReceiver = function (receiver) {
+    ConcreteEmitter.prototype.plugReceiver = function (receiver) {
         if (typeof receiver !== 'function' && receiver.wire) {
             receiver = receiver.wire(this);
         }
@@ -935,7 +997,7 @@ var Emitter = (function () {
         this._asyncDispatchToReceiver(receiver, this._currentValue);
         return this._receivers.length - 1;
     };
-    Emitter.prototype._dirtyPlugReceiver = function (receiver) {
+    ConcreteEmitter.prototype._dirtyPlugReceiver = function (receiver) {
         if (typeof receiver !== 'function' && receiver.wire) {
             receiver = receiver.wire(this);
         }
@@ -943,11 +1005,11 @@ var Emitter = (function () {
         // this._asyncDispatchToReceiver(receiver, this._currentValue);
         return this._receivers.length - 1;
     };
-    Emitter.prototype.unplugReceiver = function (receiverOrId) {
+    ConcreteEmitter.prototype.unplugReceiver = function (receiverOrId) {
         var index = this._getIndexOfReceiver(receiverOrId);
         this._receivers.splice(index, 1);
     };
-    Emitter.prototype._getIndexOfReceiver = function (receiverOrId) {
+    ConcreteEmitter.prototype._getIndexOfReceiver = function (receiverOrId) {
         if (typeof receiverOrId === 'number') {
             return receiverOrId;
         }
@@ -955,26 +1017,26 @@ var Emitter = (function () {
             return this._receivers.indexOf(receiverOrId);
         }
     };
-    Emitter.prototype.dirtyCurrentValue = function () {
+    ConcreteEmitter.prototype.dirtyCurrentValue = function () {
         return this._currentValue;
     };
-    Emitter.prototype.stabilize = function () {
+    ConcreteEmitter.prototype.stabilize = function () {
         this.emit = this._throwStabilized;
         this.impulse = this._throwStabilized;
         this._releaseResources();
     };
-    Emitter.prototype.setReleaseResources = function (releaseResources) {
+    ConcreteEmitter.prototype.setReleaseResources = function (releaseResources) {
         this._releaseResources = releaseResources;
     };
-    Emitter.prototype._releaseResources = function () {
+    ConcreteEmitter.prototype._releaseResources = function () {
         // should be overwritten in more specific emitters
     };
-    Emitter.prototype._throwStabilized = function (value) {
+    ConcreteEmitter.prototype._throwStabilized = function (value) {
         throw Error("can't emit <" + value + "> from " + this.name + ", it's stabilized");
     };
     // let's say that f = constant(y).emit(x) is called at t_e
     // then f(t) = x for t >= t_e, and f(t) = y for t < t_e
-    Emitter.prototype.emit = function (value) {
+    ConcreteEmitter.prototype.emit = function (value) {
         if (this._equals(this._currentValue, value)) {
             return;
         }
@@ -983,20 +1045,20 @@ var Emitter = (function () {
     };
     // let's say that f constant(y).impulse(x) is called at t_i
     // then f(t_i) = x and f(t) = y when t != t_i
-    Emitter.prototype.impulse = function (value) {
+    ConcreteEmitter.prototype.impulse = function (value) {
         if (this._equals(this._currentValue, value)) {
             return;
         }
         this._dispatchToReceivers(value);
         this._dispatchToReceivers(this._currentValue);
     };
-    Emitter.prototype._equals = function (x, y) {
+    ConcreteEmitter.prototype._equals = function (x, y) {
         return x === y;
     };
-    Emitter.prototype.setEquals = function (equals) {
+    ConcreteEmitter.prototype.setEquals = function (equals) {
         this._equals = equals;
     };
-    Emitter.prototype._dispatchToReceivers = function (value) {
+    ConcreteEmitter.prototype._dispatchToReceivers = function (value) {
         var currentReceivers = this._receivers.slice();
         for (var _i = 0; _i < currentReceivers.length; _i++) {
             var receiver = currentReceivers[_i];
@@ -1004,7 +1066,7 @@ var Emitter = (function () {
             this._dispatchToReceiver(receiver, value);
         }
     };
-    Emitter.prototype._dispatchToReceiver = function (receiver, value) {
+    ConcreteEmitter.prototype._dispatchToReceiver = function (receiver, value) {
         if (typeof receiver === 'function') {
             receiver(value);
         }
@@ -1012,68 +1074,64 @@ var Emitter = (function () {
             receiver.receive(value);
         }
     };
-    Emitter.prototype._asyncDispatchToReceivers = function (value) {
+    ConcreteEmitter.prototype._asyncDispatchToReceivers = function (value) {
         var currentReceivers = this._receivers.slice();
         for (var _i = 0; _i < currentReceivers.length; _i++) {
             var receiver = currentReceivers[_i];
             this._asyncDispatchToReceiver(receiver, value);
         }
     };
-    Emitter.prototype._asyncDispatchToReceiver = function (receiver, value) {
+    ConcreteEmitter.prototype._asyncDispatchToReceiver = function (receiver, value) {
         var _this = this;
         scheduler.scheduleTimeout(function () { return _this._dispatchToReceiver(receiver, value); }, 0);
     };
     // transformators
-    Emitter.prototype.map = function (mapping) {
+    ConcreteEmitter.prototype.map = function (mapping) {
         return namedTransformator("map(" + fn(mapping) + ")", [this], transformators.map(mapping, 1), mapping(this._currentValue));
     };
-    Emitter.prototype.filter = function (initialValue, predicate) {
+    ConcreteEmitter.prototype.filter = function (initialValue, predicate) {
         return namedTransformator("filter(" + fn(predicate) + ")", [this], transformators.filter(predicate), initialValue);
     };
-    Emitter.prototype.filterMap = function (initialValue, mapping) {
+    ConcreteEmitter.prototype.filterMap = function (initialValue, mapping) {
         return namedTransformator("filterMap(" + fn(mapping) + ")", [this], transformators.filterMap(mapping), initialValue);
     };
-    Emitter.prototype.transformTime = function (initialValue, timeShift, t0) {
+    ConcreteEmitter.prototype.transformTime = function (initialValue, timeShift, t0) {
         if (t0 === void 0) { t0 = 0; }
         var t = namedTransformator("transformTime(" + fn(timeShift) + ")", [this], transformators.transformTime(timeShift, t0), initialValue);
         this._dispatchToReceiver(t._dirtyGetWireTo(this), this.dirtyCurrentValue());
         return t;
     };
-    Emitter.prototype.accumulate = function (initialValue, accumulator) {
+    ConcreteEmitter.prototype.accumulate = function (initialValue, accumulator) {
         var acc = accumulator(initialValue, this.dirtyCurrentValue());
         return namedTransformator("accumulate(" + fn(accumulator) + ")", [this], transformators.accumulate(acc, accumulator), acc);
     };
-    Emitter.prototype.merge = function () {
-        var emitters = [];
-        for (var _i = 0; _i < arguments.length; _i++) {
-            emitters[_i - 0] = arguments[_i];
-        }
-        return namedTransformator('merge', [this].concat(emitters), transformators.merge(), this.dirtyCurrentValue());
+    ConcreteEmitter.prototype.changes = function () {
+        return namedTransformator('changes', [this], transformators.changes(this.dirtyCurrentValue()), ElectricEvent.notHappend);
     };
-    Emitter.prototype.when = function (switcher) {
-        var t = namedTransformator('whenHappensThen', [this], transformators.when(switcher.happens, switcher.then), eevent.notHappend);
+    ConcreteEmitter.prototype.when = function (switcher) {
+        var t = namedTransformator('whenHappensThen', [this], transformators.when(switcher.happens, switcher.then), ElectricEvent.notHappend);
         return t;
     };
-    Emitter.prototype.whenThen = function (happens) {
-        var t = namedTransformator('whenThen', [this], transformators.whenThen(happens), eevent.notHappend);
+    ConcreteEmitter.prototype.whenThen = function (happens) {
+        var t = namedTransformator('whenThen', [this], transformators.whenThen(happens), ElectricEvent.notHappend);
         return t;
     };
-    Emitter.prototype.sample = function (initialValue, samplingEvent) {
+    ConcreteEmitter.prototype.sample = function (initialValue, samplingEvent) {
         var t = namedTransformator('sample', [this, samplingEvent], transformators.sample(), initialValue);
         return t;
     };
-    Emitter.prototype.change = function () {
+    ConcreteEmitter.prototype.change = function () {
         var switchers = [];
         for (var _i = 0; _i < arguments.length; _i++) {
             switchers[_i - 0] = arguments[_i];
         }
         return namedTransformator('changeToWhen', [this].concat(switchers.map(function (s) { return s.when; })), transformators.change(switchers), this._currentValue);
     };
-    return Emitter;
+    return ConcreteEmitter;
 })();
-exports.Emitter = Emitter;
+exports.ConcreteEmitter = ConcreteEmitter;
 function emitter(initialValue) {
-    return new Emitter(initialValue);
+    return new ConcreteEmitter(initialValue);
 }
 exports.emitter = emitter;
 var ManualEmitter = (function (_super) {
@@ -1095,7 +1153,8 @@ var ManualEmitter = (function (_super) {
         this.impulse = this.impulse;
     };
     return ManualEmitter;
-})(Emitter);
+})(ConcreteEmitter);
+exports.ManualEmitter = ManualEmitter;
 function manual(initialValue, name) {
     var e = new ManualEmitter(initialValue);
     e.name = name || 'manual';
@@ -1103,32 +1162,35 @@ function manual(initialValue, name) {
 }
 exports.manual = manual;
 function constant(value) {
-    var e = new Emitter(value);
+    var e = new ConcreteEmitter(value);
     e.name = "constant(" + value + ")";
     return e;
 }
 exports.constant = constant;
-function manualEvent(name) {
+function manualEvent(initialValue, name) {
+    // initialValue doesn nothing it just to ease up
+    // typing
+    // instead of var e = <Emitter<ElectricEvent<T>>>manualEvent()
+    // you can do var e = manualEvent(<T>null)
     // manual event emitter should
     // pack impulsed values into event
     // and not allow to emit values
     // it's done by monkey patching ManualEmitter
-    var e = manual(eevent.notHappend);
+    var e = manual(ElectricEvent.notHappend);
     var oldImpulse = e.impulse;
-    e.impulse = function (v) { return oldImpulse.apply(e, [eevent.of(v)]); };
+    e.impulse = function (v) { return oldImpulse.apply(e, [ElectricEvent.of(v)]); };
     e.emit = function (v) {
         throw Error("can't emit from event emitter, only impulse");
     };
-    e.name = name || 'manualEvent';
+    e.name = name || 'manual event';
     // monkey patching requires ugly casting...
     return e;
 }
 exports.manualEvent = manualEvent;
 var Transformator = (function (_super) {
     __extends(Transformator, _super);
-    function Transformator(emitters, transform, initialValue) {
+    function Transformator(emitters, initialValue, transform) {
         if (transform === void 0) { transform = undefined; }
-        if (initialValue === void 0) { initialValue = undefined; }
         _super.call(this, initialValue);
         this.name = 'transformator';
         this._values = Array(emitters.length);
@@ -1138,8 +1200,12 @@ var Transformator = (function (_super) {
         this._wires = [];
         this.plugEmitters(emitters);
     }
-    Transformator.prototype.toString = function () {
-        return "< " + this.name + " = " + this.dirtyCurrentValue().toString() + " >";
+    Transformator.prototype.toString = function (includeCurrentValue) {
+        if (includeCurrentValue === void 0) { includeCurrentValue = false; }
+        if (includeCurrentValue) {
+            return "< " + this.name + " = " + this.dirtyCurrentValue().toString() + " >";
+        }
+        return "< " + this.name + " >";
     };
     Transformator.prototype.setTransform = function (transform) {
         var _this = this;
@@ -1188,385 +1254,464 @@ var Transformator = (function (_super) {
         this._values[index] = value;
     };
     return Transformator;
-})(Emitter);
+})(ConcreteEmitter);
 exports.Transformator = Transformator;
 function namedTransformator(name, emitters, transform, initialValue) {
     if (transform === void 0) { transform = undefined; }
-    var t = new Transformator(emitters, transform, initialValue);
+    var t = new Transformator(emitters, initialValue, transform);
     t.name = name;
     return t;
 }
 exports.namedTransformator = namedTransformator;
 
-},{"./electric-event":19,"./placeholder":24,"./scheduler":28,"./transformator-helpers":29,"./utils/fn":34,"./wire":35}],22:[function(require,module,exports){
+},{"./electric-event":19,"./placeholder":24,"./scheduler":27,"./transformator-helpers":28,"./utils/fn":33,"./wire":39}],22:[function(require,module,exports){
 var electric = require('../electric');
-var utils = require('../receivers/utils');
-var transformator = require('../transformator');
-var eevent = require('../electric-event');
-var fp = require('../fp');
-var keyCodes = {
-    up: 38,
-    down: 40,
-    left: 37,
-    right: 39,
-    w: 87,
-    a: 65,
-    s: 83,
-    d: 68,
-    enter: 13,
-    space: 32
-};
-// NEW
-function clicks(nodeOrId, mapping) {
-    if (mapping === void 0) { mapping = fp.identity; }
-    var button = utils.getNode(nodeOrId);
-    var emitter = electric.emitter.manualEvent();
-    function emitterListener(event) {
-        emitter.impulse(mapping(event));
-    }
-    button.addEventListener('click', emitterListener, false);
-    emitter.setReleaseResources(function () { return button.removeEventListener('click', emitterListener); });
-    emitter.name = 'clicks on ' + nodeOrId;
-    return emitter;
+var shallowCopy = require('../utils/shallow-copy');
+var keyCodes = require('../utils/key-codes');
+function clicks(targetOrId, mapping) {
+    return fromEvent({
+        target: targetOrId,
+        mapping: mapping,
+        type: 'click',
+        preventDefault: true
+    });
 }
 exports.clicks = clicks;
-function arrows(layout, nodeOrId, type) {
-    if (layout === void 0) { layout = 'arrows'; }
-    if (nodeOrId === void 0) { nodeOrId = document; }
-    if (type === void 0) { type = 'keydown'; }
-    var layouts = {
-        'arrows': {
-            38: 'up', 40: 'down', 37: 'left', 39: 'right'
-        },
-        'wasd': {
-            87: 'up', 83: 'down', 65: 'left', 68: 'right'
-        },
-        'hjkl': {
-            75: 'up', 74: 'down', 72: 'left', 76: 'right'
-        },
-        'ijkl': {
-            73: 'up', 75: 'down', 74: 'left', 76: 'right'
-        }
-    };
-    var keyCodes = layouts[layout];
-    var target = utils.getNode(nodeOrId);
-    var emitter = electric.emitter.manualEvent();
-    function emitterListener(event) {
-        var direction = keyCodes[event.keyCode];
-        if (direction) {
-            event.preventDefault();
-            emitter.impulse(direction);
-        }
-    }
-    target.addEventListener(type, emitterListener);
-    emitter.name = 'arrows';
-    return emitter;
-}
-exports.arrows = arrows;
-function key(name, type, nodeOrId) {
-    if (nodeOrId === void 0) { nodeOrId = document; }
-    var target = utils.getNode(nodeOrId);
-    var emitter = electric.emitter.manualEvent();
+function key(name, type) {
     var keyCode = keyCodes[name];
-    function emitterListener(event) {
-        if (event.keyCode === keyCode) {
-            event.preventDefault();
-            emitter.impulse(name);
-        }
-    }
-    target.addEventListener('key' + type, emitterListener);
-    emitter.name = "key \"" + name + "\" " + type;
-    return emitter;
+    return fromEvent({
+        target: document.body,
+        mapping: function (e) { return name; },
+        filter: function (e) { return e.keyCode === keyCode; },
+        type: 'key' + type,
+        preventDefault: true,
+        name: "key -" + name + "- " + type
+    });
 }
 exports.key = key;
-// OLD
-function em(text) {
-    return '`' + text + '`';
-}
-function fromEvent(target, type, name, useCapture) {
-    if (name === void 0) { name = ''; }
-    if (useCapture === void 0) { useCapture = false; }
-    var emitter = electric.emitter.manualEvent();
-    emitter.name = name || '| event: ' + type + ' on ' + em(target) + '|>';
-    var impulse = function (event) {
-        // event.preventDefault();
-        emitter.impulse(event);
-    };
-    target.addEventListener(type, impulse, useCapture);
-    emitter.setReleaseResources(function () { return target.removeEventListener(type, impulse, useCapture); });
-    return emitter;
-}
-exports.fromEvent = fromEvent;
-function fromButton(nodeOrId) {
-    var button = utils.getNode(nodeOrId);
-    return fromEvent(button, 'click', 'button clicks on ' + em(nodeOrId));
-}
-exports.fromButton = fromButton;
-function fromInputText(nodeOrId, type) {
+function text(targetOrId, type) {
     if (type === void 0) { type = 'keyup'; }
-    var input = utils.getNode(nodeOrId);
-    return fromEvent(input, 'keyup', 'text of ' + em(nodeOrId)).map(function () { return input.value; });
-}
-exports.fromInputText = fromInputText;
-function fromInputTextEnter(nodeOrId) {
-    var input = utils.getNode(nodeOrId);
-    var e = electric.emitter.manualEvent();
-    e.name = '| enter on ' + em(nodeOrId) + ' |>';
-    var impulse = function (event) {
-        if (event.keyCode === 13) {
-            e.impulse(input.value);
-        }
-    };
-    input.addEventListener('keydown', impulse, false);
-    e.setReleaseResources(function () { return input.removeEventListener('keydown', impulse, false); });
-    return e;
-}
-exports.fromInputTextEnter = fromInputTextEnter;
-function fromCheckbox(nodeOrId) {
-    var checkbox = utils.getNode(nodeOrId);
-    var e = fromEvent(checkbox, 'click', 'checked of ' + em(nodeOrId));
-    return e.map(function () { return checkbox.checked; });
-}
-exports.fromCheckbox = fromCheckbox;
-;
-function fromCheckboxEvent(nodeOrId) {
-    var checkbox = utils.getNode(nodeOrId);
-    var e = electric.emitter.manualEvent();
-    e.name = '| click on checkbox ' + nodeOrId + ' |>';
-    var impulse = function (event) {
-        e.impulse(checkbox.checked);
-    };
-    checkbox.addEventListener('click', impulse, false);
-    e.setReleaseResources(function () { return checkbox.removeEventListener('click', impulse, false); });
-    return e;
-}
-exports.fromCheckboxEvent = fromCheckboxEvent;
-;
-function joinObjects(objs) {
-    var o = {};
-    objs.forEach(function (e) {
-        if (e === undefined) {
-            return;
-        }
-        o[e.key] = e.value;
+    var input = getTargetById(targetOrId);
+    return fromValue({
+        target: input,
+        mapping: function (_) { return input.value; },
+        initialValue: '',
+        type: 'keyup',
+        name: "text of " + targetOrId
     });
-    return o;
 }
-function fromCheckboxes(nodeOrIds) {
-    var emitters = nodeOrIds.map(function (nodeOrId) {
-        var checkbox = utils.getNode(nodeOrId);
-        return fromEvent(checkbox, 'click').map(function () { return ({ key: checkbox.id, value: checkbox.checked }); });
+exports.text = text;
+function enteredText(targetOrId) {
+    var input = getTargetById(targetOrId);
+    return fromEvent({
+        target: input,
+        filter: function (e) { return e.keyCode === 13; },
+        mapping: function (_) { return input.value; },
+        type: 'keyup',
+        name: "text entered into " + targetOrId
     });
-    var e = transformator.mapMany.apply(transformator, [function () {
-        var args = [];
-        for (var _i = 0; _i < arguments.length; _i++) {
-            args[_i - 0] = arguments[_i];
-        }
-        return joinObjects(args);
-    }].concat(emitters));
-    e.name = 'state of checkboxes ' + em(nodeOrIds);
-    return e;
 }
-exports.fromCheckboxes = fromCheckboxes;
+exports.enteredText = enteredText;
+function checkbox(targetOrId) {
+    var checkbox = getTargetById(targetOrId);
+    return fromValue({
+        target: checkbox,
+        type: 'click',
+        initialValue: checkbox.checked,
+        mapping: function (_) { return checkbox.checked; },
+        name: "checbox " + targetOrId
+    });
+}
+exports.checkbox = checkbox;
 ;
-function fromRadioGroup(nodesOrName) {
-    var nodes = utils.getNodes(nodesOrName);
-    var emitters = nodes.map(function (radio) { return fromEvent(radio, 'click').map(function (v) { return v.happend ? eevent.of(radio.id) : eevent.notHappend; }); });
-    var e = transformator.hold('', transformator.merge.apply(transformator, emitters));
-    e.name = 'state of radio group ' + em(nodesOrName);
-    return e;
+function checkboxClicks(targetOrId) {
+    var checkbox = getTargetById(targetOrId);
+    return fromEvent({
+        target: checkbox,
+        type: 'click',
+        mapping: function (_) { return checkbox.checked; },
+        name: "checbox " + targetOrId
+    });
 }
-exports.fromRadioGroup = fromRadioGroup;
-function fromSelect(nodeOrId) {
-    var select = utils.getNode(nodeOrId);
-    return fromEvent(select, 'change', 'selected of ' + em(nodeOrId)).map(function () { return select.value; });
-}
-exports.fromSelect = fromSelect;
+exports.checkboxClicks = checkboxClicks;
 ;
-function mouse(nodeOrId) {
-    var mouse = utils.getNode(nodeOrId);
-    var emitters = ['down', 'up', 'over', 'out', 'move'].map(function (type) { return fromEvent(mouse, 'mouse' + type).map(function (e) { return (e.happend ? eevent.of({ type: type, data: e.value }) : eevent.notHappend); }); });
-    var emitter = transformator.merge.apply(transformator, emitters);
-    emitter.name = '| mouse on ' + em(nodeOrId) + ' |>';
-    return emitter;
+function checkboxes(targetsOrName) {
+    var targets = getTargetsByName(targetsOrName);
+    var prevValue = {};
+    targets.forEach(function (t) { return prevValue[t.id] = t.checked; });
+    return fromValues({
+        targetsOrName: targets,
+        listener: function (emitter, target) {
+            return function () {
+                prevValue[target.id] = target.checked;
+                emitter.emit(shallowCopy(prevValue));
+            };
+        },
+        name: "checkboxes " + targetsOrName,
+        type: 'click',
+        initialValue: prevValue
+    });
 }
-exports.mouse = mouse;
+exports.checkboxes = checkboxes;
+function radioGroup(targetsOrName) {
+    var targets = getTargetsByName(targetsOrName);
+    return fromValues({
+        targetsOrName: targets,
+        listener: function (emitter, target) {
+            return function () { return emitter.emit(target.id); };
+        },
+        name: "radio group " + targetsOrName,
+        type: 'click',
+        initialValue: targets.filter(function (t) { return t.checked; })[0].id
+    });
+}
+exports.radioGroup = radioGroup;
+function select(targetOrId) {
+    var select = getTargetById(targetOrId);
+    return fromValue({
+        target: select,
+        name: "select " + targetOrId,
+        mapping: function () { return select.value; },
+        type: 'change',
+        initialValue: select.value
+    });
+}
+exports.select = select;
 ;
+function mouseXY(targetOrId) {
+    return fromValue({
+        type: 'mousemove',
+        target: targetOrId,
+        initialValue: { x: undefined, y: undefined },
+        name: 'mouse position',
+        mapping: function (e) { return ({ x: e.offsetX, y: e.offsetY }); }
+    });
+}
+exports.mouseXY = mouseXY;
+function mouseDown(targetOrId) {
+    return fromEvent({
+        type: 'mousedown',
+        target: targetOrId,
+        mapping: function (e) { return ({ x: e.offsetX, y: e.offsetY }); }
+    });
+}
+exports.mouseDown = mouseDown;
+function mouseUp(targetOrId) {
+    return fromEvent({
+        type: 'mouseup',
+        target: targetOrId,
+        mapping: function (e) { return ({ x: e.offsetX, y: e.offsetY }); }
+    });
+}
+exports.mouseUp = mouseUp;
 var hashEmitter = null;
 function hash() {
     if (!hashEmitter) {
-        hashEmitter = electric.emitter.manual(window.location.hash);
-        hashEmitter.name = '| window.location.hash |>';
-        window.addEventListener('hashchange', function () {
-            hashEmitter.emit(window.location.hash);
+        hashEmitter = fromValue({
+            type: 'hashchange',
+            name: 'window.location.hash',
+            target: window,
+            mapping: function () { return window.location.hash; },
+            initialValue: window.location.hash
         });
     }
     return hashEmitter;
 }
 exports.hash = hash;
-function enter(nodeOrId) {
-    var target = utils.getNode(nodeOrId);
-    var e = electric.emitter.manualEvent();
-    e.name = '| enter on ' + em(nodeOrId) + ' |>';
-    var impulse = function (event) {
-        if (event.keyCode === 13) {
-            e.impulse(null);
-        }
-    };
-    target.addEventListener('keydown', impulse, false);
-    e.setReleaseResources(function () { return target.removeEventListener('keydown', impulse, false); });
-    return e;
+function fromEvent(options) {
+    var useCapture = options.useCapture === true ? true : false;
+    var emitter = electric.emitter.manualEvent();
+    var target = getTargetById(options.target);
+    emitter.name = options.name || options.type + " on " + options.target;
+    var impulse = emitOrImpluse(emitter, options);
+    target.addEventListener(options.type, impulse, useCapture);
+    emitter.setReleaseResources(function () {
+        return target.removeEventListener(options.type, impulse, useCapture);
+    });
+    return emitter;
 }
-exports.enter = enter;
-
-},{"../electric":20,"../electric-event":19,"../fp":23,"../receivers/utils":27,"../transformator":30}],23:[function(require,module,exports){
-function identity(x) {
-    return x;
+exports.fromEvent = fromEvent;
+function fromValue(options) {
+    var useCapture = options.useCapture === true ? true : false;
+    var emitter = electric.emitter.manual(options.initialValue);
+    var target = getTargetById(options.target);
+    emitter.name = options.name || options.type + " on " + options.target;
+    var emit = emitOrImpluse(emitter, options, false);
+    target.addEventListener(options.type, emit, useCapture);
+    emitter.setReleaseResources(function () {
+        return target.removeEventListener(options.type, emit, useCapture);
+    });
+    return emitter;
 }
-exports.identity = identity;
-;
-function curry(f, arity) {
-    if (arity === void 0) { arity = 2; }
-    function partial(prevArgs) {
-        return function () {
-            var args = [];
-            for (var _i = 0; _i < arguments.length; _i++) {
-                args[_i - 0] = arguments[_i];
+exports.fromValue = fromValue;
+function fromValues(options) {
+    var targets = getTargetsByName(options.targetsOrName);
+    var emitter = electric.emitter.manual(options.initialValue);
+    var listeners = [];
+    targets.forEach(function (t) {
+        listeners.push(options.listener(emitter, t));
+        t.addEventListener(options.type, listeners[listeners.length - 1]);
+    });
+    emitter.name = options.name || options.type + " " + options.targetsOrName;
+    emitter.setReleaseResources(function () {
+        targets.forEach(function (t, i) {
+            t.removeEventListener(options.type, listeners[i]);
+        });
+    });
+    return emitter;
+}
+exports.fromValues = fromValues;
+// some event can fire with high frequency
+// so here we ensure that all the checks of
+// provided options are calculated only at creation
+// ugly code
+function emitOrImpluse(emitter, options, impulse) {
+    if (impulse === void 0) { impulse = true; }
+    var filter = options.filter;
+    var mapping = options.mapping;
+    var preventDefault = options.preventDefault;
+    if (filter && mapping && impulse && preventDefault) {
+        return function (event) {
+            if (filter(event)) {
+                emitter.impulse(mapping(event));
             }
-            var nextArgs = prevArgs.slice();
-            nextArgs.splice.apply(nextArgs, [nextArgs.length, 0].concat(args));
-            if (nextArgs.length >= arity) {
-                return f.apply(void 0, nextArgs);
+        };
+    }
+    else if (filter && mapping && impulse) {
+        return function (event) {
+            if (filter(event)) {
+                emitter.impulse(mapping(event));
             }
-            return partial(nextArgs);
         };
     }
-    return partial([]);
+    else if (filter && impulse && preventDefault) {
+        return function (event) {
+            event.preventDefault();
+            if (filter(event)) {
+                emitter.impulse(event);
+            }
+        };
+    }
+    else if (filter && impulse) {
+        return function (event) {
+            if (filter(event)) {
+                emitter.impulse(event);
+            }
+        };
+    }
+    else if (mapping && impulse && preventDefault) {
+        return function (event) {
+            event.preventDefault();
+            emitter.impulse(mapping(event));
+        };
+    }
+    else if (mapping && impulse) {
+        return function (event) {
+            emitter.impulse(mapping(event));
+        };
+    }
+    else if (filter && mapping && preventDefault) {
+        return function (event) {
+            event.preventDefault();
+            if (filter(event)) {
+                emitter.emit(mapping(event));
+            }
+        };
+    }
+    else if (filter && mapping) {
+        return function (event) {
+            if (filter(event)) {
+                emitter.emit(mapping(event));
+            }
+        };
+    }
+    else if (filter && preventDefault) {
+        return function (event) {
+            event.preventDefault();
+            if (filter(event)) {
+                emitter.emit(event);
+            }
+        };
+    }
+    else if (filter) {
+        return function (event) {
+            if (filter(event)) {
+                emitter.emit(event);
+            }
+        };
+    }
+    else if (mapping && preventDefault) {
+        return function (event) {
+            event.preventDefault();
+            emitter.emit(mapping(event));
+        };
+    }
+    else if (mapping) {
+        return function (event) {
+            emitter.emit(mapping(event));
+        };
+    }
+    else if (preventDefault) {
+        return function (event) {
+            event.preventDefault();
+            emitter.impulse(event);
+        };
+    }
+    else {
+        return function (event) {
+            emitter.impulse(event);
+        };
+    }
 }
-exports.curry = curry;
-;
-function property(name) {
-    return function (obj) {
-        return obj[name];
-    };
+function getTargetById(t) {
+    if (typeof t === 'string') {
+        return document.getElementById(t);
+    }
+    return t;
 }
-exports.property = property;
-;
-function compose(f, g) {
-    return function () {
-        var args = [];
-        for (var _i = 0; _i < arguments.length; _i++) {
-            args[_i - 0] = arguments[_i];
-        }
-        return f(g.apply(void 0, args));
-    };
+function getTargetsByName(t) {
+    if (typeof t === 'string') {
+        return Array.prototype.slice.apply(document.getElementsByName(t));
+    }
+    return t;
 }
-exports.compose = compose;
-var maybe;
-(function (maybe) {
-    var Just = (function () {
-        function Just(value) {
-            this.value = value;
-        }
-        Just.prototype.map = function (f) {
-            var result = f(this.flatten());
-            return just(result);
-        };
-        Just.prototype.flatten = function () {
-            return this.value;
-        };
-        Just.prototype.chain = function (f) {
-            return this.map(f).flatten();
-        };
-        return Just;
-    })();
-    function just(value) {
-        return new Just(value);
-    }
-    maybe.just = just;
-    var Nothing = (function () {
-        function Nothing() {
-        }
-        Nothing.prototype.map = function (f) {
-            return maybe.nothing;
-        };
-        Nothing.prototype.bind = function (f) {
-            return maybe.nothing;
-        };
-        Nothing.prototype.flatten = function () {
-            throw Error("can't flatten Nothing");
-        };
-        Nothing.prototype.chain = function (f) {
-            return maybe.nothing;
-        };
-        return Nothing;
-    })();
-    maybe.nothing = new Nothing();
-})(maybe = exports.maybe || (exports.maybe = {}));
-var either;
-(function (either) {
-    var Right = (function () {
-        function Right(value) {
-            this.value = value;
-        }
-        Right.prototype.map = function (f) {
-            var result = f(this.flatten());
-            return right(result);
-        };
-        Right.prototype.flatten = function () {
-            return this.value;
-        };
-        Right.prototype.chain = function (f) {
-            return this.map(f).flatten();
-        };
-        Right.prototype.isRight = function () {
-            return true;
-        };
-        Right.prototype.isLeft = function () {
-            return false;
-        };
-        return Right;
-    })();
-    function right(value) {
-        return new Right(value);
-    }
-    either.right = right;
-    var Left = (function () {
-        function Left(value) {
-            this.lvalue = value;
-        }
-        Left.prototype.map = function (f) {
-            return left(this.lvalue);
-        };
-        Left.prototype.flatten = function () {
-            throw Error("can't flatten Left");
-        };
-        Left.prototype.chain = function (f) {
-            return left(this.lvalue);
-        };
-        Left.prototype.isRight = function () {
-            return false;
-        };
-        Left.prototype.isLeft = function () {
-            return true;
-        };
-        return Left;
-    })();
-    function left(value) {
-        return (new Left(value));
-        // when remove <any> casting:
-        // Neither type 'Left<L, {}>' nor type 'Either<L, R>' is assignable to the other.
-        // Types of property 'flatten' are incompatible.
-        // Type '() => {} | Either<L, {}>' is not assignable to type '() => R | Monad<R>'.
-        // Type '{} | Either<L, {}>' is not assignable to type 'R | Monad<R>'.
-        // Type '{}' is not assignable to type 'R | Monad<R>'.
-        // Type '{}' is not assignable to type 'Monad<R>'.
-        // Property 'flatten' is missing in type '{}'.
-    }
-    either.left = left;
-})(either = exports.either || (exports.either = {}));
 
-},{}],24:[function(require,module,exports){
+},{"../electric":20,"../utils/key-codes":34,"../utils/shallow-copy":38}],23:[function(require,module,exports){
+var pushIfNotIn = require('./utils//push-if-not-in');
+var Graph = (function () {
+    function Graph(source, depth, showCurrentValue) {
+        this._sources = [];
+        this.vertices = [];
+        this.showCurrentValue = showCurrentValue;
+        this.sourceIndex = this._findVertices(source, 0, depth);
+        this._findEdges();
+        this.clean();
+    }
+    Graph.of = function (source, depth, showCurrentValue) {
+        if (showCurrentValue === void 0) { showCurrentValue = false; }
+        return new Graph(source, depth, showCurrentValue);
+    };
+    Graph.prototype.removeVertex = function (id) {
+        this.vertices = this.vertices
+            .filter(function (v) { return v.id !== id; })
+            .map(function (v) { return ({
+            id: v.id,
+            name: v.name,
+            receivers: v.receivers.filter(function (r) { return r !== id; }),
+            emitters: v.emitters.filter(function (e) { return e !== id; }),
+            type: v.type
+        }); });
+        this.edges = this.edges.filter(function (e) { return e.source !== id && e.target !== id; });
+    };
+    Graph.prototype._findVertices = function (source, depth, maxDepth) {
+        if (source.__$visualize_visited_id$ !== undefined) {
+            return source.__$visualize_visited_id$;
+        }
+        this._sources.push(source);
+        this.vertices.push({
+            id: this.vertices.length,
+            name: this._name(source),
+            receivers: [],
+            emitters: [],
+            type: this._sourceType(source)
+        });
+        source.__$visualize_visited_id$ = this.vertices.length - 1;
+        this._goBackwards(source, depth + 1, maxDepth);
+        this._goForwards(source, depth + 1, maxDepth);
+        return source.__$visualize_visited_id$;
+    };
+    Graph.prototype._sourceType = function (source) {
+        if (typeof source === 'function') {
+            return 'receiver';
+        }
+        if (!source._wires) {
+            return 'emitter';
+        }
+        return 'transformator';
+    };
+    Graph.prototype._goBackwards = function (source, depth, maxDepth) {
+        var _this = this;
+        if (this._shouldntGo(depth, maxDepth, source._wires)) {
+            return;
+        }
+        source._wires.forEach(function (w) {
+            var e = w.input;
+            e = _this._maybeUnpackPlaceholder(e);
+            var wId = _this._findVertices(e, depth, maxDepth);
+            var sourceId = source.__$visualize_visited_id$;
+            pushIfNotIn(_this.vertices[sourceId].emitters, wId);
+            pushIfNotIn(_this.vertices[wId].receivers, sourceId);
+        });
+    };
+    Graph.prototype._goForwards = function (source, depth, maxDepth) {
+        var _this = this;
+        if (this._shouldntGo(depth, maxDepth, source._receivers)) {
+            return;
+        }
+        source._receivers.forEach(function (r) {
+            r = _this._maybeUnpackWire(r);
+            r = _this._maybeUnpackPlaceholder(r);
+            var rId = _this._findVertices(r, depth, maxDepth);
+            var sourceId = source.__$visualize_visited_id$;
+            pushIfNotIn(_this.vertices[sourceId].receivers, rId);
+            pushIfNotIn(_this.vertices[rId].emitters, sourceId);
+        });
+    };
+    Graph.prototype._shouldntGo = function (depth, maxDepth, potentialEdges) {
+        if (maxDepth && depth >= maxDepth) {
+            return true;
+        }
+        if (potentialEdges === undefined) {
+            return true;
+        }
+        return false;
+    };
+    Graph.prototype._maybeUnpackPlaceholder = function (e) {
+        if (e._emitter !== undefined) {
+            return e._emitter;
+        }
+        return e;
+    };
+    Graph.prototype._maybeUnpackWire = function (w) {
+        if (w.input !== undefined && w.output !== undefined) {
+            return w.output;
+        }
+        return w;
+    };
+    Graph.prototype._name = function (source) {
+        if (typeof source === 'function') {
+            return "< " + (source.name || 'anonymous') + " |";
+        }
+        return source.toString(this.showCurrentValue);
+    };
+    Graph.prototype._findEdges = function () {
+        var _this = this;
+        this.edges = [];
+        for (var i = 0; i < this.vertices.length; i++) {
+            var node = this.vertices[i];
+            var type = 'transformator';
+            node.emitters.forEach(function (e) {
+                _this.edges.push({
+                    source: e,
+                    target: i
+                });
+            });
+        }
+    };
+    Graph.prototype.clean = function () {
+        this._sources.forEach(function (s) { return s.__$visualize_visited_id$ = undefined; });
+    };
+    Graph.prototype.stringify = function () {
+        return JSON.stringify({
+            vertices: this.vertices,
+            edges: this.edges
+        });
+    };
+    return Graph;
+})();
+module.exports = Graph;
+
+},{"./utils//push-if-not-in":37}],24:[function(require,module,exports){
 // functions that can be simply queued
 var functionsToVoid = [
     'plugReceiver',
@@ -1597,11 +1742,17 @@ var Placeholder = (function () {
     function Placeholder(initialValue) {
         this._actions = [];
         this.initialValue = initialValue;
-        this.name = '| placeholder >';
+        this.name = '? placeholder ?';
     }
-    Placeholder.prototype.toString = function () {
-        var subname = this._emitter ? this._emitter.toString() : "| ? = " + this.dirtyCurrentValue() + " >";
-        return "placeholder: " + subname;
+    Placeholder.prototype.toString = function (showCurrentValue) {
+        if (showCurrentValue === void 0) { showCurrentValue = false; }
+        if (this._emitter) {
+            return 'placeholder: ' + this._emitter.toString(showCurrentValue);
+        }
+        else if (showCurrentValue) {
+            return "? placeholder = " + this.dirtyCurrentValue() + " >";
+        }
+        return '? placeholder >';
     };
     Placeholder.prototype.is = function (emitter) {
         if (this._emitter) {
@@ -1621,7 +1772,7 @@ var Placeholder = (function () {
         else if (this.initialValue !== undefined) {
             return this.initialValue;
         }
-        throw Error('called dirtyCurrentValue() on placeholder without initial value');
+        throw Error('called dirtyCurrentValue() on placeholder without initial value ' + this.name);
     };
     return Placeholder;
 })();
@@ -1649,6 +1800,7 @@ function doOrQueueAndReturnPlaceholder(name) {
         }
         else {
             var p = placeholder();
+            p.name = p.name + ' ' + name + ' >';
             this._actions.push(function (emitter) {
                 p.is(emitter[name].apply(emitter, args));
             });
@@ -1720,26 +1872,6 @@ function htmlReceiverById(id) {
 exports.htmlReceiverById = htmlReceiverById;
 
 },{}],27:[function(require,module,exports){
-function getNode(nodeOrId) {
-    if (typeof nodeOrId === 'string') {
-        return document.getElementById(nodeOrId);
-    }
-    else {
-        return nodeOrId;
-    }
-}
-exports.getNode = getNode;
-function getNodes(nodesOfName) {
-    if (typeof nodesOfName === 'string') {
-        return Array.prototype.slice.call(document.getElementsByName(nodesOfName));
-    }
-    else {
-        return nodesOfName;
-    }
-}
-exports.getNodes = getNodes;
-
-},{}],28:[function(require,module,exports){
 var stopTime = Date.now();
 var callbacks = {};
 var stopped = false;
@@ -1837,7 +1969,7 @@ function removeFromCallbacksAtTime(callbacksAtTime, callback) {
     }
 }
 
-},{}],29:[function(require,module,exports){
+},{}],28:[function(require,module,exports){
 var callIfFunction = require('./utils/call-if-function');
 var Wire = require('./wire');
 var scheduler = require('./scheduler');
@@ -1995,13 +2127,28 @@ function cumulateOverTime(delayInMiliseconds) {
 }
 exports.cumulateOverTime = cumulateOverTime;
 ;
+function changes(initialValue) {
+    return function transform(emit, impulse) {
+        var previous = initialValue;
+        return function changesTransform(v, i) {
+            impulse(eevent.of({
+                previous: previous,
+                next: v[i]
+            }));
+            previous = v[i];
+        };
+    };
+}
+exports.changes = changes;
 
-},{"./electric-event":19,"./scheduler":28,"./utils/call-if-function":33,"./wire":35}],30:[function(require,module,exports){
+},{"./electric-event":19,"./scheduler":27,"./utils/call-if-function":32,"./wire":39}],29:[function(require,module,exports){
 var emitter = require('./emitter');
-var namedTransformator = emitter.namedTransformator;
 var transformators = require('./transformator-helpers');
 var eevent = require('../src/electric-event');
 var fn = require('./utils/fn');
+var mapObj = require('./utils/map-obj');
+var objKeys = require('./utils/objKeys');
+var namedTransformator = emitter.namedTransformator;
 function map(mapping, emitter1, emitter2, emitter3, emitter4, emitter5, emitter6, emitter7) {
     var emitters = Array.prototype.slice.apply(arguments, [1]);
     return namedTransformator("map(" + fn(mapping) + ")", emitters, transformators.map(mapping, emitters.length), mapping.apply(null, emitters.map(function (e) { return e.dirtyCurrentValue(); })));
@@ -2059,17 +2206,7 @@ function hold(initialValue, emitter) {
 exports.hold = hold;
 ;
 function changes(emitter) {
-    var previous = emitter.dirtyCurrentValue();
-    function transform(emit, impulse) {
-        return function changesTransform(v, i) {
-            impulse(eevent.of({
-                previous: previous,
-                next: v[i]
-            }));
-            previous = v[i];
-        };
-    }
-    return namedTransformator('changes', [emitter], transform, eevent.notHappend);
+    return namedTransformator('changes', [emitter], transformators.changes(emitter.dirtyCurrentValue()), eevent.notHappend);
 }
 exports.changes = changes;
 function skipFirst(emitter) {
@@ -2121,7 +2258,7 @@ function flattenMany(emitter) {
     var currentValues = emitter.dirtyCurrentValue().map(function (e) { return e.dirtyCurrentValue(); });
     var transformator = namedTransformator('flattenMany', [emitter].concat(emitter.dirtyCurrentValue()), transform, currentValues);
     function transform(emit) {
-        return function flattenTransform(v, i) {
+        return function flattenManyTransform(v, i) {
             if (i == 0) {
                 transformator.dropEmitters(1);
                 v[0].forEach(function (e) { return transformator.plugEmitter(e); });
@@ -2136,8 +2273,37 @@ function flattenMany(emitter) {
     return transformator;
 }
 exports.flattenMany = flattenMany;
+function flattenNamed(emitter) {
+    var currentValue = emitter.dirtyCurrentValue();
+    var currentValues = mapObj(currentValue, function (e) { return e.dirtyCurrentValue(); });
+    var currentKeys = objKeys(currentValue);
+    var transformator = namedTransformator('flattenNamed', [emitter].concat(currentKeys.map(function (k) { return currentValue[k]; })), transform, currentValues);
+    function transform(emit) {
+        var keys = currentKeys;
+        return function flattenNamedTransform(v, i) {
+            if (i == 0) {
+                transformator.dropEmitters(1);
+                keys = objKeys(v[0]);
+                keys.forEach(function (k) {
+                    transformator.plugEmitter(v[0][k]);
+                });
+                emit(mapObj(v[0], function (e) { return e.dirtyCurrentValue(); }));
+            }
+            else {
+                var r = {};
+                keys.forEach(function (k, i) {
+                    r[k] = v[i + 1];
+                });
+                emit(r);
+            }
+        };
+    }
+    ;
+    return transformator;
+}
+exports.flattenNamed = flattenNamed;
 
-},{"../src/electric-event":19,"./emitter":21,"./transformator-helpers":29,"./utils/fn":34}],31:[function(require,module,exports){
+},{"../src/electric-event":19,"./emitter":21,"./transformator-helpers":28,"./utils/fn":33,"./utils/map-obj":35,"./utils/objKeys":36}],30:[function(require,module,exports){
 var __extends = (this && this.__extends) || function (d, b) {
     for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p];
     function __() { this.constructor = d; }
@@ -2164,13 +2330,13 @@ var Transmitter = (function (_super) {
     return Transmitter;
 })(emitter.Transformator);
 function transmitter(initialValue) {
-    var t = new Transmitter([], undefined, initialValue);
+    var t = new Transmitter([], initialValue, undefined);
     t.name = '? | transmitter';
     return t;
 }
 module.exports = transmitter;
 
-},{"./emitter":21,"./wire":35}],32:[function(require,module,exports){
+},{"./emitter":21,"./wire":39}],31:[function(require,module,exports){
 function all(list) {
     for (var i = 0; i < list.length; i++) {
         if (!list[i]) {
@@ -2181,7 +2347,7 @@ function all(list) {
 }
 module.exports = all;
 
-},{}],33:[function(require,module,exports){
+},{}],32:[function(require,module,exports){
 function callIfFunction(obj) {
     var args = [];
     for (var _i = 1; _i < arguments.length; _i++) {
@@ -2196,13 +2362,157 @@ function callIfFunction(obj) {
 }
 module.exports = callIfFunction;
 
-},{}],34:[function(require,module,exports){
+},{}],33:[function(require,module,exports){
 function fn(f) {
     return f.name || '=>';
 }
 module.exports = fn;
 
+},{}],34:[function(require,module,exports){
+var keyCodes = {
+    space: 32,
+    backspace: 8,
+    tab: 9,
+    enter: 13,
+    shift: 16,
+    ctrl: 17,
+    alt: 18,
+    pause: 19,
+    capslock: 20,
+    escape: 27,
+    pageup: 33,
+    pagedown: 34,
+    end: 35,
+    home: 36,
+    left: 37,
+    up: 38,
+    right: 39,
+    down: 40,
+    insert: 45,
+    delete: 46,
+    '0': 48,
+    '1': 49,
+    '2': 50,
+    '3': 51,
+    '4': 52,
+    '5': 53,
+    '6': 54,
+    '7': 55,
+    '8': 56,
+    '9': 57,
+    a: 65,
+    b: 66,
+    c: 67,
+    d: 68,
+    e: 69,
+    f: 70,
+    g: 71,
+    h: 72,
+    i: 73,
+    j: 74,
+    k: 75,
+    l: 76,
+    m: 77,
+    n: 78,
+    o: 79,
+    p: 80,
+    q: 81,
+    r: 82,
+    s: 83,
+    t: 84,
+    u: 85,
+    v: 86,
+    w: 87,
+    x: 88,
+    y: 89,
+    z: 90,
+    numpad0: 96,
+    numpad1: 97,
+    numpad2: 98,
+    numpad3: 99,
+    numpad4: 100,
+    numpad5: 101,
+    numpad6: 102,
+    numpad7: 103,
+    numpad8: 104,
+    numpad9: 105,
+    multiply: 106,
+    add: 107,
+    subtract: 109,
+    decimalpoint: 110,
+    divide: 111,
+    f1: 112,
+    f2: 113,
+    f3: 114,
+    f4: 115,
+    f5: 116,
+    f6: 117,
+    f7: 118,
+    f8: 119,
+    f9: 120,
+    f10: 121,
+    f11: 122,
+    f12: 123,
+    numlock: 144,
+    scrolllock: 145,
+    semicolon: 186,
+    equal: 187,
+    comma: 188,
+    dash: 189,
+    period: 190,
+    forwardslash: 191,
+    graveaccent: 192,
+    openbracket: 219,
+    backslash: 220,
+    closebraket: 221,
+    singlequote: 222
+};
+module.exports = keyCodes;
+
 },{}],35:[function(require,module,exports){
+function mapObj(obj, mapping) {
+    var result = {};
+    for (var key in obj) {
+        if (!obj.hasOwnProperty(key)) {
+            continue;
+        }
+        result[key] = mapping(obj[key]);
+    }
+    return result;
+}
+module.exports = mapObj;
+
+},{}],36:[function(require,module,exports){
+function objKeys(obj) {
+    var result = [];
+    for (var k in obj) {
+        if (obj.hasOwnProperty(k)) {
+            result.push(k);
+        }
+    }
+    return result;
+}
+module.exports = objKeys;
+
+},{}],37:[function(require,module,exports){
+function pushIfNotIn(list, item) {
+    if (list.indexOf(item) === -1) {
+        list.push(item);
+    }
+}
+module.exports = pushIfNotIn;
+
+},{}],38:[function(require,module,exports){
+function shallowCopy(obj) {
+    var copy = {};
+    for (var k in obj) {
+        copy[k] = obj[k];
+    }
+    return copy;
+}
+module.exports = shallowCopy;
+
+},{}],39:[function(require,module,exports){
 var Wire = (function () {
     function Wire(input, output, receive, set) {
         this.input = input;
@@ -2215,7 +2525,7 @@ var Wire = (function () {
         else {
             this.receive = receive;
         }
-        this.receiverId = this.input.plugReceiver(this);
+        this._receiverId = this.input.plugReceiver(this);
     }
     Wire.prototype.toString = function () {
         return this.input.toString() + " -" + this.name + "- " + this.output.toString();
@@ -2228,7 +2538,7 @@ var Wire = (function () {
     };
     Wire.prototype.unplug = function () {
         if (this.input) {
-            this.input.unplugReceiver(this.receiverId);
+            this.input.unplugReceiver(this._receiverId);
         }
         this.input = undefined;
         this.output = undefined;

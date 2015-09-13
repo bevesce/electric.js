@@ -1,4 +1,3 @@
-import inf = require('../interfaces');
 import electric = require('../electric');
 import utils = require('../receivers/utils');
 import transformator = require('../transformator');
@@ -19,14 +18,15 @@ export function clicks<T>(targetOrId: TargetOrId, mapping?: (event: Event) => T)
 	});
 }
 
-export function key(name: string, type: string): inf.IEmitter<electric.event<string>> {
+export function key(name: string, type: string): electric.emitter.Emitter<electric.event<string>> {
 	var keyCode = keyCodes[name];
 	return fromEvent({
 		target: document.body,
 		mapping: (e: Event) => name,
 		filter: (e: any) => e.keyCode === keyCode,
 		type: 'key' + type,
-		preventDefault: true
+		preventDefault: true,
+		name: `key -${name}- ${type}`
 	})
 }
 
@@ -41,7 +41,7 @@ export function text(targetOrId: TargetOrId, type = 'keyup') {
 	});
 }
 
-export function enteredText(targetOrId: TargetOrId): inf.IEmitter<eevent<string>> {
+export function enteredText(targetOrId: TargetOrId): electric.emitter.Emitter<eevent<string>> {
 	var input = getTargetById(targetOrId);
 	return fromEvent({
 		target: input,
@@ -79,7 +79,7 @@ export function checkboxes(targetsOrName: TargetsOrName) {
 	targets.forEach((t: any) => prevValue[t.id] = t.checked);
 	return fromValues({
 		targetsOrName: targets,
-		listener: (emitter: electric.emitter.Emitter<{ [id: string]: boolean }>, target: any) => {
+		listener: (emitter: electric.emitter.ConcreteEmitter<{ [id: string]: boolean }>, target: any) => {
 			return () => {
 				prevValue[target.id] = target.checked;
 				emitter.emit(shallowCopy(prevValue))
@@ -95,7 +95,7 @@ export function radioGroup(targetsOrName: TargetsOrName) {
 	var targets = getTargetsByName(targetsOrName);
 	return fromValues({
 		targetsOrName: targets,
-		listener: (emitter: electric.emitter.Emitter<string>, target: any) => {
+		listener: (emitter: electric.emitter.ConcreteEmitter<string>, target: any) => {
 			return () => emitter.emit(target.id)
 		},
 		name: `radio group ${targetsOrName}`,
@@ -115,11 +115,11 @@ export function select(targetOrId: TargetOrId) {
 	})
 };
 
-export function mouseXY(targetOrId: TargetOrId): inf.IEmitter<{ x: number, y: number }> {
+export function mouseXY(targetOrId: TargetOrId): electric.emitter.Emitter<{ x: number, y: number }> {
 	return fromValue({
 		type: 'mousemove',
 		target: targetOrId,
-		initialValue: undefined,
+		initialValue: {x: undefined, y: undefined},
 		name: 'mouse position',
 		mapping: (e: any) => ({ x: e.offsetX, y: e.offsetY })
 	})
@@ -127,7 +127,7 @@ export function mouseXY(targetOrId: TargetOrId): inf.IEmitter<{ x: number, y: nu
 
 export function mouseDown(
 	targetOrId: TargetOrId
-): inf.IEmitter<electric.event<{ x: number, y: number }>> {
+): electric.emitter.Emitter<electric.event<{ x: number, y: number }>> {
 	return fromEvent({
 		type: 'mousedown',
 		target: targetOrId,
@@ -137,7 +137,7 @@ export function mouseDown(
 
 export function mouseUp(
 	targetOrId: TargetOrId
-): inf.IEmitter<electric.event<{ x: number, y: number }>> {
+): electric.emitter.Emitter<electric.event<{ x: number, y: number }>> {
 	return fromEvent({
 		type: 'mouseup',
 		target: targetOrId,
@@ -147,7 +147,7 @@ export function mouseUp(
 
 var hashEmitter: any = null;
 
-export function hash(): inf.IEmitter<string> {
+export function hash(): electric.emitter.Emitter<string> {
 	if (!hashEmitter) {
 		hashEmitter = fromValue({
 			type: 'hashchange',
@@ -168,14 +168,14 @@ export function fromEvent<T>(options: {
 	filter?: (event: Event) => boolean,
 	mapping: (event: Event) => T,
 	useCapture?: boolean
-}): inf.IEmitter<electric.event<T>>;
+}): electric.emitter.Emitter<electric.event<T>>;
 export function fromEvent<T>(options: {
 	name?: string,
 	target: (EventTarget | string),
 	type: string,
 	filter?: (event: Event) => boolean,
 	useCapture?: boolean
-}): inf.IEmitter<electric.event<Event>>;
+}): electric.emitter.Emitter<electric.event<Event>>;
 export function fromEvent<T>(options: {
 	name?: string,
 	target: (EventTarget | string),
@@ -183,9 +183,9 @@ export function fromEvent<T>(options: {
 	filter?: (event: Event) => boolean,
 	mapping?: (event: Event) => T,
 	useCapture?: boolean
-}): inf.IEmitter<electric.event<Event | T>> {
+}): electric.emitter.Emitter<electric.event<Event | T>> {
 	var useCapture = options.useCapture === true ? true : false;
-	var emitter = <inf.IEmitter<electric.event<T | Event>>><any>electric.emitter.manualEvent();
+	var emitter = <electric.emitter.Emitter<electric.event<T | Event>>><any>electric.emitter.manualEvent();
 	var target = getTargetById(options.target);
 	emitter.name = options.name || `${options.type} on ${options.target}`
 	var impulse = emitOrImpluse(emitter, options);
@@ -205,7 +205,7 @@ export function fromValue<T>(options: {
 	initialValue: T,
 	preventDefault?: boolean,
 	useCapture?: boolean
-}): inf.IEmitter<T>;
+}): electric.emitter.Emitter<T>;
 export function fromValue<T>(options: {
 	name?: string,
 	target: (EventTarget | string),
@@ -214,7 +214,7 @@ export function fromValue<T>(options: {
 	initialValue: Event,
 	preventDefault?: boolean,
 	useCapture?: boolean
-}): inf.IEmitter<Event>;
+}): electric.emitter.Emitter<Event>;
 export function fromValue<T>(options: {
 	name?: string,
 	target: (EventTarget | string),
@@ -224,9 +224,9 @@ export function fromValue<T>(options: {
 	initialValue: Event | T,
 	preventDefault?: boolean,
 	useCapture?: boolean
-}): inf.IEmitter<Event | T> {
+}): electric.emitter.Emitter<Event | T> {
 	var useCapture = options.useCapture === true ? true : false;
-	var emitter = <inf.IEmitter<T | Event>><any>electric.emitter.manual(
+	var emitter = <electric.emitter.Emitter<T | Event>><any>electric.emitter.manual(
 		options.initialValue
 	);
 	var target = getTargetById(options.target);
@@ -241,7 +241,7 @@ export function fromValue<T>(options: {
 
 export function fromValues<T>(options: {
 	targetsOrName: TargetsOrName,
-	listener: (emitter: inf.IEmitter<T>, target: EventTarget) => void,
+	listener: (emitter: electric.emitter.Emitter<T>, target: EventTarget) => void,
 	initialValue: T,
 	name?: string,
 	type: string

@@ -3,7 +3,6 @@
 import chai = require("chai");
 var expect = chai.expect;
 
-import inf = require('../src/interfaces');
 import electric = require('../src/electric');
 import eevent = require('../src/electric-event');
 import graph = require('../src/graph');
@@ -17,9 +16,9 @@ function double(x: number) {
 
 describe('toString', function() {
 	it('should work for emitters', function() {
-		var e = electric.e.manual(0);
+		var e = electric.emitter.manual(0);
 		expect(
-			e.toString()
+			e.toString(true)
 		).to.equal('| manual = 0 >');
 	});
 
@@ -27,15 +26,15 @@ describe('toString', function() {
 		var e = electric.e.manual(0);
 		e.name = 'test'
 		expect(
-			e.toString()
+			e.toString(true)
 		).to.equal('| test = 0 >');
 	});
 });
 
-describe('walk', function() {
+describe('graph', function() {
 	it('should construct graph with single node', function() {
 		var e = electric.e.manual(0);
-		var g = graph.of(e);
+		var g = graph.of(e, undefined, true);
 		expect(g.vertices).to.eql([
 			{
 				id: 0,
@@ -51,7 +50,7 @@ describe('walk', function() {
 	it('should construct graph with two nodes from emitter', function() {
 		var e = electric.e.manual(1);
 		var t = e.map(double);
-		var g = graph.of(e);
+		var g = graph.of(e, undefined, true);
 		expect(g.vertices).to.eql([
 			{
 				id: 0,
@@ -76,7 +75,7 @@ describe('walk', function() {
 	it('should construct graph with two nodes from receiver', function() {
 		var e = electric.e.manual(1);
 		var t = e.map(double);
-		var g = graph.of(t);
+		var g = graph.of(t, undefined, true);
 		expect(g.vertices).to.eql([
 			{
 				id: 0,
@@ -104,11 +103,11 @@ describe('walk', function() {
 		var t = e.change({
 			to: electric.e.constant(1), when: ev
 		});
-		var g = graph.of(ev);
+		var g = graph.of(ev, undefined, true);
 		expect(g.vertices).to.eql([
 			{
 				id: 0,
-			    name: '| manualEvent = NotHappend >',
+			    name: '| manual event = NotHappend >',
 			    receivers: [ 1 ],
 			    emitters: [],
 			    type: 'emitter'
@@ -138,7 +137,7 @@ describe('walk', function() {
 		var p = electric.e.placeholder(0);
 		var e = electric.e.manual(1);
 		p.is(e);
-		var g = graph.of(p);
+		var g = graph.of(p, undefined, true);
 		expect(g.vertices).to.eql([
 			{
 				id: 0,
@@ -153,7 +152,7 @@ describe('walk', function() {
 
 	it('should work with recursion', function() {
 		var collision = electric.e.placeholder(
-			<inf.IElectricEvent<string>>electric.event.notHappend
+			<electric.event<string>>electric.event.notHappend
 		);
 		var bullets = electric.e.constant('s').change({
 			to: electric.e.constant('w'),
@@ -164,7 +163,7 @@ describe('walk', function() {
 		)
 		bullets.name = 'bullets';
 		bullets.plugReceiver(function rec(x){ return x });
-		var g = graph.of(bullets);
+		var g = graph.of(bullets, undefined, true);
 		expect(g.vertices).to.eql([
 			{
 				id: 0,
@@ -213,7 +212,7 @@ describe('walk', function() {
 					.map(double)
 					.map(double)
 					.plugReceiver(function log(x) { return x; })
-		var g = graph.of(t, 2);
+		var g = graph.of(t, 2, true);
 		expect(g.vertices).to.eql([
 			{
 				id: 0,
@@ -242,4 +241,29 @@ describe('walk', function() {
 			{ source: 0, target: 2 }
 		]);
 	});
+
+	it('shoud habe removable vertices', function() {
+		var t = electric.emitter.manual(1)
+					.map(double)
+					.map(double);
+		var g = graph.of(t, undefined, true);
+		g.removeVertex(1);
+		expect(g.vertices).to.eql([
+			{
+			  	id: 0,
+			    name: '< map(double) = 4 >',
+			    receivers: [],
+			    emitters: [],
+			    type: 'transformator'
+			},
+			{
+				id: 2,
+			    name: '| manual = 1 >',
+			    receivers: [],
+			    emitters: [],
+			    type: 'emitter'
+			}
+		]);
+		expect(g.edges).to.eql([]);
+	})
 });

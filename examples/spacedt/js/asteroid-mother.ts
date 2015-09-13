@@ -5,7 +5,6 @@ import IntegrableAntiderivativeOfTwoNumbers = require('../../../src/calculus/int
 
 import c = require('./constants');
 import Point = require('./angled-point');
-import random = require('./utils/random');
 
 export = create;
 
@@ -21,19 +20,19 @@ function velocity(x: number, y: number) {
 }
 
 
-function create(startingPoint: Point) {
-	var v = cont(velocity(-Math.PI / 2, 100)).change(
-		{ to: (a, _) => cont(a.withX(random(-1, 1))), when: clock.interval({ inMs: 2000 }) }
-	);
+function create(
+	startingPoint: Point,
+	changeVelocity: electric.emitter.EventEmitter<number>
+) {
+	var v = cont(velocity(-Math.PI / 2, 100)).change({
+		to: (a, v) => cont(a.withX(v)),
+		when: changeVelocity
+	});
+	v.name = 'asteroid mother velocity';
 	var xya = calculus.integral(startingPoint, v, { fps: c.fps });
-	var birth = electric.transformator.map(
-		(time, xya) => time.map(_ => xya),
-		clock.interval({ inMs: c.asteroidMother.birthIntervalInMs }), xya
-	)
-
+	xya.name = 'asteroid mother position'
 	return {
 		v: v,
-		xya: xya,
-		birth: birth
+		xya: xya
 	}
 }

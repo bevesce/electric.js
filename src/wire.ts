@@ -1,19 +1,19 @@
-import inf = require('./interfaces');
+import Emitter = require('./interfaces/emitter');
+import receiver = require('./interfaces/receiver');
 
-class Wire<InOut>
-	implements inf.IWire<InOut>
-{
-	input: inf.IEmitter<InOut>;
-	output: inf.IReceiver<InOut>;
-	// receive: (x: InOut) => void;
-	private _futureReceive: (x: InOut) => void;
-	private _set: (x: InOut) => void;
-	private receiverId: number;
+
+class Wire<InOut> {
+	input: Emitter<InOut>;
+	output: receiver.Receiver<InOut>;
 	name: string;
 
+	private _futureReceive: (x: InOut) => void;
+	private _set: (x: InOut) => void;
+	private _receiverId: number;
+
 	constructor(
-		input: inf.IEmitter<InOut>,
-		output: inf.IReceiver<InOut>,
+		input: Emitter<InOut>,
+		output: receiver.Receiver<InOut>,
 		receive: (x: InOut) => void,
 		set?: (x: InOut) => void
 	) {
@@ -27,7 +27,7 @@ class Wire<InOut>
 		else {
 			this.receive = receive;
 		}
-		this.receiverId = this.input.plugReceiver(this);
+		this._receiverId = this.input.plugReceiver(this);
 	}
 
 	toString() {
@@ -43,7 +43,7 @@ class Wire<InOut>
 
 	unplug() {
 		if (this.input) {
-			this.input.unplugReceiver(this.receiverId);
+			this.input.unplugReceiver(this._receiverId);
 		}
 		this.input = undefined;
 		this.output = undefined;

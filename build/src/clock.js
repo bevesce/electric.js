@@ -11,7 +11,7 @@ function interval(options) {
 }
 exports.interval = interval;
 function intervalValue(value, options) {
-    var timer = emitter.manualEvent();
+    var timer = emitter.manualEvent(null);
     var id = scheduler.scheduleInterval(function () {
         timer.impulse(value);
     }, calculateInterval(options.inMs, options.fps));
@@ -20,6 +20,16 @@ function intervalValue(value, options) {
     return timer;
 }
 exports.intervalValue = intervalValue;
+function intervalOfRandom(min, max, options) {
+    var timer = emitter.manualEvent(null);
+    var id = scheduler.scheduleInterval(function () {
+        timer.impulse(random(min, max));
+    }, calculateInterval(options.inMs, options.fps));
+    timer.name = "intervalOfRandom(" + min + "-" + max + ", " + calculateEmitterName(options) + ")";
+    timer.setReleaseResources(function () { return scheduler.unscheduleInterval(id); });
+    return timer;
+}
+exports.intervalOfRandom = intervalOfRandom;
 function time(options) {
     var interval = calculateInterval(options.intervalInMs, options.fps);
     var timeEmitter = emitter.manual(scheduler.now());
@@ -47,4 +57,7 @@ function calculateEmitterName(options) {
     else {
         return 'interval: ' + options.intervalInMs + 'ms';
     }
+}
+function random(min, max) {
+    return Math.random() * (max - min) + min;
 }

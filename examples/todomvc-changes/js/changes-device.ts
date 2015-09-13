@@ -1,5 +1,3 @@
-import inf = require('../../../src/interfaces');
-
 import item = require('./item');
 import counter = require('./counter');
 import electric = require('../../../src/electric');
@@ -10,73 +8,63 @@ export = collection;
 
 const ACTIVE = '#/active';
 const COMPLETED = '#/completed';
+const ALL = '#/'
 
 
 function collection(
 	initialTasks: item[],
 	input: {
-		insert: inf.IEmitter<eevent<string>>,
-		check: inf.IEmitter<eevent<{ id: number, completed: boolean }>>,
-		toggle: inf.IEmitter<eevent<boolean>>,
-		retitle: inf.IEmitter<eevent<{ id: number, title: string }>>,
-		del: inf.IEmitter<eevent<number>>,
-		clear: inf.IEmitter<eevent<{}>>,
-		filter: inf.IEmitter<string>
+		insert: electric.emitter.EventEmitter<string>,
+		check: electric.emitter.EventEmitter<{ id: number, completed: boolean }>,
+		toggle: electric.emitter.EventEmitter<boolean>,
+		retitle: electric.emitter.EventEmitter<{ id: number, title: string }>,
+		del: electric.emitter.EventEmitter<number>,
+		clear: electric.emitter.EventEmitter<{}>,
+		filter: electric.emitter.Emitter<string>
 	}
 ) {
-	var ac = electric.emitter.placeholder(0);
-	var acShifted = <inf.IPlaceholder<number>>ac.transformTime(0, t => t + 1);
-	acShifted.initialValue = 0;
-	var cc = electric.emitter.placeholder(0);
-	var ccShifted = <inf.IPlaceholder<number>>cc.transformTime(0, t => t + 1);
-	ccShifted.initialValue = 0;
-	var toggleTo = electric.transformator.map(
-		(a, c, t) => {
-			return t.map(_ => a !== c);
-		},
-		acShifted, ccShifted, input.toggle
-	);
-	var insert: inf.IEmitter<eevent<item>> = notEmpty(input.insert);
-
+	var insert = notEmpty(input.insert);
 	var tasks = electric.emitter.placeholder([]);
-
+	var delayedTasks = tasks.transformTime([], t => t + 1);
+	(<any>delayedTasks).initialValue = [];
 	var $ = eevent.lift;
 
-	var changes: inf.IEmitter<eevent<Change[]>> = electric.transformator.merge(
-		// append
-		insert.map(
-			$((t: item) => [Change.append(t.id(), t.isCompleted(), t.title())])
-		),
-		// check
-		input.check.map(
-			$((t: { id: number, completed: boolean }) => [Change.check(t.id, t.completed)])
-		),
-		// toggle
-		electric.transformator.map(
-			(toggle, tasks) => toggle.flattenMap(toWhat => {
-				var toggledTasks = tasks.filter(t => t.isCompleted() != toWhat);
-				var changes = toggledTasks.map(t => Change.check(t.id(), toWhat))
-				return changes.length > 0 ? eevent.of(changes) : eevent.notHappend;
-			}),
-			toggleTo, tasks
-		),
-		// retitle
-		input.retitle.map(
-			$((rt: { id: number, title: string }) => [Change.retitle(rt.id, rt.title)])
-		),
-		// remove
-		input.del.map(
-			$((id: number) => [Change.remove(id)])
-		),
-		// clear
-		electric.transformator.map(
-			(clear, tasks) => clear.flattenMap(_ => {
-				var changes = onlyCompleted(tasks).map(t => Change.remove(t.id()));
-				return changes.length > 0 ? eevent.of(changes) : eevent.notHappend;
-			}),
-			input.clear, tasks
-		)
+	var appendChanges = insert.map(
+		$((t: item) => [Change.append(t.id(), t.isCompleted(), t.title())])
 	);
+	var checkChanges = input.check.map(
+		$((t: { id: number, completed: boolean }) => [Change.check(t.id, t.completed)])
+	);
+	var toggleChanges = electric.transformator.map(
+		(toggle, tasks) => toggle.flattenMap(_ => {
+			var noAll = tasks.length;
+			var noCompleted = tasks.filter(t => t.isCompleted()).length;
+			var toWhat = noAll !== noCompleted;
+			var toggledTasks = tasks.filter(t => t.isCompleted() != toWhat);
+			var changes = toggledTasks.map(t => Change.check(t.id(), toWhat))
+			return changes.length > 0 ? eevent.of(changes) : eevent.notHappend;
+		}),
+		input.toggle, delayedTasks
+	);
+	var retitleChanges = input.retitle.map(
+		$((rt: { id: number, title: string }) => [Change.retitle(rt.id, rt.title)])
+	);
+	var deleteChanges = input.del.map(
+		$((id: number) => [Change.remove(id)])
+	);
+	var clearChanges = electric.transformator.map(
+		(clear, tasks) => clear.flattenMap(_ => {
+			var changes = onlyCompleted(tasks).map(t => Change.remove(t.id()));
+			return changes.length > 0 ? eevent.of(changes) : eevent.notHappend;
+		}),
+		input.clear, tasks
+	);
+
+	var changes = electric.transformator.merge(
+		appendChanges, checkChanges, toggleChanges,
+		retitleChanges, deleteChanges, clearChanges
+	);
+	changes.name = 'tasks changes'
 
 	var filteringChanges = electric.transformator.map(
 		(tasks, filter) => filter.flattenMap(f => visibilityChangesOfTask(tasks, f)),
@@ -94,16 +82,19 @@ function collection(
 	var visibleChanges = electric.transformator.merge(
 		changesVisibleWithFilter, filteringChanges
 	);
-
+	visibleChanges.name = 'visible changes';
 
 	var allCount = tasks.map(ts => ts.length);
-	ac.is(allCount);
 	var completedCount = tasks.map(ts => onlyCompleted(ts).length);
-	cc.is(completedCount);
 	var activeCount = tasks.map(ts => onlyActive(ts).length);
+	allCount.name = 'count of all tasks'
+	completedCount.name = 'count of completed tasks'
+	activeCount.name = 'count of active tasks'
 
+	var accumulatedChanges = changes.accumulate(initialTasks, applyChanges)
+	accumulatedChanges.name = 'tasks'
 	tasks.is(
-		changes.accumulate(initialTasks, applyChanges)
+		accumulatedChanges
 	)
 	var initialVisibleTasks = initialTasks;
 	if (input.filter.dirtyCurrentValue() === ACTIVE) {
@@ -114,6 +105,7 @@ function collection(
 	}
 
 	var visible = visibleChanges.accumulate(initialVisibleTasks, applyChanges);
+	visible.name = 'visible tasks';
 
 	return {
 		all: tasks,
@@ -124,37 +116,39 @@ function collection(
 			all: allCount
 		},
 		changes: {
-			all: <inf.IEmitter<eevent<Change[]>>>changes,
-			visible: <inf.IEmitter<eevent<Change[]>>>visibleChanges
+			all: changes,
+			visible: visibleChanges
 		}
 	};
 };
 
-function notEmpty(insert: inf.IEmitter<eevent<string>>) {
-	return insert.map(v => v.flattenMap(text => {
+function notEmpty(insert: electric.emitter.EventEmitter<string>) {
+	var t = insert.map(v => v.flattenMap(text => {
 		text = text.trim();
 		if (text !== '') {
 			return eevent.of(item.of(text))
 		}
 		return eevent.notHappend
 	}));
+	t.name = 'not empty';
+	return t;
 }
 
-function visibilityChangesOfTask(tasks: item[], f: { previous: string; next: string; }) {
+function visibilityChangesOfTask(tasks: item[], filter: { previous: string; next: string; }) {
 	var changes: Change[] = [];
-	if (f.previous === f.next) {
+	if (filter.previous === filter.next) {
 		return eevent.notHappend
 	}
 	// all -> active
-	else if (f.previous === '#/' && f.next === ACTIVE) {
+	else if (filter.previous === ALL && filter.next === ACTIVE) {
 		changes = onlyCompleted(tasks).map(Change.removeTask)
 	}
 	// all -> completed
-	else if (f.previous === '#/' && f.next === COMPLETED) {
+	else if (filter.previous === ALL && filter.next === COMPLETED) {
 		changes = onlyActive(tasks).map(Change.removeTask)
 	}
 	// active -> all
-	else if (f.previous === ACTIVE && f.next === '#/') {
+	else if (filter.previous === ACTIVE && filter.next === ALL) {
 		for (var i = 0; i < tasks.length; i++) {
 			var task = tasks[i];
 			if (task.isCompleted()) {
@@ -163,11 +157,11 @@ function visibilityChangesOfTask(tasks: item[], f: { previous: string; next: str
 		}
 	}
 	// active -> completed
-	else if (f.previous === ACTIVE && f.next === COMPLETED) {
+	else if (filter.previous === ACTIVE && filter.next === COMPLETED) {
 		changes = tasks.map(t => t.isCompleted() ? Change.appendTask(t) : Change.removeTask(t));
 	}
 	// completed -> all
-	else if (f.previous === COMPLETED && f.next === '#/') {
+	else if (filter.previous === COMPLETED && filter.next === ALL) {
 		for (var i = 0; i < tasks.length; i++) {
 			var task = tasks[i];
 			if (!task.isCompleted()) {
@@ -176,7 +170,7 @@ function visibilityChangesOfTask(tasks: item[], f: { previous: string; next: str
 		}
 	}
 	// completed -> active
-	else if (f.previous === COMPLETED && f.next === ACTIVE) {
+	else if (filter.previous === COMPLETED && filter.next === ACTIVE) {
 		changes = tasks.map(t => !t.isCompleted() ? Change.appendTask(t) : Change.removeTask(t));
 	}
 	return changes.length > 0 ? eevent.of(changes) : eevent.notHappend;

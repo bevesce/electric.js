@@ -1,5 +1,6 @@
-import inf = require('./interfaces');
 import emitter = require('./emitter');
+
+export = placeholder;
 
 
 // functions that can be simply queued
@@ -32,22 +33,27 @@ var functionsToSomething: string[] = [
 ]
 
 class Placeholder<Out> {
-	private _emitter: inf.IEmitter<Out>;
-	private _actions: Array<((emitter: inf.IEmitter<Out>) => any)> = [];
+	private _emitter: emitter.Emitter<Out>;
+	private _actions: Array<((emitter: emitter.Emitter<Out>) => any)> = [];
 	initialValue: Out;
 	name: string;
 
 	constructor(initialValue: Out) {
 		this.initialValue = initialValue;
-		this.name = '| placeholder >';
+		this.name = '? placeholder ?';
 	}
 
-	toString() {
-		var subname = this._emitter ? this._emitter.toString() : `| ? = ${this.dirtyCurrentValue()} >`;
-		return `placeholder: ${subname}`
+	toString(showCurrentValue = false) {
+		if (this._emitter) {
+			return 'placeholder: ' + this._emitter.toString(showCurrentValue);
+		}
+		else if (showCurrentValue) {
+			return `? placeholder = ${this.dirtyCurrentValue()} >`
+		}
+		return '? placeholder >';
 	}
 
-	is(emitter: inf.IEmitter<Out>) {
+	is(emitter: emitter.Emitter<Out>) {
 		if (this._emitter) {
 			throw Error("placeholder is " + this._emitter.name + " so cannot be " + emitter.name);
 		}
@@ -65,7 +71,7 @@ class Placeholder<Out> {
 		else if (this.initialValue !== undefined) {
 			return this.initialValue
 		}
-		throw Error('called dirtyCurrentValue() on placeholder without initial value');
+		throw Error('called dirtyCurrentValue() on placeholder without initial value ' + this.name);
 	}
 }
 
@@ -95,6 +101,7 @@ function doOrQueueAndReturnPlaceholder(name: string) {
 		}
 		else {
 			var p = placeholder();
+			p.name = p.name + ' ' + name + ' >';
 			this._actions.push((emitter: any) => {
 				p.is(emitter[name].apply(emitter, args));
 			});
@@ -121,8 +128,14 @@ functionsToSomething.forEach((name: string) => {
 	(<any>Placeholder.prototype)[name] = doOrThrow(name)
 })
 
-function placeholder<T>(initialValue?: T) {
-	return <inf.IPlaceholder<T>>(<any>(new Placeholder(initialValue)));
+interface IPlaceholder<Out>
+	extends emitter.Emitter<Out>
+{
+	is(emitter: emitter.Emitter<Out>): void;
+	initialValue: Out;
 }
 
-export = placeholder;
+function placeholder<T>(initialValue?: T) {
+	return <IPlaceholder<T>>(<any>(new Placeholder(initialValue)));
+}
+

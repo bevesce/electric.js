@@ -4,51 +4,47 @@ var eevent = require('../../../src/electric-event');
 var Change = require('./change');
 var ACTIVE = '#/active';
 var COMPLETED = '#/completed';
+var ALL = '#/';
 function collection(initialTasks, input) {
-    var ac = electric.emitter.placeholder(0);
-    var acShifted = ac.transformTime(0, function (t) { return t + 1; });
-    acShifted.initialValue = 0;
-    var cc = electric.emitter.placeholder(0);
-    var ccShifted = cc.transformTime(0, function (t) { return t + 1; });
-    ccShifted.initialValue = 0;
-    var toggleTo = electric.transformator.map(function (a, c, t) {
-        return t.map(function (_) { return a !== c; });
-    }, acShifted, ccShifted, input.toggle);
     var insert = notEmpty(input.insert);
     var tasks = electric.emitter.placeholder([]);
+    var delayedTasks = tasks.transformTime([], function (t) { return t + 1; });
+    delayedTasks.initialValue = [];
     var $ = eevent.lift;
-    var changes = electric.transformator.merge(
-    // append
-    insert.map($(function (t) { return [Change.append(t.id(), t.isCompleted(), t.title())]; })), 
-    // check
-    input.check.map($(function (t) { return [Change.check(t.id, t.completed)]; })), 
-    // toggle
-    electric.transformator.map(function (toggle, tasks) { return toggle.flattenMap(function (toWhat) {
+    var appendChanges = insert.map($(function (t) { return [Change.append(t.id(), t.isCompleted(), t.title())]; }));
+    var checkChanges = input.check.map($(function (t) { return [Change.check(t.id, t.completed)]; }));
+    var toggleChanges = electric.transformator.map(function (toggle, tasks) { return toggle.flattenMap(function (_) {
+        var noAll = tasks.length;
+        var noCompleted = tasks.filter(function (t) { return t.isCompleted(); }).length;
+        var toWhat = noAll !== noCompleted;
         var toggledTasks = tasks.filter(function (t) { return t.isCompleted() != toWhat; });
         var changes = toggledTasks.map(function (t) { return Change.check(t.id(), toWhat); });
         return changes.length > 0 ? eevent.of(changes) : eevent.notHappend;
-    }); }, toggleTo, tasks), 
-    // retitle
-    input.retitle.map($(function (rt) { return [Change.retitle(rt.id, rt.title)]; })), 
-    // remove
-    input.del.map($(function (id) { return [Change.remove(id)]; })), 
-    // clear
-    electric.transformator.map(function (clear, tasks) { return clear.flattenMap(function (_) {
+    }); }, input.toggle, delayedTasks);
+    var retitleChanges = input.retitle.map($(function (rt) { return [Change.retitle(rt.id, rt.title)]; }));
+    var deleteChanges = input.del.map($(function (id) { return [Change.remove(id)]; }));
+    var clearChanges = electric.transformator.map(function (clear, tasks) { return clear.flattenMap(function (_) {
         var changes = onlyCompleted(tasks).map(function (t) { return Change.remove(t.id()); });
         return changes.length > 0 ? eevent.of(changes) : eevent.notHappend;
-    }); }, input.clear, tasks));
+    }); }, input.clear, tasks);
+    var changes = electric.transformator.merge(appendChanges, checkChanges, toggleChanges, retitleChanges, deleteChanges, clearChanges);
+    changes.name = 'tasks changes';
     var filteringChanges = electric.transformator.map(function (tasks, filter) { return filter.flattenMap(function (f) { return visibilityChangesOfTask(tasks, f); }); }, tasks, electric.transformator.changes(input.filter));
     var changesVisibleWithFilter = electric.transformator.map(function (changes, filter, tasks) {
         var r = changes.flattenMap(function (c) { return calculateVisibleChanges(c, filter, tasks); });
         return r;
     }, changes.transformTime(eevent.notHappend, function (t) { return t + 1; }), input.filter, tasks);
     var visibleChanges = electric.transformator.merge(changesVisibleWithFilter, filteringChanges);
+    visibleChanges.name = 'visible changes';
     var allCount = tasks.map(function (ts) { return ts.length; });
-    ac.is(allCount);
     var completedCount = tasks.map(function (ts) { return onlyCompleted(ts).length; });
-    cc.is(completedCount);
     var activeCount = tasks.map(function (ts) { return onlyActive(ts).length; });
-    tasks.is(changes.accumulate(initialTasks, applyChanges));
+    allCount.name = 'count of all tasks';
+    completedCount.name = 'count of completed tasks';
+    activeCount.name = 'count of active tasks';
+    var accumulatedChanges = changes.accumulate(initialTasks, applyChanges);
+    accumulatedChanges.name = 'tasks';
+    tasks.is(accumulatedChanges);
     var initialVisibleTasks = initialTasks;
     if (input.filter.dirtyCurrentValue() === ACTIVE) {
         initialVisibleTasks = onlyActive(initialTasks);
@@ -57,6 +53,7 @@ function collection(initialTasks, input) {
         initialVisibleTasks = onlyCompleted(initialTasks);
     }
     var visible = visibleChanges.accumulate(initialVisibleTasks, applyChanges);
+    visible.name = 'visible tasks';
     return {
         all: tasks,
         visible: visible,
@@ -73,26 +70,28 @@ function collection(initialTasks, input) {
 }
 ;
 function notEmpty(insert) {
-    return insert.map(function (v) { return v.flattenMap(function (text) {
+    var t = insert.map(function (v) { return v.flattenMap(function (text) {
         text = text.trim();
         if (text !== '') {
             return eevent.of(item.of(text));
         }
         return eevent.notHappend;
     }); });
+    t.name = 'not empty';
+    return t;
 }
-function visibilityChangesOfTask(tasks, f) {
+function visibilityChangesOfTask(tasks, filter) {
     var changes = [];
-    if (f.previous === f.next) {
+    if (filter.previous === filter.next) {
         return eevent.notHappend;
     }
-    else if (f.previous === '#/' && f.next === ACTIVE) {
+    else if (filter.previous === ALL && filter.next === ACTIVE) {
         changes = onlyCompleted(tasks).map(Change.removeTask);
     }
-    else if (f.previous === '#/' && f.next === COMPLETED) {
+    else if (filter.previous === ALL && filter.next === COMPLETED) {
         changes = onlyActive(tasks).map(Change.removeTask);
     }
-    else if (f.previous === ACTIVE && f.next === '#/') {
+    else if (filter.previous === ACTIVE && filter.next === ALL) {
         for (var i = 0; i < tasks.length; i++) {
             var task = tasks[i];
             if (task.isCompleted()) {
@@ -100,10 +99,10 @@ function visibilityChangesOfTask(tasks, f) {
             }
         }
     }
-    else if (f.previous === ACTIVE && f.next === COMPLETED) {
+    else if (filter.previous === ACTIVE && filter.next === COMPLETED) {
         changes = tasks.map(function (t) { return t.isCompleted() ? Change.appendTask(t) : Change.removeTask(t); });
     }
-    else if (f.previous === COMPLETED && f.next === '#/') {
+    else if (filter.previous === COMPLETED && filter.next === ALL) {
         for (var i = 0; i < tasks.length; i++) {
             var task = tasks[i];
             if (!task.isCompleted()) {
@@ -111,7 +110,7 @@ function visibilityChangesOfTask(tasks, f) {
             }
         }
     }
-    else if (f.previous === COMPLETED && f.next === ACTIVE) {
+    else if (filter.previous === COMPLETED && filter.next === ACTIVE) {
         changes = tasks.map(function (t) { return !t.isCompleted() ? Change.appendTask(t) : Change.removeTask(t); });
     }
     return changes.length > 0 ? eevent.of(changes) : eevent.notHappend;

@@ -1,5 +1,3 @@
-import inf = require('../../../src/interfaces');
-
 import item = require('./item');
 import counter = require('./counter');
 import electric = require('../../../src/electric');
@@ -15,20 +13,20 @@ const COMPLETED = '#/completed';
 function collection(
 	initialTasks: item[],
 	input: {
-		insert: inf.IEmitter<eevent<string>>,
-		check: inf.IEmitter<eevent<{ id: number, completed: boolean }>>,
-		toggle: inf.IEmitter<eevent<boolean>>,
-		retitle: inf.IEmitter<eevent<{ id: number, title: string }>>,
-		del: inf.IEmitter<eevent<number>>,
-		clear: inf.IEmitter<eevent<{}>>
+		insert: electric.emitter.EventEmitter<string>,
+		check: electric.emitter.EventEmitter<{ id: number, completed: boolean }>,
+		toggle: electric.emitter.EventEmitter<boolean>,
+		retitle: electric.emitter.EventEmitter<{ id: number, title: string }>,
+		del: electric.emitter.EventEmitter<number>,
+		clear: electric.emitter.EventEmitter<{}>
 	}
 ) {
 	var ac = electric.emitter.placeholder(0);
-	var acShifted = <inf.IPlaceholder<number>>ac.transformTime(0, t => t + 1);
-	acShifted.initialValue = 0;
+	var acShifted = ac.transformTime(0, t => t + 1);
+	(<any>acShifted).initialValue = 0;
 	var cc = electric.emitter.placeholder(0);
-	var ccShifted = <inf.IPlaceholder<number>>cc.transformTime(0, t => t + 1);
-	ccShifted.initialValue = 0;
+	var ccShifted = cc.transformTime(0, t => t + 1);
+	(<any>ccShifted).initialValue = 0;
 	// this is ugly
 	// we shouldn't make this transformTime by hand
 	// to avoid infinite recursion
@@ -40,13 +38,13 @@ function collection(
 		ccShifted,
 		input.toggle
 	);
-	var insert: inf.IEmitter<eevent<item>> = notEmpty(input.insert);
+	var insert = notEmpty(input.insert);
 
 	var tasks = electric.emitter.placeholder([]);
 
 	var $ = eevent.lift;
 
-	var changes: inf.IEmitter<eevent<Change[]>> = electric.transformator.merge(
+	var changes = electric.transformator.merge(
 		// append
 		insert.map(
 			$((t: item) => [Change.append(t.id(), t.isCompleted(), t.title())])
@@ -95,11 +93,11 @@ function collection(
 
 	return {
 		all: tasks,
-		changes: <inf.IEmitter<eevent<Change[]>>>changes,
+		changes: changes,
 	};
 };
 
-function notEmpty(insert: inf.IEmitter<eevent<string>>) {
+function notEmpty(insert: electric.emitter.Emitter<eevent<string>>) {
 	return insert.map(v => v.flattenMap(text => {
 		text = text.trim();
 		if (text !== '') {

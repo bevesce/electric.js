@@ -6,11 +6,11 @@ var storage = require('./storage');
 var hash = eui.hash();
 var newTask = eui.enteredText('new-task');
 var clear = eui.clicks('clear-button');
-var check = electric.emitter.manualEvent('check');
-var del = electric.emitter.manualEvent('delete');
+var check = electric.emitter.manualEvent(null, 'check');
+var del = electric.emitter.manualEvent(null, 'delete');
 var toggle = eui.checkboxClicks('toggle');
-var editingStart = electric.emitter.manualEvent('editing start');
-var retitle = electric.emitter.manualEvent('retitle');
+var editingStart = electric.emitter.manualEvent(null, 'editing start');
+var retitle = electric.emitter.manualEvent(null, 'retitle');
 // Transformators
 var tasksDevice = require('./changes-device-client');
 var tasks = tasksDevice({

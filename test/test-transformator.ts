@@ -5,7 +5,6 @@ import electricKettle = require('./electric-kettle');
 electricKettle.pourAsync(chai);
 var expect = chai.expect;
 
-import inf = require('../src/interfaces');
 import electric = require('../src/electric');
 import t = require('../src/transformator');
 import eevent = require('../src/electric-event');
@@ -134,35 +133,41 @@ describe('transformators', function() {
 	});
 	transformator('merge1', function(done) {
 		// merge1 does nothing...
-		var emitter = electric.emitter.manual(0);
+		var emitter = electric.emitter.manualEvent();
 		var merged = t.merge(emitter);
 		expect(merged)
-			.to.emit(0)
-			.then.after(() => emitter.emit(1))
-			.to.emit(1)
+			.to.emit(eevent.notHappend)
+			.then.after(() => emitter.impulse(1))
+			.to.emit(eevent.of(1))
+			.to.emit(eevent.notHappend)
 			.that.finish(done);
 	});
 
 	transformator('merge4', function(done) {
-		var emitter1 = electric.emitter.manual('1a');
-		var emitter2 = electric.emitter.manual('2a');
-		var emitter3 = electric.emitter.manual('3a');
-		var emitter4 = electric.emitter.manual('4a');
+		var emitter1 = electric.emitter.manualEvent();
+		var emitter2 = electric.emitter.manualEvent();
+		var emitter3 = electric.emitter.manualEvent();
+		var emitter4 = electric.emitter.manualEvent();
 		var merged = t.merge(
 			emitter1, emitter2, emitter3, emitter4
 		);
 		expect(merged)
-			.to.emit('1a')
-			.then.after(() => emitter1.emit('1b'))
-			.to.emit('1b')
-			.then.after(() => emitter2.emit('2b'))
-			.to.emit('2b')
-			.then.after(() => emitter3.emit('3b'))
-			.to.emit('3b')
-			.then.after(() => emitter4.emit('4b'))
-			.to.emit('4b')
-			.then.after(() => emitter2.emit('2c'))
-			.to.emit('2c')
+			.to.emit(eevent.notHappend)
+			.then.after(() => emitter1.impulse('1b'))
+			.to.emit(eevent.of('1b'))
+			.to.emit(eevent.notHappend)
+			.then.after(() => emitter2.impulse('2b'))
+			.to.emit(eevent.of('2b'))
+			.to.emit(eevent.notHappend)
+			.then.after(() => emitter3.impulse('3b'))
+			.to.emit(eevent.of('3b'))
+			.to.emit(eevent.notHappend)
+			.then.after(() => emitter4.impulse('4b'))
+			.to.emit(eevent.of('4b'))
+			.to.emit(eevent.notHappend)
+			.then.after(() => emitter2.impulse('2c'))
+			.to.emit(eevent.of('2c'))
+			.to.emit(eevent.notHappend)
 			.that.finish(done);
 	});
 
@@ -274,7 +279,7 @@ describe('flattens', function() {
 			var e1 = electric.emitter.manual('1a');
 			var e2 = electric.emitter.manual('2a');
 			var emitters = electric.emitter.manual(
-				<{ [name: string]: inf.IEmitter<string> }>{
+				<{ [name: string]: electric.emitter.Emitter<string> }>{
 					'0': e0, '1': e1
 				}
 			);

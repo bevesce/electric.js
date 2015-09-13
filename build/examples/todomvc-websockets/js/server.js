@@ -39,7 +39,9 @@ function forEach(inputsDict, f) {
     }
 }
 io.on('connection', function (socket) {
-    forEach(inputs, function (name, emitter) { return socket.on(name, emitter.impulse); });
+    forEach(inputs, function (name, emitter) {
+        socket.on(name, emitter.impulse);
+    });
     var initialTasks = tasks.all.dirtyCurrentValue();
     var initialChanges = initialTasks.map(Change.appendTask);
     socket.emit('changes', initialChanges);

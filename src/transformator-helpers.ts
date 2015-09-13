@@ -1,13 +1,14 @@
-import inf = require('./interfaces');
 import callIfFunction = require('./utils/call-if-function');
 import Wire = require('./wire');
 import scheduler = require('./scheduler');
 import eevent = require('./electric-event');
+import EmitFunction = require('./interfaces/t-to-void');
+import Emitter = require('./interfaces/emitter');
 
 type Index = number;
 
 export function map<In, Out>(f: (...vs: any[]) => Out, noOfEmitters: number) {
-	return function mapTransform(emit: inf.IEmitterFunction<Out>) {
+	return function mapTransform(emit: EmitFunction<Out>) {
 		return function mapTransform(v: In[], i: Index) {
 			emit(f.apply(null, v));
 		}
@@ -18,7 +19,7 @@ export function filter<InOut>(
 	predicate: (...args: InOut[]) => boolean,
 	noOfEmitters = 1
 ) {
-	return function transform(emit: inf.IEmitterFunction<InOut>) {
+	return function transform(emit: EmitFunction<InOut>) {
 		var eaten = 0;
 		return function filterTransform(v: InOut[], i: Index) {
 			if (predicate.apply(null, v)) {
@@ -32,7 +33,7 @@ export function filterMap<Out>(
 	mapping: (...args: any[]) => Out | void,
 	noOfEmitters = 1
 ) {
-	return function transform(emit: inf.IEmitterFunction<Out>) {
+	return function transform(emit: EmitFunction<Out>) {
 		var eaten = 0;
 		return function filterMapTransform(v: any[], i: Index) {
 			var result = mapping.apply(null, v);
@@ -44,7 +45,7 @@ export function filterMap<Out>(
 };
 
 export function merge<InOut>() {
-	return function mergeTransform(emit: inf.IEmitterFunction<InOut>) {
+	return function mergeTransform(emit: EmitFunction<InOut>) {
 		var prev: InOut;
 		return function mergeTransform(v: InOut[], i: Index) {
 			if (prev !== v[i]) {
@@ -60,7 +61,7 @@ export function accumulate<Out>(
 	accumulator: (accumulated: Out, ...vs: any[]) => Out
 ) {
 	var accumulated = initialValue;
-	return function transform(emit: inf.IEmitterFunction<Out>) {
+	return function transform(emit: EmitFunction<Out>) {
 		return function accumulateTransform(v: any[], i: Index) {
 			accumulated = accumulator(accumulated, ...v);
 			emit(accumulated)
@@ -73,7 +74,7 @@ export function transformTime<Out>(
 	t0: number
 ) {
 	// var firstEmitted = false;
-	return function transform(emit: inf.IEmitterFunction<Out>) {
+	return function transform(emit: EmitFunction<Out>) {
 		return function timeTransform(v: Out[], i: number){
 			var delay = timeTransformation(scheduler.now() - t0) + t0 - scheduler.now();
 			var toEmit = v[i];
@@ -87,7 +88,7 @@ export function transformTime<Out>(
 }
 
 export function sample<InOut>() {
-	return function transform(emit: inf.IEmitterFunction<InOut>) {
+	return function transform(emit: EmitFunction<InOut>) {
 		return function sampleTransform(v: any[], i: Index) {
 			if (i > 0 && v[i].happend) {
 				emit(v[0]);
@@ -98,11 +99,11 @@ export function sample<InOut>() {
 
 export function change<Out>(
 	switchers: {
-		when: inf.IEmitter<any>,
-		to: inf.IEmitter<Out> | ((x: Out, y: any) => inf.IEmitter<Out>)
+		when: Emitter<any>,
+		to: Emitter<Out> | ((x: Out, y: any) => Emitter<Out>)
 	}[]
 ) {
-	return function transform(emit: inf.IEmitterFunction<Out>) {
+	return function transform(emit: EmitFunction<Out>) {
 		return function changeTransform(v: any[], i: Index) {
 			if (i == 0){
 				emit(<Out>v[0]);
@@ -122,7 +123,7 @@ export function change<Out>(
 }
 
 export function when<In, Out>(happens: (value: In) => boolean, then: (value: In) => Out) {
-	return function transform(emit: inf.IEmitterFunction<eevent<Out>>, impulse: inf.IEmitterFunction<eevent<Out>>) {
+	return function transform(emit: EmitFunction<eevent<Out>>, impulse: EmitFunction<eevent<Out>>) {
 		var prevHappend = false;
 		return function whenTransform(v: any[], i: Index) {
 			var happend = happens(v[i]);
@@ -138,7 +139,7 @@ export function when<In, Out>(happens: (value: In) => boolean, then: (value: In)
 }
 
 export function whenThen<In, Out>(happens: (value: In) => Out | void) {
-	return function transform(emit: inf.IEmitterFunction<eevent<Out>>, impulse: inf.IEmitterFunction<eevent<Out>>) {
+	return function transform(emit: EmitFunction<eevent<Out>>, impulse: EmitFunction<eevent<Out>>) {
 		var prevHappend: Out;
 		return function whenTransform(v: any[], i: Index) {
 			var happend = happens(v[i]);
@@ -156,7 +157,7 @@ export function whenThen<In, Out>(happens: (value: In) => Out | void) {
 export function cumulateOverTime<InOut>(
 	delayInMiliseconds: number
 ) {
-	return function transform(emit: inf.IEmitterFunction<eevent<InOut[]>>, impulse: inf.IEmitterFunction<eevent<InOut[]>>) {
+	return function transform(emit: EmitFunction<eevent<InOut[]>>, impulse: EmitFunction<eevent<InOut[]>>) {
 		var accumulated: InOut[] = [];
 		var accumulating = false;
 		return function throttleTransform(v: eevent<InOut>[], i: Index) {
@@ -183,8 +184,8 @@ export function changes<InOut>(
 	initialValue: InOut
 ) {
 	return function transform(
-	    emit: inf.IEmitterFunction<eevent<{ previous: InOut, next: InOut }>>,
-	    impulse: inf.IEmitterFunction<eevent<{ previous: InOut, next: InOut }>>
+	    emit: EmitFunction<eevent<{ previous: InOut, next: InOut }>>,
+	    impulse: EmitFunction<eevent<{ previous: InOut, next: InOut }>>
 	) {
 	    var previous = initialValue;
 	    return function changesTransform(v: InOut[], i: number) {

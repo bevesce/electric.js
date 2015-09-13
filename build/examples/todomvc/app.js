@@ -1,0 +1,1 @@
+console.error("Error: Cannot find module '/Users/piotrwilczynski/Dropbox/Projects/Praca magisterska/electric-js/build/examples/todomvc/app-cm.js' from '/Users/piotrwilczynski/Dropbox/Projects/Praca magisterska/electric-js/build/examples/todomvc'");

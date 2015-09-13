@@ -1,14 +1,28 @@
 var pushIfNotIn = require('./utils//push-if-not-in');
 var Graph = (function () {
-    function Graph(source, depth) {
+    function Graph(source, depth, showCurrentValue) {
         this._sources = [];
         this.vertices = [];
+        this.showCurrentValue = showCurrentValue;
         this.sourceIndex = this._findVertices(source, 0, depth);
         this._findEdges();
         this.clean();
     }
-    Graph.of = function (source, depth) {
-        return new Graph(source, depth);
+    Graph.of = function (source, depth, showCurrentValue) {
+        if (showCurrentValue === void 0) { showCurrentValue = false; }
+        return new Graph(source, depth, showCurrentValue);
+    };
+    Graph.prototype.removeVertex = function (id) {
+        this.vertices = this.vertices
+            .filter(function (v) { return v.id !== id; })
+            .map(function (v) { return ({
+            id: v.id,
+            name: v.name,
+            receivers: v.receivers.filter(function (r) { return r !== id; }),
+            emitters: v.emitters.filter(function (e) { return e !== id; }),
+            type: v.type
+        }); });
+        this.edges = this.edges.filter(function (e) { return e.source !== id && e.target !== id; });
     };
     Graph.prototype._findVertices = function (source, depth, maxDepth) {
         if (source.__$visualize_visited_id$ !== undefined) {
@@ -89,7 +103,7 @@ var Graph = (function () {
         if (typeof source === 'function') {
             return "< " + (source.name || 'anonymous') + " |";
         }
-        return source.toString();
+        return source.toString(this.showCurrentValue);
     };
     Graph.prototype._findEdges = function () {
         var _this = this;

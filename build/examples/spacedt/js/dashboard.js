@@ -7,7 +7,7 @@ function speed() {
     var aSpeedLeft = document.getElementById('angular-speed-left');
     var aSpeedCurrent = document.getElementById('angular-speed-current');
     var aSpeedRight = document.getElementById('angular-speed-right');
-    return function (s) {
+    return function speedometer(s) {
         var speed = Math.abs(s.y);
         var w = speedBar.offsetWidth;
         var wh = w / 2;
@@ -32,6 +32,8 @@ function speed() {
 }
 exports.speed = speed;
 function score() {
-    return rui.htmlReceiverById('score');
+    var r = rui.htmlReceiverById('score');
+    r.name = 'show score';
+    return r;
 }
 exports.score = score;

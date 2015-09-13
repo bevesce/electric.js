@@ -1,5 +1,5 @@
-import inf = require('./interfaces');
-import eevent = require('./electric-event');
+import Emitter = require('./interfaces/emitter');
+import ElectricEvent = require('./electric-event');
 
 
 export function logReceiver(message: string) {
@@ -11,13 +11,13 @@ export function logReceiver(message: string) {
 	}
 }
 
-export function log(emitter: inf.IEmitter<any>) {
+export function log(emitter: Emitter<any>) {
 	emitter.plugReceiver((x: any) => {
 		console.log(emitter.name, '>>>', x);
 	});
 }
 
-export function logEvents(emitter: inf.IEmitter<inf.IElectricEvent<any>>) {
+export function logEvents(emitter: Emitter<ElectricEvent<any>>) {
 	emitter.plugReceiver((x: any) => {
 		if (!x.happend) {
 			return;
@@ -26,7 +26,7 @@ export function logEvents(emitter: inf.IEmitter<inf.IElectricEvent<any>>) {
 	});
 }
 
-export function collect(emitter: inf.IEmitter<any>) {
+export function collect(emitter: Emitter<any>) {
 	var r: any[] = [];
 	emitter.plugReceiver((x: any) => {
 		r.push(x);

@@ -1,5 +1,4 @@
 /// <reference path="../../../d/socket.io-client.d.ts" />
-import inf = require('../../../src/interfaces');
 import item = require('./item');
 import eevent = require('../../../src/electric-event');
 import Change = require('./change');
@@ -15,13 +14,13 @@ const COMPLETED = '#/completed';
 
 function collection(
 	input: {
-		insert: inf.IEmitter<eevent<string>>,
-		check: inf.IEmitter<eevent<{ id: number, completed: boolean }>>,
-		toggle: inf.IEmitter<eevent<boolean>>,
-		retitle: inf.IEmitter<eevent<{ id: number, title: string }>>,
-		del: inf.IEmitter<eevent<number>>,
-		clear: inf.IEmitter<eevent<{}>>,
-		filter: inf.IEmitter<string>
+		insert: electric.emitter.EventEmitter<string>,
+		check: electric.emitter.EventEmitter<{ id: number, completed: boolean }>,
+		toggle: electric.emitter.EventEmitter<boolean>,
+		retitle: electric.emitter.EventEmitter<{ id: number, title: string }>,
+		del: electric.emitter.EventEmitter<number>,
+		clear: electric.emitter.EventEmitter<{}>,
+		filter: electric.emitter.Emitter<string>
 	}
 ) {
 	var socket = io('http://localhost:8080');
@@ -30,7 +29,7 @@ function collection(
 			electricSocket.eventReceiver(name, socket)
 		);
 	}
-	var changes = <inf.IEmitter<eevent<Change[]>>>electricSocket.eventEmitter(
+	var changes = <electric.emitter.EventEmitter<Change[]>>electricSocket.eventEmitter(
 		'changes', socket
 	).map(eevent.lift((c: any[]) => c.map(Change.restore)));
 
@@ -76,8 +75,8 @@ function collection(
 			all: allCount
 		},
 		changes: {
-			all: <inf.IEmitter<eevent<Change[]>>>changes,
-			visible: <inf.IEmitter<eevent<Change[]>>>visibleChanges
+			all: <electric.emitter.EventEmitter<Change[]>>changes,
+			visible: <electric.emitter.EventEmitter<Change[]>>visibleChanges
 		}
 	};
 };

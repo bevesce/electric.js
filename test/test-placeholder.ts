@@ -10,7 +10,6 @@ import scheduler = require('../src/scheduler');
 import placeholder = require('../src/placeholder');
 import clock = require('../src/clock');
 import transformator = require('../src/transformator');
-import inf = require('../src/interfaces');
 
 
 function double(x: number) {
@@ -104,7 +103,7 @@ describe('placeholder in recursion', function() {
 
     it('should allow recursion', function(done) {
         var mouseclick = electric.emitter.manual(eevent.notHappend);
-        var animationBegins = <inf.IPlaceholder<eevent<any>>>placeholder(eevent.notHappend);
+        var animationBegins = placeholder(<any>eevent.notHappend);
         var animating = electric.emitter.constant(false).change(
             { to: electric.emitter.constant(true), when: animationBegins }
         )
@@ -125,8 +124,8 @@ describe('placeholder in recursion', function() {
     it('should allow recursion with time transformation', function(done) {
         var constant = electric.emitter.constant;
         var mouseclick = electric.emitter.manual(eevent.notHappend);
-        var animationBegins = <inf.IPlaceholder<eevent<any>>>placeholder(eevent.notHappend);
-        var animationEnds = <inf.IPlaceholder<eevent<any>>>placeholder(eevent.notHappend);
+        var animationBegins = placeholder(eevent.notHappend);
+        var animationEnds = placeholder(eevent.notHappend);
 
         // start animationg on animationBegins
         // and end on animationEnds (1ms after start)

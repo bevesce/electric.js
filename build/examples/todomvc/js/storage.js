@@ -8,7 +8,7 @@ function restoreTasks() {
     return [];
 }
 exports.restoreTasks = restoreTasks;
-function tasksReceiver(tasks) {
+function saveTaskToStorage(tasks) {
     localStorage.setItem(TASK_KEY, JSON.stringify(tasks));
 }
-exports.tasksReceiver = tasksReceiver;
+exports.saveTaskToStorage = saveTaskToStorage;

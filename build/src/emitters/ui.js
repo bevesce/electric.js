@@ -17,7 +17,8 @@ function key(name, type) {
         mapping: function (e) { return name; },
         filter: function (e) { return e.keyCode === keyCode; },
         type: 'key' + type,
-        preventDefault: true
+        preventDefault: true,
+        name: "key -" + name + "- " + type
     });
 }
 exports.key = key;
@@ -114,7 +115,7 @@ function mouseXY(targetOrId) {
     return fromValue({
         type: 'mousemove',
         target: targetOrId,
-        initialValue: undefined,
+        initialValue: { x: undefined, y: undefined },
         name: 'mouse position',
         mapping: function (e) { return ({ x: e.offsetX, y: e.offsetY }); }
     });

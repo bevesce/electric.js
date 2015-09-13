@@ -18,7 +18,7 @@ function device(method, url, input, encode, decode) {
     if (decode === void 0) { decode = fp.identity; }
     var state = electric.emitter.manual('none');
     state.name = 'state of ' + method + ': ' + url;
-    var stateChange = electric.emitter.manualEvent();
+    var stateChange = electric.emitter.manualEvent(null);
     stateChange.name = 'state change of ' + method + ': ' + url;
     var responseEmitter = electric.emitter.manual(emptyResponse);
     responseEmitter.name = 'response on ' + method + ': ' + url;

@@ -20,18 +20,33 @@ class Graph {
 	sourceIndex: number;
 	vertices: Vertex[];
 	edges: Edge[];
+	showCurrentValue: boolean;
 	private _sources: any[];
 
-	static of(source: any, depth?: number) {
-		return new Graph(source, depth);
+	static of(source: any, depth?: number, showCurrentValue = false) {
+		return new Graph(source, depth, showCurrentValue);
 	}
 
-	constructor(source: any, depth: number) {
+	constructor(source: any, depth: number, showCurrentValue: boolean) {
 		this._sources = [];
 		this.vertices = [];
+		this.showCurrentValue = showCurrentValue;
 		this.sourceIndex = this._findVertices(source, 0, depth);
 		this._findEdges();
 		this.clean();
+	}
+
+	removeVertex(id: number) {
+		this.vertices = this.vertices
+			.filter(v => v.id !== id)
+			.map(v => ({
+				id: v.id,
+				name: v.name,
+				receivers: v.receivers.filter(r => r !== id),
+				emitters: v.emitters.filter(e => e !== id),
+				type: v.type
+			}));
+		this.edges = this.edges.filter(e => e.source !== id && e.target !== id);
 	}
 
 	private _findVertices(source: any, depth: number, maxDepth: number) {
@@ -118,7 +133,7 @@ class Graph {
 		if (typeof source === 'function') {
 			return `< ${source.name || 'anonymous'} |`;
 		}
-		return source.toString();
+		return source.toString(this.showCurrentValue);
 	}
 
 	private _findEdges() {

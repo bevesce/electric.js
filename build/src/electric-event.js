@@ -57,6 +57,7 @@ var ElectricEvent = (function () {
 var Happend = (function () {
     function Happend(value) {
         this.happend = true;
+        this.__$isevent$ = true;
         this.value = value;
     }
     Happend.prototype.toString = function () {
@@ -75,6 +76,7 @@ var NotHappend = (function () {
         this.happend = false;
         this.value = undefined;
     }
+    // private __$isevent$ = true;
     NotHappend.prototype.toString = function () {
         return 'NotHappend';
     };

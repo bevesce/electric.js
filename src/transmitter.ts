@@ -1,11 +1,10 @@
-import inf = require('./interfaces');
 import emitter = require('./emitter');
 import Wire = require('./wire');
 
-class Transmitter<In>
-	extends emitter.Transformator<In>
+class Transmitter<In, Out>
+	extends emitter.Transformator<In, Out>
 {
-	wire(emitter: inf.IEmitter<any>) {
+	wire(emitter: emitter.Emitter<any>) {
 		var index = this._wires.length;
 		this._wires[index] = new Wire(
 			emitter,
@@ -23,7 +22,7 @@ class Transmitter<In>
 
 
 function transmitter<T>(initialValue: T) {
-	var t = new Transmitter([], undefined, initialValue);
+	var t = new Transmitter([], initialValue, undefined);
 	t.name = '? | transmitter'
 	return t;
 }

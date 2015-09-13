@@ -1,6 +1,4 @@
-import inf = require('../../src/interfaces');
 import electric = require('../electric');
-import eevent = require('../electric-event');
 import fp = require('../fp');
 
 
@@ -31,17 +29,19 @@ var emptyResponse = new Response(
 
 
 export function device<T>(
-	method: string, url: string, input: inf.IEmitter<eevent<T>>,
-	encode: (data: T) => string = fp.identity, decode: (data: string) => T = fp.identity
+	method: string, url: string,
+	input: electric.emitter.Emitter<electric.event<T>>,
+	encode: (data: T) => string = fp.identity,
+	decode: (data: string) => T = fp.identity
 ) {
 	var state = electric.emitter.manual('none');
 	state.name = 'state of ' + method + ': ' + url;
-	var stateChange = <electric.emitter.EventEmitter<string>>electric.emitter.manualEvent();
+	var stateChange = electric.emitter.manualEvent(<string>null);
 	stateChange.name = 'state change of ' + method + ': ' + url;
 	var responseEmitter = electric.emitter.manual(emptyResponse);
 	responseEmitter.name = 'response on ' + method + ': ' + url;
 
-	input.plugReceiver(function emitStateChangesAndResponses(data) {
+	input.plugReceiver(function emitStateChangesAndResponses(data: electric.event<T>) {
 		if (!data.happend) {
 			return;
 		}
@@ -74,7 +74,7 @@ export function device<T>(
 }
 
 export function JSONDevice<T>(
-	method: string, url: string, input: inf.IEmitter<eevent<T>>
+	method: string, url: string, input: electric.emitter.Emitter<electric.event<T>>
 ) {
 	return device(method, url, input, JSON.stringify, JSON.parse);
 }

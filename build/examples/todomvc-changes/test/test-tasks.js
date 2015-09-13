@@ -12,12 +12,12 @@ describe('collection', function () {
     function makeTasks(initial, route, itemify) {
         if (route === void 0) { route = '#/'; }
         if (itemify === void 0) { itemify = true; }
-        var title = electric.emitter.manualEvent();
-        var check = electric.emitter.manualEvent();
-        var toggle = electric.emitter.manualEvent();
-        var retitle = electric.emitter.manualEvent();
-        var del = electric.emitter.manualEvent();
-        var clear = electric.emitter.manualEvent();
+        var title = electric.emitter.manualEvent(null);
+        var check = electric.emitter.manualEvent(null);
+        var toggle = electric.emitter.manualEvent(null);
+        var retitle = electric.emitter.manualEvent(null);
+        var del = electric.emitter.manualEvent(null);
+        var clear = electric.emitter.manualEvent(null);
         var hash = electric.emitter.manual(route);
         var input = {
             insert: title,

@@ -8,7 +8,6 @@ import electric = require("../src/electric");
 // import ui = require('../src/emitters/ui');
 import emitterFromPromise = require('../src/emitters/fromPromise');
 import eevent = require('../src/electric-event');
-import inf = require('../src/interfaces');
 
 
 describe('electric emitter', function() {
@@ -83,62 +82,80 @@ describe('electric emitter', function() {
         	.to.emit(2)
         	.andBe(done);
     });
-});
 
-describe('emitters impulse', function() {
-    it('should return to value before impulse', function(done) {
-        var emitter = electric.emitter.manual(0);
-        expect(emitter)
-            .to.emit(0)
-            .after(() => {
-                emitter.impulse(1);
-            })
-            .to.emit(1)
-            .to.emit(0)
+    it('should not allow glitches', function(done) {
+        var y = electric.emitter.manual(2);
+
+        var a = y.map(x => x + 0);
+        var b = electric.transformator.map(
+            (yv, av) => yv + av,
+            y, a
+        );
+         y.name = 'y';
+        a.name = 'a';
+        b.name = 'b';
+        expect(b)
+            .to.emit(4)
+            .then.after(() => y.emit(3))
+            .to.emit(6)
             .andBe(done);
-    });
-
-	it('it should not go to new receivers', function(done) {
-        var emitter = electric.emitter.manual(0);
-        var r: string[] = [];
-        expect(emitter)
-			.to.emit(0)
-			.after(() => emitter.impulse(1))
-			.to.emit(1, 0)
-			.after(() => emitter.plugReceiver((x: number) => r.push('b' + x)))
-			.after(() => emitter.impulse(2))
-			.to.emit(2, 0)
-			.waitFor(
-				() => expect(r).to.deep.equal(['b0', 'b2', 'b0'])
-			)
-			.andBe(done);
-    });
-
-    it('it should not go to new receivers 2', function(done) {
-        var emitter = electric.emitter.manual(0);
-        var r: string[] = [];
-        emitter.plugReceiver((x: number) => r.push('a' + x));
-        expect(emitter)
-			.to.emit(0)
-			.after(() => emitter.impulse(1))
-			.to.emit(1)
-			.to.emit(0)
-			.after(() => emitter.plugReceiver((x: number) => r.push('b' + x)))
-			.after(() => emitter.impulse(2))
-			.to.emit(2)
-			.to.emit(0)
-			.waitFor(
-				() => expect(r).to.deep.equal([
-					'a0',
-					'a1',
-					'a0', 'b0',
-				    'a2', 'b2',
-				    'a0', 'b0'
-				])
-			)
-			.andBe(done);
-    });
+    })
 });
+
+// describe('emitters impulse', function() {
+//     it('should return to value before impulse', function(done) {
+//         var emitter = electric.emitter.manual(0);
+//         expect(emitter)
+//             .to.emit(0)
+//             .after(() => {
+//                 emitter.impulse(1);
+//             })
+//             .to.emit(1)
+//             .to.emit(0)
+//             .andBe(done);
+//     });
+
+// 	it('it should not go to new receivers', function(done) {
+//         var emitter = electric.emitter.manual(0);
+//         var r: string[] = [];
+//         expect(emitter)
+// 			.to.emit(0)
+// 			.after(() => emitter.impulse(1))
+// 			.to.emit(1, 0)
+// 			.after(() => emitter.plugReceiver((x: number) => r.push('b' + x)))
+// 			.after(() => emitter.impulse(2))
+// 			.to.emit(2, 0)
+// 			.waitFor(
+// 				() => expect(r).to.deep.equal(['b0', 'b2', 'b0'])
+// 			)
+// 			.andBe(done);
+//     });
+
+//     it('it should not go to new receivers 2', function(done) {
+//         var emitter = electric.emitter.manual(0);
+//         var r: string[] = [];
+//         emitter.plugReceiver((x: number) => r.push('a' + x));
+//         expect(emitter)
+// 			.to.emit(0)
+// 			.after(() => emitter.impulse(1))
+// 			.to.emit(1)
+// 			.to.emit(0)
+// 			.after(() => emitter.plugReceiver((x: number) => r.push('b' + x)))
+// 			.after(() => emitter.impulse(2))
+// 			.to.emit(2)
+// 			.to.emit(0)
+// 			.waitFor(
+// 				() => expect(r).to.deep.equal([
+// 					'a0',
+// 					'a1',
+// 					'a0', 'b0',
+// 				    'a2', 'b2',
+// 				    'a0', 'b0'
+// 				])
+// 			)
+// 			.andBe(done);
+//     });
+// });
 
 
 
@@ -298,24 +315,6 @@ describe('emitter', function() {
             .andBe(done)
     });
 
-    it('should be mergeable', function(done) {
-        // value of emitter1 is initial value
-        // of merged
-        var emitter1 = electric.emitter.manual('1a');
-        var emitter2 = electric.emitter.manual('2a');
-        var merged = emitter1.merge(emitter2);
-        expect(merged)
-            .to.emit('1a')
-            .then.after(() => emitter2.emit('2b'))
-            .to.emit('2b')
-            .then.after(() => emitter1.emit('1a'))
-        // value of emitter1 doesn't change
-        // so it's not emitted in merged
-            .and.after(() => emitter1.emit('1c'))
-            .to.emit('1c')
-            .andBe(done);
-    });
-
     it('should be whenable', function(done) {
         var emitter = electric.emitter.manual(0);
         var whened = emitter.when({
@@ -378,7 +377,7 @@ describe('emitters recursion', function() {
         var emitter1 = electric.emitter.manual(eevent.notHappend);
         var emitter2 = electric.emitter.manual(eevent.notHappend);
 
-        function color(): inf.IEmitter<string> {
+        function color(): electric.emitter.Emitter<string> {
             return constant('red').change({
                 to: () => constant('blue'), when: emitter1
             }).change({

@@ -24,7 +24,7 @@ var Transmitter = (function (_super) {
     return Transmitter;
 })(emitter.Transformator);
 function transmitter(initialValue) {
-    var t = new Transmitter([], undefined, initialValue);
+    var t = new Transmitter([], initialValue, undefined);
     t.name = '? | transmitter';
     return t;
 }

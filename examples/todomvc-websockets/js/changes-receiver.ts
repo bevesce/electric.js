@@ -6,10 +6,10 @@ import eevent = require('../../../src/electric-event');
 
 export = changesRendererReceiver;
 
-var check: electric.emitter.EventEmitter<{ id: number, completed: boolean }>;
-var del: electric.emitter.EventEmitter<number>;
-var editing: electric.emitter.EventEmitter<number>;
-var retitle: electric.emitter.EventEmitter<{ id: number, title: string }>;
+var check: electric.emitter.ManualEventEmitter<{ id: number, completed: boolean }>;
+var del: electric.emitter.ManualEventEmitter<number>;
+var editing: electric.emitter.ManualEventEmitter<number>;
+var retitle: electric.emitter.ManualEventEmitter<{ id: number, title: string }>;
 
 var list = document.getElementById('todo-list');
 var listItemById: { [id: number]: HTMLElement } = {};

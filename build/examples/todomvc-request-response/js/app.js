@@ -5,11 +5,11 @@ var rui = require('../../../src/receivers/ui');
 var eui = require('../../../src/emitters/ui');
 // Emitters
 var hash = eui.hash();
-var newTask = eui.fromInputTextEnter('new-task');
-var clear = eui.fromButton('clear-button');
+var newTask = eui.enteredText('new-task');
+var clear = eui.clicks('clear-button');
 var check = electric.emitter.manualEvent('check');
 var del = electric.emitter.manualEvent('delete');
-var toggle = eui.fromCheckboxEvent('toggle');
+var toggle = eui.checkboxClicks('toggle');
 var editingStart = electric.emitter.manualEvent('editing start');
 var retitle = electric.emitter.manualEvent('retitle');
 var syncButtonClick = eui.clicks('sync-button');
@@ -138,8 +138,10 @@ function disable(element) {
 function enable(element) {
     element.removeAttribute('disabled');
 }
+var g = electric.graph.of(sync.state, 3);
+console.log(g.stringify());
 
-},{"../../../src/electric":10,"../../../src/electric-event":9,"../../../src/emitters/ui":12,"../../../src/receivers/ui":16,"./sync-device":3,"./tasks-device":4,"./tasks-receiver":5}],2:[function(require,module,exports){
+},{"../../../src/electric":10,"../../../src/electric-event":9,"../../../src/emitters/ui":12,"../../../src/receivers/ui":17,"./sync-device":3,"./tasks-device":4,"./tasks-receiver":5}],2:[function(require,module,exports){
 var Item = (function () {
     function Item(id, title, completed) {
         this._id = id;
@@ -210,18 +212,17 @@ function sync(userActivated, tasks) {
                 return electric.emitter.constant(eevent.notHappend);
             }
             else {
-                return userActivated.merge(electric.clock.interval({ inMs: 30 * 1000 }));
+                return electric.transformator.merge(userActivated, electric.clock.interval({ inMs: 30 * 1000 }));
             }
         },
         when: stateChange
     });
-    electric.r.log(shouldSyncTasks);
+    shouldSyncTasks.name = 'should sync tasks';
     var tasksToSync = electric.transformator.map(function (should, ts) { return should.map(function (_) { return ts; }); }, shouldSyncTasks, tasks);
     var requestsDevice = createRequestsDevice(tasksToSync);
     state.is(initialRequestState.change({
-        to: function (fromState, toState) {
-            return electric.emitter.constant(toState);
-        }, when: requestsDevice.stateChange
+        to: function (fromState, toState) { return electric.emitter.constant(toState); },
+        when: requestsDevice.stateChange
     }, { to: electric.emitter.constant('none'), when: tasksChanges }));
     return {
         state: state,
@@ -237,7 +238,7 @@ function makeInitialRequest(initialRequestState, initialTasks) {
     }, { decode: JSON.parse });
 }
 function createRequestsDevice(data) {
-    return request.JSONRequestDevice(POST, URL, data);
+    return request.JSONDevice(POST, URL, data);
 }
 module.exports = sync;
 
@@ -420,13 +421,13 @@ function setupTasksEvents(tasks) {
 ;
 module.exports = tasksRendererReceiver;
 
-},{"../../../src/receivers/ui":16}],6:[function(require,module,exports){
+},{"../../../src/receivers/ui":17}],6:[function(require,module,exports){
 var clock = require('../clock');
 var scheduler = require('../scheduler');
 var transformator = require('../transformator');
 function integral(initialValue, emitter, options) {
     var timmed = timeValue(emitter, options);
-    var result = timmed.accumulate({
+    var acc = timmed.accumulate({
         time: scheduler.now(),
         value: emitter.dirtyCurrentValue(),
         sum: initialValue
@@ -440,7 +441,9 @@ function integral(initialValue, emitter, options) {
             value: v.value,
             sum: sum
         };
-    }).map(function (v) { return v.sum; });
+    });
+    acc.name = 'internal integral accumulator';
+    var result = acc.map(function (v) { return v.sum; });
     result.name = 'integral';
     result.setEquals(function (x, y) { return x.equals(y); });
     result.stabilize = function () { return timmed.stabilize(); };
@@ -454,10 +457,14 @@ function differential(initialValue, emitter, options) {
         value: emitter.dirtyCurrentValue(),
         diff: initialValue
     }, function (acc, v) {
-        var dt = v.time - acc.time;
-        var diff = v.value.sub(acc.value).divT(dt);
+        var now = scheduler.now();
+        var dt = now - acc.time;
+        var diff = acc.diff;
+        if (dt !== 0) {
+            diff = v.value.sub(acc.value).divT(dt);
+        }
         return {
-            time: v.time,
+            time: now,
             value: v.value,
             diff: diff
         };
@@ -471,7 +478,7 @@ function timeValue(emitter, options) {
     var time = clock.time(options);
     var trans = transformator.map(function (t, v) { return ({ time: t, value: v }); }, time, emitter);
     trans.stabilize = function () { return time.stabilize(); };
-    trans.name = 'timeValue';
+    trans.name = 'calculus timer';
     return trans;
 }
 
@@ -480,19 +487,21 @@ var scheduler = require('./scheduler');
 var emitter = require('./emitter');
 function interval(options) {
     var timer = emitter.manualEvent();
-    scheduler.scheduleInterval(function () {
-        timer.impulse(Date.now());
+    var id = scheduler.scheduleInterval(function () {
+        timer.impulse(scheduler.now());
     }, calculateInterval(options.inMs, options.fps));
     timer.name = "interval(" + calculateEmitterName(options) + ")";
+    timer.setReleaseResources(function () { return scheduler.unscheduleInterval(id); });
     return timer;
 }
 exports.interval = interval;
 function intervalValue(value, options) {
     var timer = emitter.manualEvent();
-    scheduler.scheduleInterval(function () {
+    var id = scheduler.scheduleInterval(function () {
         timer.impulse(value);
     }, calculateInterval(options.inMs, options.fps));
     timer.name = "intervalValue(" + value + ", " + calculateEmitterName(options) + ")";
+    timer.setReleaseResources(function () { return scheduler.unscheduleInterval(id); });
     return timer;
 }
 exports.intervalValue = intervalValue;
@@ -541,7 +550,7 @@ var Response = (function () {
 })();
 exports.Response = Response;
 var emptyResponse = new Response(null, -1, 'No request was yet made and response was not yet provided');
-function requestDevice(method, url, input, encode, decode) {
+function device(method, url, input, encode, decode) {
     if (encode === void 0) { encode = fp.identity; }
     if (decode === void 0) { decode = fp.identity; }
     var state = electric.emitter.manual('none');
@@ -572,11 +581,11 @@ function requestDevice(method, url, input, encode, decode) {
         response: responseEmitter
     };
 }
-exports.requestDevice = requestDevice;
-function JSONRequestDevice(method, url, input) {
-    return requestDevice(method, url, input, JSON.stringify, JSON.parse);
+exports.device = device;
+function JSONDevice(method, url, input) {
+    return device(method, url, input, JSON.stringify, JSON.parse);
 }
-exports.JSONRequestDevice = JSONRequestDevice;
+exports.JSONDevice = JSONDevice;
 function request(method, url, callback, args) {
     args.encode = args.encode || fp.identity;
     args.decode = args.decode || fp.identity;
@@ -680,6 +689,9 @@ var Happend = (function () {
         this.happend = true;
         this.value = value;
     }
+    Happend.prototype.toString = function () {
+        return "Happend: " + this.value.toString();
+    };
     Happend.prototype.map = function (f) {
         return ElectricEvent.of(f(this.value));
     };
@@ -693,6 +705,9 @@ var NotHappend = (function () {
         this.happend = false;
         this.value = undefined;
     }
+    NotHappend.prototype.toString = function () {
+        return 'NotHappend';
+    };
     NotHappend.prototype.map = function (f) {
         return ElectricEvent.notHappend;
     };
@@ -712,12 +727,14 @@ exports.receiver = require('./receiver');
 exports.clock = require('./clock');
 exports.transmitter = require('./transmitter');
 exports.calculus = require('./calculus/calculus');
+exports.event = require('./electric-event');
+exports.graph = require('./graph');
 exports.e = exports.emitter;
 exports.t = exports.transformator;
 exports.r = exports.receiver;
 exports.c = exports.calculus;
 
-},{"./calculus/calculus":6,"./clock":7,"./emitter":11,"./receiver":15,"./scheduler":18,"./transformator":20,"./transmitter":21}],11:[function(require,module,exports){
+},{"./calculus/calculus":6,"./clock":7,"./electric-event":9,"./emitter":11,"./graph":14,"./receiver":16,"./scheduler":18,"./transformator":20,"./transmitter":21}],11:[function(require,module,exports){
 var __extends = (this && this.__extends) || function (d, b) {
     for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p];
     function __() { this.constructor = d; }
@@ -737,8 +754,12 @@ var Emitter = (function () {
         this._currentValue = initialValue;
         this.name = (this.name);
     }
-    Emitter.prototype.toString = function () {
-        return "| " + this.name + " | " + this.dirtyCurrentValue() + " |>";
+    Emitter.prototype.toString = function (includeCurrentValue) {
+        if (includeCurrentValue === void 0) { includeCurrentValue = false; }
+        if (includeCurrentValue) {
+            return "| " + this.name + " = " + this.dirtyCurrentValue().toString() + " >";
+        }
+        return "| " + this.name + " >";
     };
     // when reveiver is plugged current value is not emitted to him
     // instantaneously, but instead it's done asynchronously
@@ -747,7 +768,7 @@ var Emitter = (function () {
             receiver = receiver.wire(this);
         }
         this._receivers.push(receiver);
-        this._ayncDispatchToReceiver(receiver, this._currentValue);
+        this._asyncDispatchToReceiver(receiver, this._currentValue);
         return this._receivers.length - 1;
     };
     Emitter.prototype._dirtyPlugReceiver = function (receiver) {
@@ -755,7 +776,7 @@ var Emitter = (function () {
             receiver = receiver.wire(this);
         }
         this._receivers.push(receiver);
-        // this._ayncDispatchToReceiver(receiver, this._currentValue);
+        // this._asyncDispatchToReceiver(receiver, this._currentValue);
         return this._receivers.length - 1;
     };
     Emitter.prototype.unplugReceiver = function (receiverOrId) {
@@ -815,6 +836,7 @@ var Emitter = (function () {
         var currentReceivers = this._receivers.slice();
         for (var _i = 0; _i < currentReceivers.length; _i++) {
             var receiver = currentReceivers[_i];
+            // this._asyncDispatchToReceiver(receiver, value);
             this._dispatchToReceiver(receiver, value);
         }
     };
@@ -826,14 +848,14 @@ var Emitter = (function () {
             receiver.receive(value);
         }
     };
-    Emitter.prototype._ayncDispatchToReceivers = function (value) {
+    Emitter.prototype._asyncDispatchToReceivers = function (value) {
         var currentReceivers = this._receivers.slice();
         for (var _i = 0; _i < currentReceivers.length; _i++) {
             var receiver = currentReceivers[_i];
-            this._ayncDispatchToReceiver(receiver, value);
+            this._asyncDispatchToReceiver(receiver, value);
         }
     };
-    Emitter.prototype._ayncDispatchToReceiver = function (receiver, value) {
+    Emitter.prototype._asyncDispatchToReceiver = function (receiver, value) {
         var _this = this;
         scheduler.scheduleTimeout(function () { return _this._dispatchToReceiver(receiver, value); }, 0);
     };
@@ -857,12 +879,8 @@ var Emitter = (function () {
         var acc = accumulator(initialValue, this.dirtyCurrentValue());
         return namedTransformator("accumulate(" + fn(accumulator) + ")", [this], transformators.accumulate(acc, accumulator), acc);
     };
-    Emitter.prototype.merge = function () {
-        var emitters = [];
-        for (var _i = 0; _i < arguments.length; _i++) {
-            emitters[_i - 0] = arguments[_i];
-        }
-        return namedTransformator('merge', [this].concat(emitters), transformators.merge(), this.dirtyCurrentValue());
+    Emitter.prototype.changes = function () {
+        return namedTransformator('changes', [this], transformators.changes(this.dirtyCurrentValue()), eevent.notHappend);
     };
     Emitter.prototype.when = function (switcher) {
         var t = namedTransformator('whenHappensThen', [this], transformators.when(switcher.happens, switcher.then), eevent.notHappend);
@@ -952,8 +970,12 @@ var Transformator = (function (_super) {
         this._wires = [];
         this.plugEmitters(emitters);
     }
-    Transformator.prototype.toString = function () {
-        return "<| " + this.name + " | " + this.dirtyCurrentValue() + " |>";
+    Transformator.prototype.toString = function (includeCurrentValue) {
+        if (includeCurrentValue === void 0) { includeCurrentValue = false; }
+        if (includeCurrentValue) {
+            return "< " + this.name + " = " + this.dirtyCurrentValue().toString() + " >";
+        }
+        return "< " + this.name + " >";
     };
     Transformator.prototype.setTransform = function (transform) {
         var _this = this;
@@ -1012,228 +1034,319 @@ function namedTransformator(name, emitters, transform, initialValue) {
 }
 exports.namedTransformator = namedTransformator;
 
-},{"./electric-event":9,"./placeholder":14,"./scheduler":18,"./transformator-helpers":19,"./utils/fn":24,"./wire":25}],12:[function(require,module,exports){
+},{"./electric-event":9,"./placeholder":15,"./scheduler":18,"./transformator-helpers":19,"./utils/fn":24,"./wire":30}],12:[function(require,module,exports){
 var electric = require('../electric');
-var utils = require('../receivers/utils');
-var transformator = require('../transformator');
-var eevent = require('../electric-event');
-var fp = require('../fp');
-var keyCodes = {
-    up: 38,
-    down: 40,
-    left: 37,
-    right: 39,
-    w: 87,
-    a: 65,
-    s: 83,
-    d: 68,
-    enter: 13,
-    space: 32
-};
-// NEW
-function clicks(nodeOrId, mapping) {
-    if (mapping === void 0) { mapping = fp.identity; }
-    var button = utils.getNode(nodeOrId);
-    var emitter = electric.emitter.manualEvent();
-    function emitterListener(event) {
-        emitter.impulse(mapping(event));
-    }
-    button.addEventListener('click', emitterListener, false);
-    emitter.setReleaseResources(function () { return button.removeEventListener('click', emitterListener); });
-    emitter.name = '| clicks on ' + nodeOrId + ' |>';
-    return emitter;
+var shallowCopy = require('../utils/shallow-copy');
+var keyCodes = require('../utils/key-codes');
+function clicks(targetOrId, mapping) {
+    return fromEvent({
+        target: targetOrId,
+        mapping: mapping,
+        type: 'click',
+        preventDefault: true
+    });
 }
 exports.clicks = clicks;
-function arrows(layout, nodeOrId, type) {
-    if (layout === void 0) { layout = 'arrows'; }
-    if (nodeOrId === void 0) { nodeOrId = document; }
-    if (type === void 0) { type = 'keydown'; }
-    var layouts = {
-        'arrows': {
-            38: 'up', 40: 'down', 37: 'left', 39: 'right'
-        },
-        'wasd': {
-            87: 'up', 83: 'down', 65: 'left', 68: 'right'
-        },
-        'hjkl': {
-            75: 'up', 74: 'down', 72: 'left', 76: 'right'
-        },
-        'ijkl': {
-            73: 'up', 75: 'down', 74: 'left', 76: 'right'
-        }
-    };
-    var keyCodes = layouts[layout];
-    var target = utils.getNode(nodeOrId);
-    var emitter = electric.emitter.manualEvent();
-    function emitterListener(event) {
-        var direction = keyCodes[event.keyCode];
-        if (direction) {
-            event.preventDefault();
-            emitter.impulse(direction);
-        }
-    }
-    target.addEventListener(type, emitterListener);
-    emitter.name = '| arrows |>';
-    return emitter;
-}
-exports.arrows = arrows;
-function key(name, type, nodeOrId) {
-    if (nodeOrId === void 0) { nodeOrId = document; }
-    var target = utils.getNode(nodeOrId);
-    var emitter = electric.emitter.manualEvent();
+function key(name, type) {
     var keyCode = keyCodes[name];
-    function emitterListener(event) {
-        if (event.keyCode === keyCode) {
-            event.preventDefault();
-            emitter.impulse(name);
-        }
-    }
-    target.addEventListener('key' + type, emitterListener);
-    emitter.name = '| key ' + name + ' on ' + type + ' |>';
-    return emitter;
+    return fromEvent({
+        target: document.body,
+        mapping: function (e) { return name; },
+        filter: function (e) { return e.keyCode === keyCode; },
+        type: 'key' + type,
+        preventDefault: true,
+        name: "key \"" + name + "\" " + type
+    });
 }
 exports.key = key;
-// OLD
-function em(text) {
-    return '`' + text + '`';
-}
-function fromEvent(target, type, name, useCapture) {
-    if (name === void 0) { name = ''; }
-    if (useCapture === void 0) { useCapture = false; }
-    var emitter = electric.emitter.manualEvent();
-    emitter.name = name || '| event: ' + type + ' on ' + em(target) + '|>';
-    var impulse = function (event) {
-        // event.preventDefault();
-        emitter.impulse(event);
-    };
-    target.addEventListener(type, impulse, useCapture);
-    emitter.setReleaseResources(function () { return target.removeEventListener(type, impulse, useCapture); });
-    return emitter;
-}
-exports.fromEvent = fromEvent;
-function fromButton(nodeOrId) {
-    var button = utils.getNode(nodeOrId);
-    return fromEvent(button, 'click', 'button clicks on ' + em(nodeOrId));
-}
-exports.fromButton = fromButton;
-function fromInputText(nodeOrId, type) {
+function text(targetOrId, type) {
     if (type === void 0) { type = 'keyup'; }
-    var input = utils.getNode(nodeOrId);
-    return fromEvent(input, 'keyup', 'text of ' + em(nodeOrId)).map(function () { return input.value; });
-}
-exports.fromInputText = fromInputText;
-function fromInputTextEnter(nodeOrId) {
-    var input = utils.getNode(nodeOrId);
-    var e = electric.emitter.manualEvent();
-    e.name = '| enter on ' + em(nodeOrId) + ' |>';
-    var impulse = function (event) {
-        if (event.keyCode === 13) {
-            e.impulse(input.value);
-        }
-    };
-    input.addEventListener('keydown', impulse, false);
-    e.setReleaseResources(function () { return input.removeEventListener('keydown', impulse, false); });
-    return e;
-}
-exports.fromInputTextEnter = fromInputTextEnter;
-function fromCheckbox(nodeOrId) {
-    var checkbox = utils.getNode(nodeOrId);
-    var e = fromEvent(checkbox, 'click', 'checked of ' + em(nodeOrId));
-    return e.map(function () { return checkbox.checked; });
-}
-exports.fromCheckbox = fromCheckbox;
-;
-function fromCheckboxEvent(nodeOrId) {
-    var checkbox = utils.getNode(nodeOrId);
-    var e = electric.emitter.manualEvent();
-    e.name = '| click on checkbox ' + nodeOrId + ' |>';
-    var impulse = function (event) {
-        e.impulse(checkbox.checked);
-    };
-    checkbox.addEventListener('click', impulse, false);
-    e.setReleaseResources(function () { return checkbox.removeEventListener('click', impulse, false); });
-    return e;
-}
-exports.fromCheckboxEvent = fromCheckboxEvent;
-;
-function joinObjects(objs) {
-    var o = {};
-    objs.forEach(function (e) {
-        if (e === undefined) {
-            return;
-        }
-        o[e.key] = e.value;
+    var input = getTargetById(targetOrId);
+    return fromValue({
+        target: input,
+        mapping: function (_) { return input.value; },
+        initialValue: '',
+        type: 'keyup',
+        name: "text of " + targetOrId
     });
-    return o;
 }
-function fromCheckboxes(nodeOrIds) {
-    var emitters = nodeOrIds.map(function (nodeOrId) {
-        var checkbox = utils.getNode(nodeOrId);
-        return fromEvent(checkbox, 'click').map(function () { return ({ key: checkbox.id, value: checkbox.checked }); });
+exports.text = text;
+function enteredText(targetOrId) {
+    var input = getTargetById(targetOrId);
+    return fromEvent({
+        target: input,
+        filter: function (e) { return e.keyCode === 13; },
+        mapping: function (_) { return input.value; },
+        type: 'keyup',
+        name: "text entered into " + targetOrId
     });
-    var e = transformator.mapMany.apply(transformator, [function () {
-        var args = [];
-        for (var _i = 0; _i < arguments.length; _i++) {
-            args[_i - 0] = arguments[_i];
-        }
-        return joinObjects(args);
-    }].concat(emitters));
-    e.name = 'state of checkboxes ' + em(nodeOrIds);
-    return e;
 }
-exports.fromCheckboxes = fromCheckboxes;
+exports.enteredText = enteredText;
+function checkbox(targetOrId) {
+    var checkbox = getTargetById(targetOrId);
+    return fromValue({
+        target: checkbox,
+        type: 'click',
+        initialValue: checkbox.checked,
+        mapping: function (_) { return checkbox.checked; },
+        name: "checbox " + targetOrId
+    });
+}
+exports.checkbox = checkbox;
 ;
-function fromRadioGroup(nodesOrName) {
-    var nodes = utils.getNodes(nodesOrName);
-    var emitters = nodes.map(function (radio) { return fromEvent(radio, 'click').map(function (v) { return v.happend ? eevent.of(radio.id) : eevent.notHappend; }); });
-    var e = transformator.hold('', transformator.merge.apply(transformator, emitters));
-    e.name = 'state of radio group ' + em(nodesOrName);
-    return e;
+function checkboxClicks(targetOrId) {
+    var checkbox = getTargetById(targetOrId);
+    return fromEvent({
+        target: checkbox,
+        type: 'click',
+        mapping: function (_) { return checkbox.checked; },
+        name: "checbox " + targetOrId
+    });
 }
-exports.fromRadioGroup = fromRadioGroup;
-function fromSelect(nodeOrId) {
-    var select = utils.getNode(nodeOrId);
-    return fromEvent(select, 'change', 'selected of ' + em(nodeOrId)).map(function () { return select.value; });
-}
-exports.fromSelect = fromSelect;
+exports.checkboxClicks = checkboxClicks;
 ;
-function mouse(nodeOrId) {
-    var mouse = utils.getNode(nodeOrId);
-    var emitters = ['down', 'up', 'over', 'out', 'move'].map(function (type) { return fromEvent(mouse, 'mouse' + type).map(function (e) { return (e.happend ? eevent.of({ type: type, data: e.value }) : eevent.notHappend); }); });
-    var emitter = transformator.merge.apply(transformator, emitters);
-    emitter.name = '| mouse on ' + em(nodeOrId) + ' |>';
-    return emitter;
+function checkboxes(targetsOrName) {
+    var targets = getTargetsByName(targetsOrName);
+    var prevValue = {};
+    targets.forEach(function (t) { return prevValue[t.id] = t.checked; });
+    return fromValues({
+        targetsOrName: targets,
+        listener: function (emitter, target) {
+            return function () {
+                prevValue[target.id] = target.checked;
+                emitter.emit(shallowCopy(prevValue));
+            };
+        },
+        name: "checkboxes " + targetsOrName,
+        type: 'click',
+        initialValue: prevValue
+    });
 }
-exports.mouse = mouse;
+exports.checkboxes = checkboxes;
+function radioGroup(targetsOrName) {
+    var targets = getTargetsByName(targetsOrName);
+    return fromValues({
+        targetsOrName: targets,
+        listener: function (emitter, target) {
+            return function () { return emitter.emit(target.id); };
+        },
+        name: "radio group " + targetsOrName,
+        type: 'click',
+        initialValue: targets.filter(function (t) { return t.checked; })[0].id
+    });
+}
+exports.radioGroup = radioGroup;
+function select(targetOrId) {
+    var select = getTargetById(targetOrId);
+    return fromValue({
+        target: select,
+        name: "select " + targetOrId,
+        mapping: function () { return select.value; },
+        type: 'change',
+        initialValue: select.value
+    });
+}
+exports.select = select;
 ;
+function mouseXY(targetOrId) {
+    return fromValue({
+        type: 'mousemove',
+        target: targetOrId,
+        initialValue: { x: undefined, y: undefined },
+        name: 'mouse position',
+        mapping: function (e) { return ({ x: e.offsetX, y: e.offsetY }); }
+    });
+}
+exports.mouseXY = mouseXY;
+function mouseDown(targetOrId) {
+    return fromEvent({
+        type: 'mousedown',
+        target: targetOrId,
+        mapping: function (e) { return ({ x: e.offsetX, y: e.offsetY }); }
+    });
+}
+exports.mouseDown = mouseDown;
+function mouseUp(targetOrId) {
+    return fromEvent({
+        type: 'mouseup',
+        target: targetOrId,
+        mapping: function (e) { return ({ x: e.offsetX, y: e.offsetY }); }
+    });
+}
+exports.mouseUp = mouseUp;
 var hashEmitter = null;
 function hash() {
     if (!hashEmitter) {
-        hashEmitter = electric.emitter.manual(window.location.hash);
-        hashEmitter.name = '| window.location.hash |>';
-        window.addEventListener('hashchange', function () {
-            hashEmitter.emit(window.location.hash);
+        hashEmitter = fromValue({
+            type: 'hashchange',
+            name: 'window.location.hash',
+            target: window,
+            mapping: function () { return window.location.hash; },
+            initialValue: window.location.hash
         });
     }
     return hashEmitter;
 }
 exports.hash = hash;
-function enter(nodeOrId) {
-    var target = utils.getNode(nodeOrId);
-    var e = electric.emitter.manualEvent();
-    e.name = '| enter on ' + em(nodeOrId) + ' |>';
-    var impulse = function (event) {
-        if (event.keyCode === 13) {
-            e.impulse(null);
-        }
-    };
-    target.addEventListener('keydown', impulse, false);
-    e.setReleaseResources(function () { return target.removeEventListener('keydown', impulse, false); });
-    return e;
+function fromEvent(options) {
+    var useCapture = options.useCapture === true ? true : false;
+    var emitter = electric.emitter.manualEvent();
+    var target = getTargetById(options.target);
+    emitter.name = options.name || options.type + " on " + options.target;
+    var impulse = emitOrImpluse(emitter, options);
+    target.addEventListener(options.type, impulse, useCapture);
+    emitter.setReleaseResources(function () {
+        return target.removeEventListener(options.type, impulse, useCapture);
+    });
+    return emitter;
 }
-exports.enter = enter;
+exports.fromEvent = fromEvent;
+function fromValue(options) {
+    var useCapture = options.useCapture === true ? true : false;
+    var emitter = electric.emitter.manual(options.initialValue);
+    var target = getTargetById(options.target);
+    emitter.name = options.name || options.type + " on " + options.target;
+    var emit = emitOrImpluse(emitter, options, false);
+    target.addEventListener(options.type, emit, useCapture);
+    emitter.setReleaseResources(function () {
+        return target.removeEventListener(options.type, emit, useCapture);
+    });
+    return emitter;
+}
+exports.fromValue = fromValue;
+function fromValues(options) {
+    var targets = getTargetsByName(options.targetsOrName);
+    var emitter = electric.emitter.manual(options.initialValue);
+    var listeners = [];
+    targets.forEach(function (t) {
+        listeners.push(options.listener(emitter, t));
+        t.addEventListener(options.type, listeners[listeners.length - 1]);
+    });
+    emitter.name = options.name || options.type + " " + options.targetsOrName;
+    emitter.setReleaseResources(function () {
+        targets.forEach(function (t, i) {
+            t.removeEventListener(options.type, listeners[i]);
+        });
+    });
+    return emitter;
+}
+exports.fromValues = fromValues;
+// some event can fire with high frequency
+// so here we ensure that all the checks of
+// provided options are calculated only at creation
+// ugly code
+function emitOrImpluse(emitter, options, impulse) {
+    if (impulse === void 0) { impulse = true; }
+    var filter = options.filter;
+    var mapping = options.mapping;
+    var preventDefault = options.preventDefault;
+    if (filter && mapping && impulse && preventDefault) {
+        return function (event) {
+            if (filter(event)) {
+                emitter.impulse(mapping(event));
+            }
+        };
+    }
+    else if (filter && mapping && impulse) {
+        return function (event) {
+            if (filter(event)) {
+                emitter.impulse(mapping(event));
+            }
+        };
+    }
+    else if (filter && impulse && preventDefault) {
+        return function (event) {
+            event.preventDefault();
+            if (filter(event)) {
+                emitter.impulse(event);
+            }
+        };
+    }
+    else if (filter && impulse) {
+        return function (event) {
+            if (filter(event)) {
+                emitter.impulse(event);
+            }
+        };
+    }
+    else if (mapping && impulse && preventDefault) {
+        return function (event) {
+            event.preventDefault();
+            emitter.impulse(mapping(event));
+        };
+    }
+    else if (mapping && impulse) {
+        return function (event) {
+            emitter.impulse(mapping(event));
+        };
+    }
+    else if (filter && mapping && preventDefault) {
+        return function (event) {
+            event.preventDefault();
+            if (filter(event)) {
+                emitter.emit(mapping(event));
+            }
+        };
+    }
+    else if (filter && mapping) {
+        return function (event) {
+            if (filter(event)) {
+                emitter.emit(mapping(event));
+            }
+        };
+    }
+    else if (filter && preventDefault) {
+        return function (event) {
+            event.preventDefault();
+            if (filter(event)) {
+                emitter.emit(event);
+            }
+        };
+    }
+    else if (filter) {
+        return function (event) {
+            if (filter(event)) {
+                emitter.emit(event);
+            }
+        };
+    }
+    else if (mapping && preventDefault) {
+        return function (event) {
+            event.preventDefault();
+            emitter.emit(mapping(event));
+        };
+    }
+    else if (mapping) {
+        return function (event) {
+            emitter.emit(mapping(event));
+        };
+    }
+    else if (preventDefault) {
+        return function (event) {
+            event.preventDefault();
+            emitter.impulse(event);
+        };
+    }
+    else {
+        return function (event) {
+            emitter.impulse(event);
+        };
+    }
+}
+function getTargetById(t) {
+    if (typeof t === 'string') {
+        return document.getElementById(t);
+    }
+    return t;
+}
+function getTargetsByName(t) {
+    if (typeof t === 'string') {
+        return Array.prototype.slice.apply(document.getElementsByName(t));
+    }
+    return t;
+}
 
-},{"../electric":10,"../electric-event":9,"../fp":13,"../receivers/utils":17,"../transformator":20}],13:[function(require,module,exports){
+},{"../electric":10,"../utils/key-codes":25,"../utils/shallow-copy":29}],13:[function(require,module,exports){
 function identity(x) {
     return x;
 }
@@ -1381,6 +1494,141 @@ var either;
 })(either = exports.either || (exports.either = {}));
 
 },{}],14:[function(require,module,exports){
+var pushIfNotIn = require('./utils//push-if-not-in');
+var Graph = (function () {
+    function Graph(source, depth, showCurrentValue) {
+        this._sources = [];
+        this.vertices = [];
+        this.showCurrentValue = showCurrentValue;
+        this.sourceIndex = this._findVertices(source, 0, depth);
+        this._findEdges();
+        this.clean();
+    }
+    Graph.of = function (source, depth, showCurrentValue) {
+        if (showCurrentValue === void 0) { showCurrentValue = false; }
+        return new Graph(source, depth, showCurrentValue);
+    };
+    Graph.prototype.removeVertex = function (id) {
+        this.vertices = this.vertices
+            .filter(function (v) { return v.id !== id; })
+            .map(function (v) { return ({
+            id: v.id,
+            name: v.name,
+            receivers: v.receivers.filter(function (r) { return r !== id; }),
+            emitters: v.emitters.filter(function (e) { return e !== id; }),
+            type: v.type
+        }); });
+        this.edges = this.edges.filter(function (e) { return e.source !== id && e.target !== id; });
+    };
+    Graph.prototype._findVertices = function (source, depth, maxDepth) {
+        if (source.__$visualize_visited_id$ !== undefined) {
+            return source.__$visualize_visited_id$;
+        }
+        this._sources.push(source);
+        this.vertices.push({
+            id: this.vertices.length,
+            name: this._name(source),
+            receivers: [],
+            emitters: [],
+            type: this._sourceType(source)
+        });
+        source.__$visualize_visited_id$ = this.vertices.length - 1;
+        this._goBackwards(source, depth + 1, maxDepth);
+        this._goForwards(source, depth + 1, maxDepth);
+        return source.__$visualize_visited_id$;
+    };
+    Graph.prototype._sourceType = function (source) {
+        if (typeof source === 'function') {
+            return 'receiver';
+        }
+        if (!source._wires) {
+            return 'emitter';
+        }
+        return 'transformator';
+    };
+    Graph.prototype._goBackwards = function (source, depth, maxDepth) {
+        var _this = this;
+        if (this._shouldntGo(depth, maxDepth, source._wires)) {
+            return;
+        }
+        source._wires.forEach(function (w) {
+            var e = w.input;
+            e = _this._maybeUnpackPlaceholder(e);
+            var wId = _this._findVertices(e, depth, maxDepth);
+            var sourceId = source.__$visualize_visited_id$;
+            pushIfNotIn(_this.vertices[sourceId].emitters, wId);
+            pushIfNotIn(_this.vertices[wId].receivers, sourceId);
+        });
+    };
+    Graph.prototype._goForwards = function (source, depth, maxDepth) {
+        var _this = this;
+        if (this._shouldntGo(depth, maxDepth, source._receivers)) {
+            return;
+        }
+        source._receivers.forEach(function (r) {
+            r = _this._maybeUnpackWire(r);
+            r = _this._maybeUnpackPlaceholder(r);
+            var rId = _this._findVertices(r, depth, maxDepth);
+            var sourceId = source.__$visualize_visited_id$;
+            pushIfNotIn(_this.vertices[sourceId].receivers, rId);
+            pushIfNotIn(_this.vertices[rId].emitters, sourceId);
+        });
+    };
+    Graph.prototype._shouldntGo = function (depth, maxDepth, potentialEdges) {
+        if (maxDepth && depth >= maxDepth) {
+            return true;
+        }
+        if (potentialEdges === undefined) {
+            return true;
+        }
+        return false;
+    };
+    Graph.prototype._maybeUnpackPlaceholder = function (e) {
+        if (e._emitter !== undefined) {
+            return e._emitter;
+        }
+        return e;
+    };
+    Graph.prototype._maybeUnpackWire = function (w) {
+        if (w.input !== undefined && w.output !== undefined) {
+            return w.output;
+        }
+        return w;
+    };
+    Graph.prototype._name = function (source) {
+        if (typeof source === 'function') {
+            return "< " + (source.name || 'anonymous') + " |";
+        }
+        return source.toString(this.showCurrentValue);
+    };
+    Graph.prototype._findEdges = function () {
+        var _this = this;
+        this.edges = [];
+        for (var i = 0; i < this.vertices.length; i++) {
+            var node = this.vertices[i];
+            var type = 'transformator';
+            node.emitters.forEach(function (e) {
+                _this.edges.push({
+                    source: e,
+                    target: i
+                });
+            });
+        }
+    };
+    Graph.prototype.clean = function () {
+        this._sources.forEach(function (s) { return s.__$visualize_visited_id$ = undefined; });
+    };
+    Graph.prototype.stringify = function () {
+        return JSON.stringify({
+            vertices: this.vertices,
+            edges: this.edges
+        });
+    };
+    return Graph;
+})();
+module.exports = Graph;
+
+},{"./utils//push-if-not-in":28}],15:[function(require,module,exports){
 // functions that can be simply queued
 var functionsToVoid = [
     'plugReceiver',
@@ -1411,11 +1659,17 @@ var Placeholder = (function () {
     function Placeholder(initialValue) {
         this._actions = [];
         this.initialValue = initialValue;
-        this.name = '| placeholder |>';
+        this.name = '| placeholder >';
     }
-    Placeholder.prototype.toString = function () {
-        var subname = this._emitter ? this._emitter.toString() : "| " + this.dirtyCurrentValue() + " |>";
-        return "| placeholder " + subname;
+    Placeholder.prototype.toString = function (showCurrentValue) {
+        if (showCurrentValue === void 0) { showCurrentValue = false; }
+        if (this._emitter) {
+            return 'placeholder: ' + this._emitter.toString(showCurrentValue);
+        }
+        else if (showCurrentValue) {
+            return "? placeholder = " + this.dirtyCurrentValue() + " >";
+        }
+        return '? placeholder >';
     };
     Placeholder.prototype.is = function (emitter) {
         if (this._emitter) {
@@ -1427,7 +1681,6 @@ var Placeholder = (function () {
             action(this._emitter);
         }
         this._actions = undefined;
-        this.name = '| placeholder | ' + emitter.name;
     };
     Placeholder.prototype.dirtyCurrentValue = function () {
         if (this._emitter) {
@@ -1491,7 +1744,7 @@ function placeholder(initialValue) {
 }
 module.exports = placeholder;
 
-},{}],15:[function(require,module,exports){
+},{}],16:[function(require,module,exports){
 function logReceiver(message) {
     if (!message) {
         message = '<<<';
@@ -1525,7 +1778,7 @@ function collect(emitter) {
 }
 exports.collect = collect;
 
-},{}],16:[function(require,module,exports){
+},{}],17:[function(require,module,exports){
 function htmlReceiverById(id) {
     var element = document.getElementById(id);
     return function htmlReceiver(html) {
@@ -1533,26 +1786,6 @@ function htmlReceiverById(id) {
     };
 }
 exports.htmlReceiverById = htmlReceiverById;
-
-},{}],17:[function(require,module,exports){
-function getNode(nodeOrId) {
-    if (typeof nodeOrId === 'string') {
-        return document.getElementById(nodeOrId);
-    }
-    else {
-        return nodeOrId;
-    }
-}
-exports.getNode = getNode;
-function getNodes(nodesOfName) {
-    if (typeof nodesOfName === 'string') {
-        return Array.prototype.slice.call(document.getElementsByName(nodesOfName));
-    }
-    else {
-        return nodesOfName;
-    }
-}
-exports.getNodes = getNodes;
 
 },{}],18:[function(require,module,exports){
 var stopTime = Date.now();
@@ -1575,8 +1808,9 @@ function advance(timeShiftInMiliseconds) {
         return;
     }
     var newTime = stopTime + timeShiftInMiliseconds;
-    for (; stopTime < newTime; stopTime++) {
+    while (stopTime < newTime) {
         executeCallbacksForTime(stopTime);
+        stopTime++;
     }
     return stopTime;
 }
@@ -1755,11 +1989,17 @@ function change(switchers) {
     };
 }
 exports.change = change;
-function when(happend, then) {
+function when(happens, then) {
     return function transform(emit, impulse) {
+        var prevHappend = false;
         return function whenTransform(v, i) {
-            if (happend(v[i])) {
+            var happend = happens(v[i]);
+            if (happend && !prevHappend) {
                 impulse(eevent.of(then(v[i])));
+                prevHappend = true;
+            }
+            else if (!happend) {
+                prevHappend = false;
             }
         };
     };
@@ -1803,13 +2043,28 @@ function cumulateOverTime(delayInMiliseconds) {
 }
 exports.cumulateOverTime = cumulateOverTime;
 ;
+function changes(initialValue) {
+    return function transform(emit, impulse) {
+        var previous = initialValue;
+        return function changesTransform(v, i) {
+            impulse(eevent.of({
+                previous: previous,
+                next: v[i]
+            }));
+            previous = v[i];
+        };
+    };
+}
+exports.changes = changes;
 
-},{"./electric-event":9,"./scheduler":18,"./utils/call-if-function":23,"./wire":25}],20:[function(require,module,exports){
+},{"./electric-event":9,"./scheduler":18,"./utils/call-if-function":23,"./wire":30}],20:[function(require,module,exports){
 var emitter = require('./emitter');
 var namedTransformator = emitter.namedTransformator;
 var transformators = require('./transformator-helpers');
 var eevent = require('../src/electric-event');
 var fn = require('./utils/fn');
+var mapObj = require('./utils/map-obj');
+var objKeys = require('./utils/objKeys');
 function map(mapping, emitter1, emitter2, emitter3, emitter4, emitter5, emitter6, emitter7) {
     var emitters = Array.prototype.slice.apply(arguments, [1]);
     return namedTransformator("map(" + fn(mapping) + ")", emitters, transformators.map(mapping, emitters.length), mapping.apply(null, emitters.map(function (e) { return e.dirtyCurrentValue(); })));
@@ -1867,17 +2122,7 @@ function hold(initialValue, emitter) {
 exports.hold = hold;
 ;
 function changes(emitter) {
-    var previous = emitter.dirtyCurrentValue();
-    function transform(emit, impulse) {
-        return function changesTransform(v, i) {
-            impulse(eevent.of({
-                previous: previous,
-                next: v[i]
-            }));
-            previous = v[i];
-        };
-    }
-    return namedTransformator('changes', [emitter], transform, eevent.notHappend);
+    return namedTransformator('changes', [emitter], transformators.changes(emitter.dirtyCurrentValue()), eevent.notHappend);
 }
 exports.changes = changes;
 function skipFirst(emitter) {
@@ -1929,7 +2174,7 @@ function flattenMany(emitter) {
     var currentValues = emitter.dirtyCurrentValue().map(function (e) { return e.dirtyCurrentValue(); });
     var transformator = namedTransformator('flattenMany', [emitter].concat(emitter.dirtyCurrentValue()), transform, currentValues);
     function transform(emit) {
-        return function flattenTransform(v, i) {
+        return function flattenManyTransform(v, i) {
             if (i == 0) {
                 transformator.dropEmitters(1);
                 v[0].forEach(function (e) { return transformator.plugEmitter(e); });
@@ -1944,8 +2189,37 @@ function flattenMany(emitter) {
     return transformator;
 }
 exports.flattenMany = flattenMany;
+function flattenNamed(emitter) {
+    var currentValue = emitter.dirtyCurrentValue();
+    var currentValues = mapObj(currentValue, function (e) { return e.dirtyCurrentValue(); });
+    var currentKeys = objKeys(currentValue);
+    var transformator = namedTransformator('flattenNamed', [emitter].concat(currentKeys.map(function (k) { return currentValue[k]; })), transform, currentValues);
+    function transform(emit) {
+        var keys = currentKeys;
+        return function flattenNamedTransform(v, i) {
+            if (i == 0) {
+                transformator.dropEmitters(1);
+                keys = objKeys(v[0]);
+                keys.forEach(function (k) {
+                    transformator.plugEmitter(v[0][k]);
+                });
+                emit(mapObj(v[0], function (e) { return e.dirtyCurrentValue(); }));
+            }
+            else {
+                var r = {};
+                keys.forEach(function (k, i) {
+                    r[k] = v[i + 1];
+                });
+                emit(r);
+            }
+        };
+    }
+    ;
+    return transformator;
+}
+exports.flattenNamed = flattenNamed;
 
-},{"../src/electric-event":9,"./emitter":11,"./transformator-helpers":19,"./utils/fn":24}],21:[function(require,module,exports){
+},{"../src/electric-event":9,"./emitter":11,"./transformator-helpers":19,"./utils/fn":24,"./utils/map-obj":26,"./utils/objKeys":27}],21:[function(require,module,exports){
 var __extends = (this && this.__extends) || function (d, b) {
     for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p];
     function __() { this.constructor = d; }
@@ -1978,7 +2252,7 @@ function transmitter(initialValue) {
 }
 module.exports = transmitter;
 
-},{"./emitter":11,"./wire":25}],22:[function(require,module,exports){
+},{"./emitter":11,"./wire":30}],22:[function(require,module,exports){
 function all(list) {
     for (var i = 0; i < list.length; i++) {
         if (!list[i]) {
@@ -2011,6 +2285,149 @@ function fn(f) {
 module.exports = fn;
 
 },{}],25:[function(require,module,exports){
+var keyCodes = {
+    backspace: 8,
+    tab: 9,
+    enter: 13,
+    shift: 16,
+    ctrl: 17,
+    alt: 18,
+    pause: 19,
+    capslock: 20,
+    escape: 27,
+    pageup: 33,
+    pagedown: 34,
+    end: 35,
+    home: 36,
+    left: 37,
+    up: 38,
+    right: 39,
+    down: 40,
+    insert: 45,
+    delete: 46,
+    0: 48,
+    1: 49,
+    2: 50,
+    3: 51,
+    4: 52,
+    5: 53,
+    6: 54,
+    7: 55,
+    8: 56,
+    9: 57,
+    a: 65,
+    b: 66,
+    c: 67,
+    d: 68,
+    e: 69,
+    f: 70,
+    g: 71,
+    h: 72,
+    i: 73,
+    j: 74,
+    k: 75,
+    l: 76,
+    m: 77,
+    n: 78,
+    o: 79,
+    p: 80,
+    q: 81,
+    r: 82,
+    s: 83,
+    t: 84,
+    u: 85,
+    v: 86,
+    w: 87,
+    x: 88,
+    y: 89,
+    z: 90,
+    numpad0: 96,
+    numpad1: 97,
+    numpad2: 98,
+    numpad3: 99,
+    numpad4: 100,
+    numpad5: 101,
+    numpad6: 102,
+    numpad7: 103,
+    numpad8: 104,
+    numpad9: 105,
+    multiply: 106,
+    add: 107,
+    subtract: 109,
+    decimalpoint: 110,
+    divide: 111,
+    f1: 112,
+    f2: 113,
+    f3: 114,
+    f4: 115,
+    f5: 116,
+    f6: 117,
+    f7: 118,
+    f8: 119,
+    f9: 120,
+    f10: 121,
+    f11: 122,
+    f12: 123,
+    numlock: 144,
+    scrolllock: 145,
+    semicolon: 186,
+    equal: 187,
+    comma: 188,
+    dash: 189,
+    period: 190,
+    forwardslash: 191,
+    graveaccent: 192,
+    openbracket: 219,
+    backslash: 220,
+    closebraket: 221,
+    singlequote: 222
+};
+module.exports = keyCodes;
+
+},{}],26:[function(require,module,exports){
+function mapObj(obj, mapping) {
+    var result = {};
+    for (var key in obj) {
+        if (!obj.hasOwnProperty(key)) {
+            continue;
+        }
+        result[key] = mapping(obj[key]);
+    }
+    return result;
+}
+module.exports = mapObj;
+
+},{}],27:[function(require,module,exports){
+function objKeys(obj) {
+    var result = [];
+    for (var k in obj) {
+        if (obj.hasOwnProperty(k)) {
+            result.push(k);
+        }
+    }
+    return result;
+}
+module.exports = objKeys;
+
+},{}],28:[function(require,module,exports){
+function pushIfNotIn(list, item) {
+    if (list.indexOf(item) === -1) {
+        list.push(item);
+    }
+}
+module.exports = pushIfNotIn;
+
+},{}],29:[function(require,module,exports){
+function shallowCopy(obj) {
+    var copy = {};
+    for (var k in obj) {
+        copy[k] = obj[k];
+    }
+    return copy;
+}
+module.exports = shallowCopy;
+
+},{}],30:[function(require,module,exports){
 var Wire = (function () {
     function Wire(input, output, receive, set) {
         this.input = input;

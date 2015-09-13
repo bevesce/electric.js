@@ -1,4 +1,3 @@
-import inf = require('../../../src/interfaces');
 import electric = require('../../../src/electric');
 import eevent = require('../../../src/electric-event');
 import item = require('./item');
@@ -10,12 +9,14 @@ const GET = 'GET';
 
 export = sync;
 
-function sync(userActivated: inf.IEmitter<eevent<any>>, tasks: inf.IEmitter<item[]>) {
+function sync(
+	userActivated: electric.emitter.EventEmitter<{}>, tasks: electric.emitter.Emitter<item[]>
+) {
 	var tasksChanges = electric.transformator.skipFirst(electric.transformator.changes(tasks));
 	var initialRequestState = electric.emitter.manual('waiting');
-	var initialTasks = electric.emitter.manualEvent();
+	var initialTasks = electric.emitter.manualEvent(<item[]>null);
 
-	makeInitialRequest(initialRequestState, <electric.emitter.EventEmitter<item[]>>initialTasks);
+	makeInitialRequest(initialRequestState, initialTasks);
 
 	var state = electric.emitter.placeholder('none');
 	var stateChange = electric.transformator.changes(state);
@@ -26,13 +27,15 @@ function sync(userActivated: inf.IEmitter<eevent<any>>, tasks: inf.IEmitter<item
 					return electric.emitter.constant(eevent.notHappend);
 				}
 				else {
-					return userActivated.merge(electric.clock.interval({ inMs: 30 * 1000 }))
+					return electric.transformator.merge(
+						userActivated, electric.clock.interval({ inMs: 30 * 1000 })
+					);
 				}
 			},
 			when: stateChange
 		}
 	);
-	electric.r.log(shouldSyncTasks);
+	shouldSyncTasks.name = 'should sync tasks'
 	var tasksToSync = electric.transformator.map(
 		(should, ts) => should.map(_ => ts),
 		shouldSyncTasks, tasks
@@ -41,9 +44,8 @@ function sync(userActivated: inf.IEmitter<eevent<any>>, tasks: inf.IEmitter<item
 
 	state.is(initialRequestState.change(
 		{
-			to: (fromState, toState) => {
-				return electric.emitter.constant(toState);
-			}, when: requestsDevice.stateChange
+			to: (fromState, toState) => electric.emitter.constant(toState),
+			when: requestsDevice.stateChange
 		},
 		{ to: electric.emitter.constant('none'), when: tasksChanges }
 	));
@@ -56,8 +58,8 @@ function sync(userActivated: inf.IEmitter<eevent<any>>, tasks: inf.IEmitter<item
 
 
 function makeInitialRequest(
-	initialRequestState: electric.emitter.Emitter<string>,
-	initialTasks: electric.emitter.EventEmitter<item[]>
+	initialRequestState: electric.emitter.ConcreteEmitter<string>,
+	initialTasks: electric.emitter.ManualEventEmitter<item[]>
 ) {
 	request.request(
 		GET,
@@ -72,7 +74,7 @@ function makeInitialRequest(
 	)
 }
 
-function createRequestsDevice(data: inf.IEmitter<eevent<any>>) {
+function createRequestsDevice(data: electric.emitter.EventEmitter<{}>) {
 	return request.JSONDevice(
 		POST, URL, data
 	);

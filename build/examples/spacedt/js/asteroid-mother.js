@@ -1,10 +1,8 @@
 var electric = require('../../../src/electric');
-var clock = require('../../../src/clock');
 var calculus = require('../../../src/calculus/calculus');
 var IntegrableAntiderivativeOfTwoNumbers = require('../../../src/calculus/integrable-antiderivative-of-two-numbers');
 var c = require('./constants');
 var Point = require('./angled-point');
-var random = require('./utils/random');
 var cont = electric.emitter.constant;
 function acceleration(x, y) {
     return IntegrableAntiderivativeOfTwoNumbers.of(x, y, velocity);
@@ -12,14 +10,17 @@ function acceleration(x, y) {
 function velocity(x, y) {
     return IntegrableAntiderivativeOfTwoNumbers.of(x, y, Point.of);
 }
-function create(startingPoint) {
-    var v = cont(velocity(-Math.PI / 2, 100)).change({ to: function (a, _) { return cont(a.withX(random(-1, 1))); }, when: clock.interval({ inMs: 2000 }) });
+function create(startingPoint, changeVelocity) {
+    var v = cont(velocity(-Math.PI / 2, 100)).change({
+        to: function (a, v) { return cont(a.withX(v)); },
+        when: changeVelocity
+    });
+    v.name = 'asteroid mother velocity';
     var xya = calculus.integral(startingPoint, v, { fps: c.fps });
-    var birth = electric.transformator.map(function (time, xya) { return time.map(function (_) { return xya; }); }, clock.interval({ inMs: c.asteroidMother.birthIntervalInMs }), xya);
+    xya.name = 'asteroid mother position';
     return {
         v: v,
-        xya: xya,
-        birth: birth
+        xya: xya
     };
 }
 module.exports = create;

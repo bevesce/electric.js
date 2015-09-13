@@ -1,4 +1,3 @@
-import inf = require('../../../src/interfaces');
 import electric = require('../../../src/electric');
 import eevent = require('../../../src/electric-event');
 import eui = require('../../../src/emitters/ui');
@@ -25,47 +24,55 @@ function shipVelocity(x: number, y: number) {
 function create(
 	startingPoint: Point,
 	input: {
-		accelerate: inf.IEmitter<eevent<any>>,
-		deccelerate: inf.IEmitter<eevent<any>>,
-		stopAcceleration: inf.IEmitter<eevent<any>>,
-		stopDecceleration: inf.IEmitter<eevent<any>>,
-		rotateLeft: inf.IEmitter<eevent<any>>,
-		rotateRight: inf.IEmitter<eevent<any>>,
-		stopRotateLeft: inf.IEmitter<eevent<any>>,
-		stopRotateRight: inf.IEmitter<eevent<any>>,
-		shoot: inf.IEmitter<eevent<any>>
+		accelerate: electric.emitter.EventEmitter<{}>,
+		deccelerate: electric.emitter.EventEmitter<{}>,
+		stopAcceleration: electric.emitter.EventEmitter<{}>,
+		stopDecceleration: electric.emitter.EventEmitter<{}>,
+		rotateLeft: electric.emitter.EventEmitter<{}>,
+		rotateRight: electric.emitter.EventEmitter<{}>,
+		stopRotation: electric.emitter.EventEmitter<{}>,
+		shoot: electric.emitter.EventEmitter<{}>
 	}
 ) {
-	var shipA = cont(shipAcceleration(0, 0)).change(
-		{ to: (a, _) => cont(a.withX(-c.ship.acceleration.angular)), when: input.rotateLeft },
-		{ to: (a, _) => cont(a.withX(c.ship.acceleration.angular)), when: input.rotateRight },
+	var fps = { fps: c.fps };
+	var acceleration = cont(shipAcceleration(0, 0)).change(
+		{ to: (a, _) => cont(a.withX(-c.ship.acceleration.angular)),
+			when: input.rotateLeft },
+		{ to: (a, _) => cont(a.withX(c.ship.acceleration.angular)),
+			when: input.rotateRight },
 
-		{ to: (a, _) => cont(a.withX(0)), when: input.stopRotateRight },
-		{ to: (a, _) => cont(a.withX(0)), when: input.stopRotateLeft },
+		{ to: (a, _) => cont(a.withY(c.ship.acceleration.linear)),
+			when: input.accelerate },
+		{ to: (a, _) => cont(a.withY(-c.ship.acceleration.de)),
+			when: input.deccelerate },
 
-		{ to: (a, _) => cont(a.withY(-c.ship.acceleration.de)), when: input.deccelerate },
-		{ to: (a, _) => cont(a.withY(c.ship.acceleration.linear)), when: input.accelerate },
-
-		{ to: (a, _) => cont(a.withY(0)), when: input.stopAcceleration },
-		{ to: (a, _) => cont(a.withY(0)), when: input.stopDecceleration }
+		{ to: (a, _) => cont(a.withY(0)),
+			when: input.stopAcceleration },
+		{ to: (a, _) => cont(a.withY(0)),
+			when: input.stopDecceleration },
+		{ to: (a, _) => cont(a.withX(0)),
+			when: input.stopRotation }
 	);
-	shipA.name = 'ship acceleration';
-	var shipV = calculus.integral(shipVelocity(0, 0), shipA, { fps: c.fps }).change(
-		{ to: (v, _) => calculus.integral(v.withX(0), shipA, { fps: c.fps }), when: input.stopRotateRight.transformTime(eevent.notHappend, t => t + 10) },
-		{ to: (v, _) => calculus.integral(v.withX(0), shipA, { fps: c.fps }), when: input.stopRotateLeft.transformTime(eevent.notHappend, t => t + 10) }
-	);
-	shipV.name = 'ship velocity';
-	var shipXYA = calculus.integral(startingPoint, shipV, { fps: c.fps });
-	shipXYA.name = 'ship position'
+	acceleration.name = 'ship acceleration';
+	var velocity = calculus.integral(shipVelocity(0, 0), acceleration, fps).change({
+		to: (v, _) => calculus.integral(v.withX(0), acceleration, fps),
+		when: input.stopRotation.transformTime(
+			eevent.notHappend, t => t + c.ship.rotationStopDelay
+		)
+	});
+	velocity.name = 'ship velocity';
+	var position = calculus.integral(startingPoint, velocity, fps);
+	position.name = 'ship position'
 	var shot = electric.transformator.map(
 		(space, xya, v) => space.map(_ => ({ xya: xya, velocity: v })),
-		eui.key('space', 'up'), shipXYA, shipV
+		input.shoot, position, velocity
 	);
+	shot.name = 'shot';
 
 	return {
-		a: shipA,
-		v: shipV,
-		xya: shipXYA,
+		a: acceleration,
+		v: velocity,
+		xya: position,
 		shot: shot
 	};
 }

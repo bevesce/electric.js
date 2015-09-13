@@ -14,8 +14,12 @@ function shootBullet(bullets, xya, velocity) {
     return insert(bullets, newBullet);
 }
 function create(input) {
+    input.removeBoth.name = 'bullets collisions';
+    input.removeFirst.name = 'bullet collisions';
     var bullets = cont([]).change({ to: function (bs, s) { return shootBullet(bs, s.xya, s.velocity); }, when: input.shoot }, { to: function (bs, c) { return remove(bs, c.index1, c.index2); }, when: input.removeBoth }, { to: function (bs, c) { return remove(bs, c.index1); }, when: input.removeFirst });
+    bullets.name = 'bullets';
     var bulletsXY = electric.transformator.flattenMany(bullets.map(function (bs) { return bs.map(function (b) { return b.xya; }); }));
+    bulletsXY.name = 'bullets positions';
     return {
         all: bullets,
         xy: bulletsXY

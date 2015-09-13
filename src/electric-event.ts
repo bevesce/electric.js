@@ -1,8 +1,7 @@
-import inf = require('./interfaces');
 import all = require('./utils/all');
 
 
-class ElectricEvent<T> implements inf.IElectricEvent<T>{
+class ElectricEvent<T>{
 	static notHappend: NotHappend<any>;
 
 	static restore<K>(e: {happend: boolean, value: K}) {
@@ -98,6 +97,7 @@ class ElectricEvent<T> implements inf.IElectricEvent<T>{
 class Happend<T> implements ElectricEvent<T> {
 	value: T;
 	happend = true;
+	private __$isevent$ = true;
 
 	toString() {
 		return `Happend: ${this.value.toString()}`;
@@ -120,6 +120,7 @@ class Happend<T> implements ElectricEvent<T> {
 class NotHappend<T> implements ElectricEvent<T> {
 	happend = false;
 	value: T = undefined;
+	// private __$isevent$ = true;
 
 	toString() {
 		return 'NotHappend';

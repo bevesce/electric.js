@@ -7,12 +7,14 @@ const BULLET_RADIUS = 3;
 var values = {
 	asteroid: {
 		color: '#BCACFA',
-		radius: 20
+		radius: 20,
+		speed: 100
 	},
 	asteroidMother: {
 		birthIntervalInMs: 2000,
 		color: '#A691FA',
-		radius: 50
+		radius: 50,
+		velocityShangeInterval: 2000
 	},
 	collision: {
 		color: '#FA4141',
@@ -40,6 +42,7 @@ var values = {
 		},
 		color: 'white',
 		radius: 5,
+		rotationStopDelay: 1,
 		vbounds: {
 			maxX: 5,
 			maxY: 2000,

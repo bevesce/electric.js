@@ -10,7 +10,7 @@ var Wire = (function () {
         else {
             this.receive = receive;
         }
-        this.receiverId = this.input.plugReceiver(this);
+        this._receiverId = this.input.plugReceiver(this);
     }
     Wire.prototype.toString = function () {
         return this.input.toString() + " -" + this.name + "- " + this.output.toString();
@@ -23,7 +23,7 @@ var Wire = (function () {
     };
     Wire.prototype.unplug = function () {
         if (this.input) {
-            this.input.unplugReceiver(this.receiverId);
+            this.input.unplugReceiver(this._receiverId);
         }
         this.input = undefined;
         this.output = undefined;
