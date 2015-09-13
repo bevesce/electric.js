@@ -1,0 +1,22 @@
+.link {
+  fill: none;
+  stroke: silver;
+  stroke-width: 1.5px;
+}
+
+circle {
+  fill: #34E05F;
+}
+
+circle.receiver {
+	fill: #348AE0;
+}
+
+circle.emitter {
+  fill: #E13464;
+}
+
+text {
+  font: 1em sans-serif;
+  pointer-events: none;
+}

@@ -1,0 +1,60 @@
+body {
+	font-family: "Avenir", sans-serif;
+	color: #202020;
+	padding: 20px;
+	margin: 0;
+	background-color: rgb(240, 240, 240);
+}
+
+.container {
+	margin: 10px 0;
+	padding: 0;
+	width: 100%;
+	background-color: red;
+	display: -webkit-inline-flex;
+	display: flex;
+	-webkit-align-items: stretch;
+	align-items: stretch;
+}
+
+.box {
+	min-height: 200px;
+	width: 50%;
+	display: -webkit-flex;
+	display: flex;
+	-webkit-align-items: center;
+	align-items: center;
+	-webkit-justify-content: center;
+	justify-content: center;
+}
+
+.left-box {
+	color: rgb(253, 253, 253);
+	background: rgb(10, 10, 10);
+}
+
+.right-box {
+	color: rgb(10, 10, 10);
+	background: rgb(253, 253, 253);
+}
+
+.big-text {
+	font-size: 3em;
+}
+
+.canvas {
+
+}
+
+.no-touch {
+	-webkit-touch-callout: none;
+    -webkit-user-select: none;
+    -khtml-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+}
+
+.trackpad {
+    cursor: crosshair;
+}

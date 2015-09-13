@@ -1,0 +1,59 @@
+/* The animation code */
+$spinner-max-width: 27px;
+$spinner-min-width: 1px;
+
+@-webkit-keyframes example {
+    0% {width: $spinner-min-width;}
+    50% {width: $spinner-max-width;}
+    100% {width: $spinner-min-width;}
+}
+
+/* The element to apply the animation to */
+.spinner {
+    width: 0;
+    height: 10px;
+    margin: 6px 0;
+    background-color: #d9d9d9;
+    animation-name: example;
+    -webkit-animation-name: example;
+    animation-duration: 4s;
+    -webkit-animation-duration: 4s;
+    -webkit-animation-iteration-count: infinite;
+}
+
+.sync-box {
+	padding: 5px 20px;
+	position: fixed;
+	top: 10px;
+	left: 10px;
+	width: 50px;
+	background-color: white;
+	padding: 3px 15px 5px 10px;
+	// border-radius: 7px;
+	cursor: pointer;
+	box-shadow: 0 1px 2px #C6C6C6;
+}
+
+.sync-box:active {
+	box-shadow: 0 0 1px #C6C6C6;
+	top: 11px;
+}
+
+.sync-success {
+	padding: 3px 0;
+	color: #6DC3AE;
+}
+
+.sync-error {
+	padding: 3px 0;
+	color: #E8A5A8;
+}
+
+.sync-box:disabled {
+	cursor: not-allowed;
+}
+
+.sync-box:active:active:disabled {
+	box-shadow: 0 1px 2px #C6C6C6;
+	top: 10px;
+}
