@@ -26,6 +26,19 @@ export function intervalValue<T>(
 	return timer;
 }
 
+export function once<T>(
+	inMs: number, value: T
+) {
+	var timer = emitter.manualEvent(<T>null);
+	var id = scheduler.scheduleTimeout(() => {
+		timer.impulse(value)
+	}, inMs);
+	timer.name = `once(${inMs} ms, ${value})`;
+	timer.setReleaseResources(() => scheduler.unscheduleInterval(id));
+	return timer;
+}
+
+
 export function intervalOfRandom(
 	min: number, max: number,
 	options: { inMs?: number, fps?: number }

@@ -306,3 +306,40 @@ describe('flattens', function() {
 		});
 	});
 });
+
+
+describe('unglitch', function() {
+	it('should work on normal values', function(done) {
+	    var y = electric.emitter.manual(2);
+
+	    var a = y.map(x => x + 0);
+	    var b = electric.transformator.map(
+	        (yv, av) => yv + av,
+	        y, a
+	    );
+	    expect(t.unglitch(b))
+	        .to.emit(4)
+	        .then.after(() => y.emit(3))
+	        .to.emit(6)
+	        .andBe(done);
+	});
+
+	it('should work with events', function(done) {
+	    var y = electric.emitter.manual(2);
+
+	    var a = y.map(x => x + 0);
+	    var b = electric.transformator.map(
+	        (yv, av) => yv + av,
+	        y, a
+	    );
+	    var e = t.unglitch(b).when(
+	    	{ happens: x => x >= 5, then: x => x}
+    	);
+	    expect(e)
+	    	.to.emit(eevent.notHappend)
+	        .then.after(() => y.emit(3))
+	        .to.emit(eevent.of(6))
+	    	.then.to.emit(eevent.notHappend)
+	        .andBe(done);
+	});
+});

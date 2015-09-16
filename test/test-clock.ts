@@ -54,4 +54,15 @@ describe('clock', function() {
 			.after(() => sh.advance(3))
 			.andBe(done);
 	});
+
+	it('should count down to one event', function(done) {
+		var time = sh.stop();
+		var once = clock.once(1, '!');
+		expect(once)
+			.to.emit(electric.event.notHappend)
+			.then.after(() => sh.advance(2))
+			.to.emit(electric.event.of('!'))
+			.then.to.emit(electric.event.notHappend)
+			.andBe(done);
+	});
 });

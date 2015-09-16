@@ -161,10 +161,12 @@ exports.flattenNamed = flattenNamed;
 function unglitch(emitter) {
     var transformator = namedTransformator('unglitch', [emitter], transform, emitter.dirtyCurrentValue());
     function transform(emit) {
-        return function flattenTransform(v, i) {
+        var value;
+        return function unglitchTransform(v, i) {
+            value = v[i];
             setTimeout(function () {
-                emit(emitter.dirtyCurrentValue());
-            }, 1);
+                emit(value);
+            }, 0);
         };
     }
     ;

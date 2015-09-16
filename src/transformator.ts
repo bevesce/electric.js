@@ -432,10 +432,12 @@ export function unglitch<InOut>(
         emitter.dirtyCurrentValue()
     );
     function transform(emit: EmitFunction<InOut>) {
-        return function flattenTransform(v: any[], i: number) {
+        var value: InOut;
+        return function unglitchTransform(v: any[], i: number) {
+            value = v[i];
             setTimeout(() => {
-                emit(emitter.dirtyCurrentValue())
-            }, 1);
+                emit(value)
+            }, 0);
         }
     };
     return transformator;

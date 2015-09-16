@@ -20,6 +20,16 @@ function intervalValue(value, options) {
     return timer;
 }
 exports.intervalValue = intervalValue;
+function once(inMs, value) {
+    var timer = emitter.manualEvent(null);
+    var id = scheduler.scheduleTimeout(function () {
+        timer.impulse(value);
+    }, inMs);
+    timer.name = "once(" + inMs + " ms, " + value + ")";
+    timer.setReleaseResources(function () { return scheduler.unscheduleInterval(id); });
+    return timer;
+}
+exports.once = once;
 function intervalOfRandom(min, max, options) {
     var timer = emitter.manualEvent(null);
     var id = scheduler.scheduleInterval(function () {
