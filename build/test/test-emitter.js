@@ -86,58 +86,54 @@ describe('electric emitter', function () {
             .andBe(done);
     });
 });
-// describe('emitters impulse', function() {
-//     it('should return to value before impulse', function(done) {
-//         var emitter = electric.emitter.manual(0);
-//         expect(emitter)
-//             .to.emit(0)
-//             .after(() => {
-//                 emitter.impulse(1);
-//             })
-//             .to.emit(1)
-//             .to.emit(0)
-//             .andBe(done);
-//     });
-// 	it('it should not go to new receivers', function(done) {
-//         var emitter = electric.emitter.manual(0);
-//         var r: string[] = [];
-//         expect(emitter)
-// 			.to.emit(0)
-// 			.after(() => emitter.impulse(1))
-// 			.to.emit(1, 0)
-// 			.after(() => emitter.plugReceiver((x: number) => r.push('b' + x)))
-// 			.after(() => emitter.impulse(2))
-// 			.to.emit(2, 0)
-// 			.waitFor(
-// 				() => expect(r).to.deep.equal(['b0', 'b2', 'b0'])
-// 			)
-// 			.andBe(done);
-//     });
-//     it('it should not go to new receivers 2', function(done) {
-//         var emitter = electric.emitter.manual(0);
-//         var r: string[] = [];
-//         emitter.plugReceiver((x: number) => r.push('a' + x));
-//         expect(emitter)
-// 			.to.emit(0)
-// 			.after(() => emitter.impulse(1))
-// 			.to.emit(1)
-// 			.to.emit(0)
-// 			.after(() => emitter.plugReceiver((x: number) => r.push('b' + x)))
-// 			.after(() => emitter.impulse(2))
-// 			.to.emit(2)
-// 			.to.emit(0)
-// 			.waitFor(
-// 				() => expect(r).to.deep.equal([
-// 					'a0',
-// 					'a1',
-// 					'a0', 'b0',
-// 				    'a2', 'b2',
-// 				    'a0', 'b0'
-// 				])
-// 			)
-// 			.andBe(done);
-//     });
-// });
+describe('emitters impulse', function () {
+    it('should return to value before impulse', function (done) {
+        var emitter = electric.emitter.manual(0);
+        expect(emitter)
+            .to.emit(0)
+            .after(function () {
+            emitter.impulse(1);
+        })
+            .to.emit(1)
+            .to.emit(0)
+            .andBe(done);
+    });
+    it('it should not go to new receivers', function (done) {
+        var emitter = electric.emitter.manual(0);
+        var r = [];
+        expect(emitter)
+            .to.emit(0)
+            .after(function () { return emitter.impulse(1); })
+            .to.emit(1, 0)
+            .after(function () { return emitter.plugReceiver(function (x) { return r.push('b' + x); }); })
+            .after(function () { return emitter.impulse(2); })
+            .to.emit(2, 0)
+            .waitFor(function () { return expect(r).to.deep.equal(['b0', 'b2', 'b0']); })
+            .andBe(done);
+    });
+    it('it should not go to new receivers 2', function (done) {
+        var emitter = electric.emitter.manual(0);
+        var r = [];
+        emitter.plugReceiver(function (x) { return r.push('a' + x); });
+        expect(emitter)
+            .to.emit(0)
+            .after(function () { return emitter.impulse(1); })
+            .to.emit(1)
+            .to.emit(0)
+            .after(function () { return emitter.plugReceiver(function (x) { return r.push('b' + x); }); })
+            .after(function () { return emitter.impulse(2); })
+            .to.emit(2)
+            .to.emit(0)
+            .waitFor(function () { return expect(r).to.deep.equal([
+            'a0',
+            'a1',
+            'a0', 'b0',
+            'a2', 'b2',
+            'a0', 'b0'
+        ]); })
+            .andBe(done);
+    });
+});
 function double(x) {
     return x * 2;
 }

@@ -158,3 +158,17 @@ function flattenNamed(emitter) {
     return transformator;
 }
 exports.flattenNamed = flattenNamed;
+function unglitch(emitter) {
+    var transformator = namedTransformator('unglitch', [emitter], transform, emitter.dirtyCurrentValue());
+    function transform(emit) {
+        return function flattenTransform(v, i) {
+            setTimeout(function () {
+                emit(emitter.dirtyCurrentValue());
+            }, 1);
+        };
+    }
+    ;
+    return transformator;
+}
+exports.unglitch = unglitch;
+;

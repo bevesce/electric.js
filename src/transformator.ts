@@ -420,3 +420,23 @@ export function flattenNamed<InOut>(
     };
     return transformator;
 }
+
+
+export function unglitch<InOut>(
+    emitter: emitter.Emitter<InOut>
+): emitter.Emitter<InOut> {
+    var transformator = namedTransformator(
+        'unglitch',
+        [emitter],
+        transform,
+        emitter.dirtyCurrentValue()
+    );
+    function transform(emit: EmitFunction<InOut>) {
+        return function flattenTransform(v: any[], i: number) {
+            setTimeout(() => {
+                emit(emitter.dirtyCurrentValue())
+            }, 1);
+        }
+    };
+    return transformator;
+};
