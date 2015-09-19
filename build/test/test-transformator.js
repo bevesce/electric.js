@@ -33,7 +33,7 @@ describe('transformators', function () {
             .then.finish(done);
     });
     transformator('filter1', function (done) {
-        var emitter = electric.emitter.emitter(0);
+        var emitter = electric.emitter.manual(0);
         var filtered = t.filter(2, function (x) { return x > 2; }, emitter);
         expect(filtered)
             .to.emit(2)
@@ -54,7 +54,7 @@ describe('transformators', function () {
             .that.finish(done);
     });
     transformator('filterMap1', function (done) {
-        var emitter = electric.emitter.emitter(0);
+        var emitter = electric.emitter.manual(0);
         var filterMapped = t.filterMap('2!', function (x) {
             if (x > 2) {
                 return x + '!';
@@ -139,26 +139,26 @@ describe('transformators', function () {
             .to.emit(eevent.notHappend)
             .that.finish(done);
     });
-    transformator('cummulateOverTime', function (done) {
-        var emitter = electric.emitter.manual(eevent.notHappend);
-        var cumulated = t.cumulateOverTime(emitter, 10);
-        expect(cumulated)
-            .to.emit(eevent.notHappend)
-            .then.after(function () { return emitter.impulse(eevent.of(1)); })
-            .and.after(function () { return emitter.impulse(eevent.of(2)); })
-            .to.emit(eevent.of([1, 2]))
-            .to.emit(eevent.notHappend)
-            .and.then.to.finish(done);
-    });
+    //   transformator('cummulateOverTime', function(done) {
+    // var emitter = electric.emitter.manual(eevent.notHappend);
+    // var cumulated = t.cumulateOverTime(emitter, 10);
+    // expect(cumulated)
+    // 	.to.emit(eevent.notHappend)
+    // 	.then.after(() => emitter.impulse(eevent.of(1)))
+    // 	.and.after(() => emitter.impulse(eevent.of(2)))
+    // 	.to.emit(eevent.of([1, 2]))
+    // 	.to.emit(eevent.notHappend)
+    // 	.and.then.to.finish(done)
+    //   });
     transformator('hold', function (done) {
-        var emitter = electric.emitter.manual(eevent.notHappend);
+        var emitter = electric.emitter.manualEvent();
         var holded = t.hold(0, emitter);
         expect(holded)
             .to.emit(0)
-            .then.after(function () { return emitter.impulse(eevent.of(1)); })
+            .then.after(function () { return emitter.impulse(1); })
             .to.emit(1)
-            .then.after(function () { return emitter.impulse(eevent.of(1)); })
-            .then.after(function () { return emitter.impulse(eevent.of(2)); })
+            .then.after(function () { return emitter.impulse(1); })
+            .then.after(function () { return emitter.impulse(2); })
             .to.emit(2)
             .andBe(done);
     });
@@ -263,27 +263,35 @@ describe('flattens', function () {
         });
     });
 });
-describe('unglitch', function () {
-    it('should work on normal values', function (done) {
-        var y = electric.emitter.manual(2);
-        var a = y.map(function (x) { return x + 0; });
-        var b = electric.transformator.map(function (yv, av) { return yv + av; }, y, a);
-        expect(t.unglitch(b))
-            .to.emit(4)
-            .then.after(function () { return y.emit(3); })
-            .to.emit(6)
-            .andBe(done);
-    });
-    it('should work with events', function (done) {
-        var y = electric.emitter.manual(2);
-        var a = y.map(function (x) { return x + 0; });
-        var b = electric.transformator.map(function (yv, av) { return yv + av; }, y, a);
-        var e = t.unglitch(b).when({ happens: function (x) { return x >= 5; }, then: function (x) { return x; } });
-        expect(e)
-            .to.emit(eevent.notHappend)
-            .then.after(function () { return y.emit(3); })
-            .to.emit(eevent.of(6))
-            .then.to.emit(eevent.notHappend)
-            .andBe(done);
-    });
-});
+// describe('unglitch', function() {
+// 	it('should work on normal values', function(done) {
+// 	    var y = electric.emitter.manual(2);
+// 	    var a = y.map(x => x + 0);
+// 	    var b = electric.transformator.map(
+// 	        (yv, av) => yv + av,
+// 	        y, a
+// 	    );
+// 	    expect(t.unglitch(b))
+// 	        .to.emit(4)
+// 	        .then.after(() => y.emit(3))
+// 	        .to.emit(6)
+// 	        .andBe(done);
+// 	});
+// 	it('should work with events', function(done) {
+// 	    var y = electric.emitter.manual(2);
+// 	    var a = y.map(x => x + 0);
+// 	    var b = electric.transformator.map(
+// 	        (yv, av) => yv + av,
+// 	        y, a
+// 	    );
+// 	    var e = t.unglitch(b).when(
+// 	    	{ happens: x => x >= 5, then: x => x}
+//     	);
+// 	    expect(e)
+// 	    	.to.emit(eevent.notHappend)
+// 	        .then.after(() => y.emit(3))
+// 	        .to.emit(eevent.of(6))
+// 	    	.then.to.emit(eevent.notHappend)
+// 	        .andBe(done);
+// 	});
+// });

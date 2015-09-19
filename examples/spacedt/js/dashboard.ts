@@ -42,6 +42,6 @@ export function speed() {
 
 export function score() {
 	var r = rui.htmlReceiverById('score');
-	r.name = 'show score'
+	(<any>r).name = 'show score'
 	return r;
 }

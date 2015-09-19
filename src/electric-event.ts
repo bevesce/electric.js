@@ -3,6 +3,8 @@ import all = require('./utils/all');
 
 class ElectricEvent<T>{
 	static notHappend: NotHappend<any>;
+	private __$isevent$ = true;
+
 
 	static restore<K>(e: {happend: boolean, value: K}) {
 		if (e.happend) {
@@ -94,10 +96,9 @@ class ElectricEvent<T>{
 	}
 }
 
-class Happend<T> implements ElectricEvent<T> {
+class Happend<T> extends ElectricEvent<T> {
 	value: T;
 	happend = true;
-	private __$isevent$ = true;
 
 	toString() {
 		return `Happend: ${this.value.toString()}`;
@@ -105,6 +106,7 @@ class Happend<T> implements ElectricEvent<T> {
 
 
 	constructor(value: T) {
+		super();
 		this.value = value;
 	}
 
@@ -117,10 +119,13 @@ class Happend<T> implements ElectricEvent<T> {
 	}
 }
 
-class NotHappend<T> implements ElectricEvent<T> {
+class NotHappend<T> extends ElectricEvent<T> {
 	happend = false;
 	value: T = undefined;
-	// private __$isevent$ = true;
+
+	constructor() {
+		super();
+	}
 
 	toString() {
 		return 'NotHappend';

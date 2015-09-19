@@ -251,17 +251,17 @@ emitter.Emitter<eevent<T>> {
 }
 
 
-export function cumulateOverTime<T>(
-    emitter: emitter.Emitter<eevent<T>>,
-    overInMs: number
-): emitter.Emitter <eevent<T[]>> {
-    return namedTransformator(
-        `cumulateOverTime(${overInMs}ms)`,
-        [emitter],
-        transformators.cumulateOverTime(overInMs),
-        eevent.notHappend
-    );
-}
+// export function cumulateOverTime<T>(
+//     emitter: emitter.Emitter<eevent<T>>,
+//     overInMs: number
+// ): emitter.Emitter <eevent<T[]>> {
+//     return namedTransformator(
+//         `cumulateOverTime(${overInMs}ms)`,
+//         [emitter],
+//         transformators.cumulateOverTime(overInMs),
+//         eevent.notHappend
+//     );
+// }
 
 
 export function hold<InOut>(

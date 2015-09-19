@@ -74,13 +74,14 @@ export function transformTime<Out>(
 	t0: number
 ) {
 	// var firstEmitted = false;
-	return function transform(emit: EmitFunction<Out>) {
+	return function transform(emit: EmitFunction<Out>, impulse: EmitFunction<Out>, dispatch: () => void) {
 		return function timeTransform(v: Out[], i: number){
 			var delay = timeTransformation(scheduler.now() - t0) + t0 - scheduler.now();
 			var toEmit = v[i];
 			scheduler.scheduleTimeout(
 				() => {
 					emit(toEmit);
+					dispatch();
 				}, delay
 			);
 		}
@@ -117,6 +118,7 @@ export function change<Out>(
 					this,
 					(x: Out) => this.receiveOn(x, 0)
 				);
+				this.receiveOn(e.dirtyCurrentValue(), 0);
 			}
 		}
 	}

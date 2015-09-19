@@ -9,7 +9,9 @@ var transformators = require('./transformator-helpers');
 var ElectricEvent = require('./electric-event');
 var Wire = require('./wire');
 var fn = require('./utils/fn');
+var queue = require('./queue');
 exports.placeholder = require('./placeholder');
+var q = queue.empty();
 var ConcreteEmitter = (function () {
     function ConcreteEmitter(initialValue) {
         if (initialValue === void 0) { initialValue = undefined; }
@@ -39,7 +41,6 @@ var ConcreteEmitter = (function () {
             receiver = receiver.wire(this);
         }
         this._receivers.push(receiver);
-        // this._asyncDispatchToReceiver(receiver, this._currentValue);
         return this._receivers.length - 1;
     };
     ConcreteEmitter.prototype.unplugReceiver = function (receiverOrId) {
@@ -87,6 +88,7 @@ var ConcreteEmitter = (function () {
             return;
         }
         this._dispatchToReceivers(value);
+        _dispatch();
         this._dispatchToReceivers(this._currentValue);
     };
     ConcreteEmitter.prototype._equals = function (x, y) {
@@ -99,13 +101,12 @@ var ConcreteEmitter = (function () {
         var currentReceivers = this._receivers.slice();
         for (var _i = 0; _i < currentReceivers.length; _i++) {
             var receiver = currentReceivers[_i];
-            // this._asyncDispatchToReceiver(receiver, value);
             this._dispatchToReceiver(receiver, value);
         }
     };
     ConcreteEmitter.prototype._dispatchToReceiver = function (receiver, value) {
         if (typeof receiver === 'function') {
-            receiver(value);
+            q.add(receiver, value);
         }
         else {
             receiver.receive(value);
@@ -119,8 +120,14 @@ var ConcreteEmitter = (function () {
         }
     };
     ConcreteEmitter.prototype._asyncDispatchToReceiver = function (receiver, value) {
-        var _this = this;
-        scheduler.scheduleTimeout(function () { return _this._dispatchToReceiver(receiver, value); }, 0);
+        scheduler.scheduleTimeout(function () {
+            if (typeof receiver === 'function') {
+                receiver(value);
+            }
+            else {
+                receiver.receive(value);
+            }
+        }, 0);
     };
     // transformators
     ConcreteEmitter.prototype.map = function (mapping) {
@@ -167,10 +174,10 @@ var ConcreteEmitter = (function () {
     return ConcreteEmitter;
 })();
 exports.ConcreteEmitter = ConcreteEmitter;
-function emitter(initialValue) {
-    return new ConcreteEmitter(initialValue);
+function _dispatch() {
+    q.dispatch();
+    q = queue.empty();
 }
-exports.emitter = emitter;
 var ManualEmitter = (function (_super) {
     __extends(ManualEmitter, _super);
     function ManualEmitter() {
@@ -178,11 +185,19 @@ var ManualEmitter = (function (_super) {
     }
     ManualEmitter.prototype.emit = function (v) {
         var _this = this;
-        scheduler.scheduleTimeout(function () { return _super.prototype.emit.call(_this, v); }, 0);
+        scheduler.scheduleTimeout(function () {
+            _super.prototype.emit.call(_this, v);
+            q.dispatch();
+            q = queue.empty();
+        }, 0);
     };
     ManualEmitter.prototype.impulse = function (v) {
         var _this = this;
-        scheduler.scheduleTimeout(function () { return _super.prototype.impulse.call(_this, v); }, 0);
+        scheduler.scheduleTimeout(function () {
+            _super.prototype.impulse.call(_this, v);
+            q.dispatch();
+            q = queue.empty();
+        }, 0);
     };
     ManualEmitter.prototype.stabilize = function () {
         _super.prototype.stabilize.call(this);
@@ -246,7 +261,7 @@ var Transformator = (function (_super) {
     };
     Transformator.prototype.setTransform = function (transform) {
         var _this = this;
-        this._transform = transform(function (x) { return _this.emit(x); }, function (x) { return _this.impulse(x); });
+        this._transform = transform(function (x) { return _this.emit(x); }, function (x) { return _this.impulse(x); }, _dispatch);
     };
     Transformator.prototype._transform = function (values, index) {
         // Default implementation that just passes values

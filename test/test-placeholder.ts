@@ -102,7 +102,7 @@ describe('placeholder in recursion', function() {
     });
 
     it('should allow recursion', function(done) {
-        var mouseclick = electric.emitter.manual(eevent.notHappend);
+        var mouseclick = electric.emitter.manualEvent();
         var animationBegins = placeholder(<any>eevent.notHappend);
         var animating = electric.emitter.constant(false).change(
             { to: electric.emitter.constant(true), when: animationBegins }
@@ -116,14 +116,14 @@ describe('placeholder in recursion', function() {
         );
         expect(animating)
             .to.emit(false)
-            .after(() => mouseclick.impulse(eevent.of(null)))
+            .after(() => mouseclick.impulse(null))
             .to.emit(true)
             .andBe(done);
     });
 
     it('should allow recursion with time transformation', function(done) {
         var constant = electric.emitter.constant;
-        var mouseclick = electric.emitter.manual(eevent.notHappend);
+        var mouseclick = electric.emitter.manualEvent();
         var animationBegins = placeholder(eevent.notHappend);
         var animationEnds = placeholder(eevent.notHappend);
 
@@ -158,10 +158,10 @@ describe('placeholder in recursion', function() {
 
         expect(animating)
             .to.emit(false)
-            .after(() => mouseclick.impulse(eevent.of(null)))
+            .after(() => mouseclick.impulse(null))
             .to.emit(true)
             .to.emit(false)
-            .after(() => mouseclick.impulse(eevent.of(null)))
+            .after(() => mouseclick.impulse(null))
             .to.emit(true)
             .to.emit(false)
             .andBe(done);

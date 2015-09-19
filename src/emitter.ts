@@ -5,9 +5,12 @@ import Wire = require('./wire');
 import fn = require('./utils/fn');
 import EmitFunction = require('./interfaces/t-to-void');
 import receiver = require('./interfaces/receiver');
+import queue = require('./queue');
 
 export import Emitter = require('./interfaces/emitter');
 export import placeholder = require('./placeholder');
+
+var q = queue.empty();
 
 
 export class ConcreteEmitter<T>
@@ -46,7 +49,6 @@ export class ConcreteEmitter<T>
 			receiver = (<receiver.Receiver<T>>receiver).wire(this);
 		}
 		this._receivers.push(receiver);
-		// this._asyncDispatchToReceiver(receiver, this._currentValue);
 		return this._receivers.length - 1;
 	}
 
@@ -106,6 +108,7 @@ export class ConcreteEmitter<T>
 			return;
 		}
 		this._dispatchToReceivers(value);
+		_dispatch();
 		this._dispatchToReceivers(this._currentValue);
 	}
 
@@ -120,14 +123,14 @@ export class ConcreteEmitter<T>
 	private _dispatchToReceivers(value: T) {
 		var currentReceivers = this._receivers.slice();
 		for (var receiver of currentReceivers) {
-			// this._asyncDispatchToReceiver(receiver, value);
 			this._dispatchToReceiver(receiver, value);
 		}
 	}
 
 	protected _dispatchToReceiver(receiver: any, value: T) {
 		if (typeof receiver === 'function') {
-			receiver(value);
+			q.add(receiver, value);
+			// receiver(value);
 		}
 		else {
 			receiver.receive(value);
@@ -143,7 +146,14 @@ export class ConcreteEmitter<T>
 
 	protected _asyncDispatchToReceiver(receiver: any, value?: T) {
 		scheduler.scheduleTimeout(
-			() => this._dispatchToReceiver(receiver, value),
+			() => {
+				if (typeof receiver === 'function') {
+					receiver(value);
+				}
+				else {
+					receiver.receive(value);
+				}
+			},
 			0
 		);
 	}
@@ -507,19 +517,28 @@ export class ConcreteEmitter<T>
 	}
 }
 
-export function emitter<T>(initialValue: T): ConcreteEmitter<T> {
-	return new ConcreteEmitter(initialValue);
+function _dispatch() {
+	q.dispatch();
+	q = queue.empty();
 }
 
 export class ManualEmitter<Out>
 	extends ConcreteEmitter<Out>
 {
 	emit(v: Out) {
-		scheduler.scheduleTimeout(() => super.emit(v), 0);
+		scheduler.scheduleTimeout(() => {
+			super.emit(v);
+			q.dispatch();
+			q = queue.empty();
+		}, 0);
 	}
 
 	impulse(v: Out) {
-		scheduler.scheduleTimeout(() => super.impulse(v), 0);
+		scheduler.scheduleTimeout(() => {
+			super.impulse(v);
+			q.dispatch();
+			q = queue.empty();
+		}, 0);
 	}
 
 	stabilize() {
@@ -579,7 +598,8 @@ type Identifier = number;
 interface ITransformGeneratorFunction<In> {
 	(
 		emit: EmitFunction<any>,
-		impulse: EmitFunction<any>
+		impulse: EmitFunction<any>,
+		dispatch: () => void
 	): ITransformFunction<In>
 }
 
@@ -619,7 +639,8 @@ export class Transformator<In, Out>
 	setTransform(transform: ITransformGeneratorFunction<In>) {
 		this._transform = transform(
 			(x: any) => this.emit(x),
-			(x: any) => this.impulse(x)
+			(x: any) => this.impulse(x),
+			_dispatch
 		);
 	}
 

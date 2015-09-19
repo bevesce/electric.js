@@ -62,12 +62,13 @@ exports.accumulate = accumulate;
 ;
 function transformTime(timeTransformation, t0) {
     // var firstEmitted = false;
-    return function transform(emit) {
+    return function transform(emit, impulse, dispatch) {
         return function timeTransform(v, i) {
             var delay = timeTransformation(scheduler.now() - t0) + t0 - scheduler.now();
             var toEmit = v[i];
             scheduler.scheduleTimeout(function () {
                 emit(toEmit);
+                dispatch();
             }, delay);
         };
     };
@@ -96,6 +97,7 @@ function change(switchers) {
                 var to = switchers[i - 1].to;
                 var e = callIfFunction(to, v[0], v[i].value);
                 this._wires[0] = new Wire(e, this, function (x) { return _this.receiveOn(x, 0); });
+                this.receiveOn(e.dirtyCurrentValue(), 0);
             }
         };
     };

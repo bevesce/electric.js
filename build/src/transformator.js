@@ -45,10 +45,17 @@ function merge() {
     return namedTransformator('merge', emitters, transformators.merge(), emitters[0].dirtyCurrentValue());
 }
 exports.merge = merge;
-function cumulateOverTime(emitter, overInMs) {
-    return namedTransformator("cumulateOverTime(" + overInMs + "ms)", [emitter], transformators.cumulateOverTime(overInMs), eevent.notHappend);
-}
-exports.cumulateOverTime = cumulateOverTime;
+// export function cumulateOverTime<T>(
+//     emitter: emitter.Emitter<eevent<T>>,
+//     overInMs: number
+// ): emitter.Emitter <eevent<T[]>> {
+//     return namedTransformator(
+//         `cumulateOverTime(${overInMs}ms)`,
+//         [emitter],
+//         transformators.cumulateOverTime(overInMs),
+//         eevent.notHappend
+//     );
+// }
 function hold(initialValue, emitter) {
     function transform(emit) {
         return function holdTransform(v, i) {

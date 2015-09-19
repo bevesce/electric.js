@@ -29,10 +29,10 @@ class MovingPoint {
 
 	constructor(speed: number, x0: number, y0: number, angle: number) {
 		this.v = cont(velocity(0, speed));
-		this.v = 'velocity';
+		this.v.name = 'velocity';
 		this.xya = calculus.integral(
 			Point.of(x0, y0, angle), this.v, { fps: c.fps }
 		);
-		this.xya = 'position';
+		this.xya.name = 'position';
 	}
 }
