@@ -9,7 +9,7 @@ export function receiver(name: string, socket: any) {
 
 export function eventReceiver(name: string, socket: any) {
 	return function(data: electric.event<any>) {
-		if (data.happend) {
+		if (data.happened) {
 			socket.emit(name, data.value);
 		}
 	}

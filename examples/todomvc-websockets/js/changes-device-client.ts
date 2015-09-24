@@ -84,7 +84,7 @@ function collection(
 function visibilityChangesOfTask(tasks: item[], f: { previous: string; next: string; }) {
 	var changes: Change[] = [];
 	if (f.previous === f.next) {
-		return eevent.notHappend
+		return eevent.notHappened
 	}
 	// all -> active
 	else if (f.previous === '#/' && f.next === ACTIVE) {
@@ -120,12 +120,12 @@ function visibilityChangesOfTask(tasks: item[], f: { previous: string; next: str
 	else if (f.previous === COMPLETED && f.next === ACTIVE) {
 		changes = tasks.map(t => !t.isCompleted() ? Change.appendTask(t) : Change.removeTask(t));
 	}
-	return changes.length > 0 ? eevent.of(changes) : eevent.notHappend;
+	return changes.length > 0 ? eevent.of(changes) : eevent.notHappened;
 }
 
 function calculateVisibleChanges(changes: Change[], filter: string, tasks: item[]) {
 	var visibleChanges = filterMap(changes, changesFilterMap(filter, tasks))
-	return visibleChanges.length > 0 ? eevent.of(visibleChanges) : eevent.notHappend;
+	return visibleChanges.length > 0 ? eevent.of(visibleChanges) : eevent.notHappened;
 }
 
 function filterMap<In, Out>(items: In[], f: ((v: In) => Out)): Out[] {
@@ -218,7 +218,7 @@ function findById(id: number, tasks: item[]) {
 }
 
 function applyChanges(tasks: item[], changes: eevent<Change[]>) {
-	if (!changes.happend) {
+	if (!changes.happened) {
 		return tasks;
 	}
 	var cs = changes.value;

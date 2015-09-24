@@ -42,7 +42,7 @@ export function device<T>(
 	responseEmitter.name = 'response on ' + method + ': ' + url;
 
 	input.plugReceiver(function emitStateChangesAndResponses(data: electric.event<T>) {
-		if (!data.happend) {
+		if (!data.happened) {
 			return;
 		}
 		stateChange.impulse('waiting');

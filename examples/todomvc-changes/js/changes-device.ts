@@ -42,7 +42,7 @@ function collection(
 			var toWhat = noAll !== noCompleted;
 			var toggledTasks = tasks.filter(t => t.isCompleted() != toWhat);
 			var changes = toggledTasks.map(t => Change.check(t.id(), toWhat))
-			return changes.length > 0 ? eevent.of(changes) : eevent.notHappend;
+			return changes.length > 0 ? eevent.of(changes) : eevent.notHappened;
 		}),
 		input.toggle, delayedTasks
 	);
@@ -55,7 +55,7 @@ function collection(
 	var clearChanges = electric.transformator.map(
 		(clear, tasks) => clear.flattenMap(_ => {
 			var changes = onlyCompleted(tasks).map(t => Change.remove(t.id()));
-			return changes.length > 0 ? eevent.of(changes) : eevent.notHappend;
+			return changes.length > 0 ? eevent.of(changes) : eevent.notHappened;
 		}),
 		input.clear, tasks
 	);
@@ -76,7 +76,7 @@ function collection(
 			var r = changes.flattenMap(c => calculateVisibleChanges(c, filter, tasks));
 			return r;
 		},
-		changes.transformTime(eevent.notHappend, t => t + 1), input.filter, tasks
+		changes.transformTime(eevent.notHappened, t => t + 1), input.filter, tasks
 	);
 
 	var visibleChanges = electric.transformator.merge(
@@ -128,7 +128,7 @@ function notEmpty(insert: electric.emitter.EventEmitter<string>) {
 		if (text !== '') {
 			return eevent.of(item.of(text))
 		}
-		return eevent.notHappend
+		return eevent.notHappened
 	}));
 	t.name = 'not empty';
 	return t;
@@ -137,7 +137,7 @@ function notEmpty(insert: electric.emitter.EventEmitter<string>) {
 function visibilityChangesOfTask(tasks: item[], filter: { previous: string; next: string; }) {
 	var changes: Change[] = [];
 	if (filter.previous === filter.next) {
-		return eevent.notHappend
+		return eevent.notHappened
 	}
 	// all -> active
 	else if (filter.previous === ALL && filter.next === ACTIVE) {
@@ -173,12 +173,12 @@ function visibilityChangesOfTask(tasks: item[], filter: { previous: string; next
 	else if (filter.previous === COMPLETED && filter.next === ACTIVE) {
 		changes = tasks.map(t => !t.isCompleted() ? Change.appendTask(t) : Change.removeTask(t));
 	}
-	return changes.length > 0 ? eevent.of(changes) : eevent.notHappend;
+	return changes.length > 0 ? eevent.of(changes) : eevent.notHappened;
 }
 
 function calculateVisibleChanges(changes: Change[], filter: string, tasks: item[]) {
 	var visibleChanges = filterMap(changes, changesFilterMap(filter, tasks))
-	return visibleChanges.length > 0 ? eevent.of(visibleChanges) : eevent.notHappend;
+	return visibleChanges.length > 0 ? eevent.of(visibleChanges) : eevent.notHappened;
 }
 
 function filterMap<In, Out>(items: In[], f: ((v: In) => Out)): Out[] {
@@ -271,7 +271,7 @@ function findById(id: number, tasks: item[]) {
 }
 
 function applyChanges(tasks: item[], changes: eevent<Change[]>) {
-	if (!changes.happend) {
+	if (!changes.happened) {
 		return tasks;
 	}
 	var cs = changes.value;

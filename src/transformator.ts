@@ -259,7 +259,7 @@ emitter.Emitter<eevent<T>> {
 //         `cumulateOverTime(${overInMs}ms)`,
 //         [emitter],
 //         transformators.cumulateOverTime(overInMs),
-//         eevent.notHappend
+//         eevent.notHappened
 //     );
 // }
 
@@ -270,7 +270,7 @@ export function hold<InOut>(
 ): emitter.Emitter<InOut> {
 	function transform(emit: EmitFunction<InOut>) {
 		return function holdTransform(v: eevent<InOut>[], i: number) {
-			if (v[i].happend) {
+			if (v[i].happened) {
 				emit(v[i].value);
 			}
 		}
@@ -291,7 +291,7 @@ export function changes<InOut>(
         'changes',
         [emitter],
         transformators.changes(emitter.dirtyCurrentValue()),
-        eevent.notHappend
+        eevent.notHappened
     )
 }
 
@@ -302,7 +302,7 @@ export function skipFirst<InOut>(
     function transform(emit: EmitFunction<eevent<InOut>>, impulse: EmitFunction<eevent<InOut>>) {
         var skipped = false;
         return function skipFirstTransform(v: eevent<InOut>[], i: number) {
-            if (v[i].happend) {
+            if (v[i].happened) {
                 if (skipped) {
                     impulse(v[i]);
                 }
@@ -316,7 +316,7 @@ export function skipFirst<InOut>(
         'skip(1)',
         [emitter],
         transform,
-        eevent.notHappend
+        eevent.notHappened
     );
 };
 

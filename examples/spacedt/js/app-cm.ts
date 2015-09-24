@@ -63,16 +63,16 @@ var asteroidMother = motherDevice(
 
 //// bullets, asteroids & collisions
 var bulletBulletCollision = electric.emitter.placeholder(
-	<electric.event<collision.Collision>>electric.event.notHappend
+	<electric.event<collision.Collision>>electric.event.notHappened
 );
 var bulletAsteroidCollision = electric.emitter.placeholder(
-	<electric.event<collision.Collision>>electric.event.notHappend
+	<electric.event<collision.Collision>>electric.event.notHappened
 );
 var bulletMotherCollision = electric.emitter.placeholder(
-	<electric.event<collision.Collision>>electric.event.notHappend
+	<electric.event<collision.Collision>>electric.event.notHappened
 );
 var bulletShipCollision = electric.emitter.placeholder(
-	<electric.event<collision.Collision>>electric.event.notHappend
+	<electric.event<collision.Collision>>electric.event.notHappened
 );
 
 var bullets = bulletsDevice({
@@ -125,7 +125,7 @@ var collisionsToDraw = cont([]).change(
 	{
 		to: (cs, _) => cont([]),
 		when: collisions.all.transformTime(
-			electric.event.notHappend, t => t + c.collision.duration
+			electric.event.notHappened, t => t + c.collision.duration
 		)
 	}
 );
@@ -137,7 +137,7 @@ var allToDraw = electric.transformator.map(
 	ship.xya, bullets.xy, asteroidMother.xya, asteroids.xy, collisionsToDraw
 )
 allToDraw.name = 'objects positions'
-var gameEnd = collisions.gameEnding.transformTime(electric.event.notHappend, t => t + 10);
+var gameEnd = collisions.gameEnding.transformTime(electric.event.notHappened, t => t + 10);
 gameEnd.name = 'game over'
 var spaceState = allToDraw.change(
 	{
@@ -167,11 +167,11 @@ spaceState.plugReceiver(function renderOnCanvas(a) {
 	draw.ship(a.ship);
 });
 
-var gameOver = cont(electric.event.notHappend).change(
+var gameOver = cont(electric.event.notHappened).change(
 	{ to: clock.intervalValue(true, { inMs: c.gameover.interval }), when: gameEnd }
 );
 gameOver.plugReceiver(e => {
-	if (e.happend) {
+	if (e.happened) {
 		draw.gameOver(width, height);
 	}
 });

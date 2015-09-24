@@ -12,7 +12,7 @@ function formatBoolean(value: any) {
 var clicks = ui.clicks('clicker');
 cont('not clicked').change(
 	{ to: cont('clicked'), when: clicks },
-	{ to: cont('not clicked'), when: clicks.transformTime(event.notHappend, t => t + 1000) }
+	{ to: cont('not clicked'), when: clicks.transformTime(event.notHappened, t => t + 1000) }
 ).plugReceiver(rui.htmlReceiverById('clicked'));
 
 cont('not clicked').change(

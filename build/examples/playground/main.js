@@ -135,13 +135,13 @@ var ElectricEvent = (function () {
     function ElectricEvent() {
     }
     ElectricEvent.restore = function (e) {
-        if (e.happend) {
+        if (e.happened) {
             return ElectricEvent.of(e.value);
         }
-        return ElectricEvent.notHappend;
+        return ElectricEvent.notHappened;
     };
     ElectricEvent.of = function (value) {
-        return new Happend(value);
+        return new happened(value);
     };
     ElectricEvent.lift = function (f) {
         return function () {
@@ -149,76 +149,76 @@ var ElectricEvent = (function () {
             for (var _i = 0; _i < arguments.length; _i++) {
                 vs[_i - 0] = arguments[_i];
             }
-            if (all(vs.map(function (v) { return v.happend; }))) {
+            if (all(vs.map(function (v) { return v.happened; }))) {
                 return ElectricEvent.of(f.apply(null, vs.map(function (v) { return v.value; })));
             }
             else {
-                return ElectricEvent.notHappend;
+                return ElectricEvent.notHappened;
             }
         };
     };
     ElectricEvent.flatLift = function (f) {
         return function (v1) {
-            if (v1.happend) {
+            if (v1.happened) {
                 return f(v1.value);
             }
             else {
-                return ElectricEvent.notHappend;
+                return ElectricEvent.notHappened;
             }
         };
     };
     ElectricEvent.liftOnFirst = function (f) {
         return function (v1, v2) {
-            if (v1.happend) {
+            if (v1.happened) {
                 return ElectricEvent.of(f(v1.value, v2));
             }
             else {
-                return ElectricEvent.notHappend;
+                return ElectricEvent.notHappened;
             }
         };
     };
     ElectricEvent.prototype.map = function (f) {
-        throw Error('ElectricEvent is abstract class, use Happend and NotHappend');
+        throw Error('ElectricEvent is abstract class, use happened and notHappened');
     };
     ;
     ElectricEvent.prototype.flattenMap = function (f) {
-        throw Error('ElectricEvent is abstract class, use Happend and NotHappend');
+        throw Error('ElectricEvent is abstract class, use happened and notHappened');
     };
     return ElectricEvent;
 })();
-var Happend = (function () {
-    function Happend(value) {
-        this.happend = true;
+var happened = (function () {
+    function happened(value) {
+        this.happened = true;
         this.value = value;
     }
-    Happend.prototype.toString = function () {
-        return "Happend: " + this.value.toString();
+    happened.prototype.toString = function () {
+        return "happened: " + this.value.toString();
     };
-    Happend.prototype.map = function (f) {
+    happened.prototype.map = function (f) {
         return ElectricEvent.of(f(this.value));
     };
-    Happend.prototype.flattenMap = function (f) {
+    happened.prototype.flattenMap = function (f) {
         return f(this.value);
     };
-    return Happend;
+    return happened;
 })();
-var NotHappend = (function () {
-    function NotHappend() {
-        this.happend = false;
+var notHappened = (function () {
+    function notHappened() {
+        this.happened = false;
         this.value = undefined;
     }
-    NotHappend.prototype.toString = function () {
-        return 'NotHappend';
+    notHappened.prototype.toString = function () {
+        return 'notHappened';
     };
-    NotHappend.prototype.map = function (f) {
-        return ElectricEvent.notHappend;
+    notHappened.prototype.map = function (f) {
+        return ElectricEvent.notHappened;
     };
-    NotHappend.prototype.flattenMap = function (f) {
-        return ElectricEvent.notHappend;
+    notHappened.prototype.flattenMap = function (f) {
+        return ElectricEvent.notHappened;
     };
-    return NotHappend;
+    return notHappened;
 })();
-ElectricEvent.notHappend = new NotHappend();
+ElectricEvent.notHappened = new notHappened();
 module.exports = ElectricEvent;
 
 },{"./utils/all":16}],5:[function(require,module,exports){
@@ -382,14 +382,14 @@ var Emitter = (function () {
         return namedTransformator("accumulate(" + fn(accumulator) + ")", [this], transformators.accumulate(acc, accumulator), acc);
     };
     Emitter.prototype.changes = function () {
-        return namedTransformator('changes', [this], transformators.changes(this.dirtyCurrentValue()), eevent.notHappend);
+        return namedTransformator('changes', [this], transformators.changes(this.dirtyCurrentValue()), eevent.notHappened);
     };
     Emitter.prototype.when = function (switcher) {
-        var t = namedTransformator('whenHappensThen', [this], transformators.when(switcher.happens, switcher.then), eevent.notHappend);
+        var t = namedTransformator('whenHappensThen', [this], transformators.when(switcher.happens, switcher.then), eevent.notHappened);
         return t;
     };
     Emitter.prototype.whenThen = function (happens) {
-        var t = namedTransformator('whenThen', [this], transformators.whenThen(happens), eevent.notHappend);
+        var t = namedTransformator('whenThen', [this], transformators.whenThen(happens), eevent.notHappened);
         return t;
     };
     Emitter.prototype.sample = function (initialValue, samplingEvent) {
@@ -447,7 +447,7 @@ function manualEvent(name) {
     // pack impulsed values into event
     // and not allow to emit values
     // it's done by monkey patching ManualEmitter
-    var e = manual(eevent.notHappend);
+    var e = manual(eevent.notHappened);
     var oldImpulse = e.impulse;
     e.impulse = function (v) { return oldImpulse.apply(e, [eevent.of(v)]); };
     e.emit = function (v) {
@@ -1116,7 +1116,7 @@ function log(emitter) {
 exports.log = log;
 function logEvents(emitter) {
     emitter.plugReceiver(function (x) {
-        if (!x.happend) {
+        if (!x.happened) {
             return;
         }
         console.log(emitter.name, '>>>', x.value);
@@ -1318,7 +1318,7 @@ exports.transformTime = transformTime;
 function sample() {
     return function transform(emit) {
         return function sampleTransform(v, i) {
-            if (i > 0 && v[i].happend) {
+            if (i > 0 && v[i].happened) {
                 emit(v[0]);
             }
         };
@@ -1333,7 +1333,7 @@ function change(switchers) {
             if (i == 0) {
                 emit(v[0]);
             }
-            else if (v[i].happend) {
+            else if (v[i].happened) {
                 this._wires[0].unplug();
                 var to = switchers[i - 1].to;
                 var e = callIfFunction(to, v[0], v[i].value);
@@ -1345,15 +1345,15 @@ function change(switchers) {
 exports.change = change;
 function when(happens, then) {
     return function transform(emit, impulse) {
-        var prevHappend = false;
+        var prevhappened = false;
         return function whenTransform(v, i) {
-            var happend = happens(v[i]);
-            if (happend && !prevHappend) {
+            var happened = happens(v[i]);
+            if (happened && !prevhappened) {
                 impulse(eevent.of(then(v[i])));
-                prevHappend = true;
+                prevhappened = true;
             }
-            else if (!happend) {
-                prevHappend = false;
+            else if (!happened) {
+                prevhappened = false;
             }
         };
     };
@@ -1361,15 +1361,15 @@ function when(happens, then) {
 exports.when = when;
 function whenThen(happens) {
     return function transform(emit, impulse) {
-        var prevHappend;
+        var prevhappened;
         return function whenTransform(v, i) {
-            var happend = happens(v[i]);
-            if (happend && !prevHappend) {
-                impulse(eevent.of(happend));
-                prevHappend = happend;
+            var happened = happens(v[i]);
+            if (happened && !prevhappened) {
+                impulse(eevent.of(happened));
+                prevhappened = happened;
             }
-            else if (!happend) {
-                prevHappend = null;
+            else if (!happened) {
+                prevhappened = null;
             }
         };
     };
@@ -1380,7 +1380,7 @@ function cumulateOverTime(delayInMiliseconds) {
         var accumulated = [];
         var accumulating = false;
         return function throttleTransform(v, i) {
-            if (!v[i].happend) {
+            if (!v[i].happened) {
                 return;
             }
             accumulated.push(v[i].value);
@@ -1460,13 +1460,13 @@ function merge() {
 }
 exports.merge = merge;
 function cumulateOverTime(emitter, overInMs) {
-    return namedTransformator("cumulateOverTime(" + overInMs + "ms)", [emitter], transformators.cumulateOverTime(overInMs), eevent.notHappend);
+    return namedTransformator("cumulateOverTime(" + overInMs + "ms)", [emitter], transformators.cumulateOverTime(overInMs), eevent.notHappened);
 }
 exports.cumulateOverTime = cumulateOverTime;
 function hold(initialValue, emitter) {
     function transform(emit) {
         return function holdTransform(v, i) {
-            if (v[i].happend) {
+            if (v[i].happened) {
                 emit(v[i].value);
             }
         };
@@ -1476,14 +1476,14 @@ function hold(initialValue, emitter) {
 exports.hold = hold;
 ;
 function changes(emitter) {
-    return namedTransformator('changes', [emitter], transformators.changes(emitter.dirtyCurrentValue()), eevent.notHappend);
+    return namedTransformator('changes', [emitter], transformators.changes(emitter.dirtyCurrentValue()), eevent.notHappened);
 }
 exports.changes = changes;
 function skipFirst(emitter) {
     function transform(emit, impulse) {
         var skipped = false;
         return function skipFirstTransform(v, i) {
-            if (v[i].happend) {
+            if (v[i].happened) {
                 if (skipped) {
                     impulse(v[i]);
                 }
@@ -1493,7 +1493,7 @@ function skipFirst(emitter) {
             }
         };
     }
-    return namedTransformator('skip(1)', [emitter], transform, eevent.notHappend);
+    return namedTransformator('skip(1)', [emitter], transform, eevent.notHappened);
 }
 exports.skipFirst = skipFirst;
 ;

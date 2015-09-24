@@ -23,7 +23,7 @@ function device(method, url, input, encode, decode) {
     var responseEmitter = electric.emitter.manual(emptyResponse);
     responseEmitter.name = 'response on ' + method + ': ' + url;
     input.plugReceiver(function emitStateChangesAndResponses(data) {
-        if (!data.happend) {
+        if (!data.happened) {
             return;
         }
         stateChange.impulse('waiting');

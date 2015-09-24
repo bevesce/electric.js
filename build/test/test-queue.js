@@ -31,7 +31,7 @@ describe('queue', function () {
         var h = false;
         var nh = false;
         function f(x) {
-            if (x.happend) {
+            if (x.happened) {
                 r = x.value;
                 h = true;
             }
@@ -51,7 +51,7 @@ describe('queue', function () {
         var h = false;
         var nh = false;
         function f(x) {
-            if (x.happend) {
+            if (x.happened) {
                 r = x.value;
                 h = true;
             }

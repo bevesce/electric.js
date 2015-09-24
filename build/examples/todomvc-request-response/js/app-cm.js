@@ -13,7 +13,7 @@ var editingStart = electric.emitter.manualEvent(null, 'editing start');
 var retitle = electric.emitter.manualEvent(null, 'retitle');
 var syncButtonClick = eui.clicks('sync-button');
 // Transformators
-var initialTasks = electric.emitter.placeholder(eevent.notHappend);
+var initialTasks = electric.emitter.placeholder(eevent.notHappened);
 var tasksDevice = require('./tasks-device');
 var tasks = tasksDevice(initialTasks, {
     insert: newTask,

@@ -18,7 +18,7 @@ var syncButtonClick = eui.clicks('sync-button');
 
 
 // Transformators
-var initialTasks = electric.emitter.placeholder(eevent.notHappend);
+var initialTasks = electric.emitter.placeholder(eevent.notHappened);
 
 import tasksDevice = require('./tasks-device');
 var tasks = tasksDevice(

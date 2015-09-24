@@ -88,13 +88,13 @@ describe('event socket', function () {
         var response = electricSocket.eventEmitter('test-event-response', socket, 0);
         e.plugReceiver(electricSocket.eventReceiver('test-event', socket));
         expect(response)
-            .to.emit(electric.event.notHappend)
+            .to.emit(electric.event.notHappened)
             .then.after(function () { return e.impulse(3); })
             .to.emit(electric.event.of(6))
-            .to.emit(electric.event.notHappend)
+            .to.emit(electric.event.notHappened)
             .then.after(function () { return e.impulse(4); })
             .to.emit(electric.event.of(8))
-            .to.emit(electric.event.notHappend)
+            .to.emit(electric.event.notHappened)
             .andBe(done);
     });
 });

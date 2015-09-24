@@ -24,7 +24,7 @@ function create(startingPoint, input) {
     acceleration.name = 'ship acceleration';
     var velocity = calculus.integral(shipVelocity(0, 0), acceleration, fps).change({
         to: function (v, _) { return calculus.integral(v.withX(0), acceleration, fps); },
-        when: input.stopRotation.transformTime(eevent.notHappend, function (t) { return t + c.ship.rotationStopDelay; })
+        when: input.stopRotation.transformTime(eevent.notHappened, function (t) { return t + c.ship.rotationStopDelay; })
     });
     velocity.name = 'ship velocity';
     var position = calculus.integral(startingPoint, velocity, fps);

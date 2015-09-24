@@ -91,7 +91,7 @@ export function transformTime<Out>(
 export function sample<InOut>() {
 	return function transform(emit: EmitFunction<InOut>) {
 		return function sampleTransform(v: any[], i: Index) {
-			if (i > 0 && v[i].happend) {
+			if (i > 0 && v[i].happened) {
 				emit(v[0]);
 			}
 		};
@@ -109,7 +109,7 @@ export function change<Out>(
 			if (i == 0){
 				emit(<Out>v[0]);
 			}
-			else if (v[i].happend){
+			else if (v[i].happened){
 				this._wires[0].unplug();
 				var to = switchers[i - 1].to;
 				var e = callIfFunction(to, <Out>v[0], v[i].value);
@@ -126,15 +126,15 @@ export function change<Out>(
 
 export function when<In, Out>(happens: (value: In) => boolean, then: (value: In) => Out) {
 	return function transform(emit: EmitFunction<eevent<Out>>, impulse: EmitFunction<eevent<Out>>) {
-		var prevHappend = false;
+		var prevhappened = false;
 		return function whenTransform(v: any[], i: Index) {
-			var happend = happens(v[i]);
-			if (happend && !prevHappend) {
+			var happened = happens(v[i]);
+			if (happened && !prevhappened) {
 				impulse(eevent.of(then(v[i])));
-				prevHappend = true;
+				prevhappened = true;
 			}
-			else if (!happend) {
-				prevHappend = false;
+			else if (!happened) {
+				prevhappened = false;
 			}
 		}
 	}
@@ -142,15 +142,15 @@ export function when<In, Out>(happens: (value: In) => boolean, then: (value: In)
 
 export function whenThen<In, Out>(happens: (value: In) => Out | void) {
 	return function transform(emit: EmitFunction<eevent<Out>>, impulse: EmitFunction<eevent<Out>>) {
-		var prevHappend: Out;
+		var prevhappened: Out;
 		return function whenTransform(v: any[], i: Index) {
-			var happend = happens(v[i]);
-			if (happend && !prevHappend) {
-				impulse(eevent.of(<Out>happend));
-				prevHappend = <Out>happend
+			var happened = happens(v[i]);
+			if (happened && !prevhappened) {
+				impulse(eevent.of(<Out>happened));
+				prevhappened = <Out>happened
 			}
-			else if (!happend) {
-				prevHappend = null;
+			else if (!happened) {
+				prevhappened = null;
 			}
 		}
 	}
@@ -163,7 +163,7 @@ export function cumulateOverTime<InOut>(
 		var accumulated: InOut[] = [];
 		var accumulating = false;
 		return function throttleTransform(v: eevent<InOut>[], i: Index) {
-			if (!v[i].happend){
+			if (!v[i].happened){
 				return;
 			}
 			accumulated.push(v[i].value);

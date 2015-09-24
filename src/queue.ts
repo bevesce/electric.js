@@ -30,9 +30,9 @@ class Queue {
 	}
 
 	private _dispatchEvent(f: any, v: any) {
-		if (v.happend) {
+		if (v.happened) {
 			f(v);
-			f(eevent.notHappend);
+			f(eevent.notHappened);
 			this._clear(f);
 		}
 		else {

@@ -57,7 +57,7 @@ function create(
 	var velocity = calculus.integral(shipVelocity(0, 0), acceleration, fps).change({
 		to: (v, _) => calculus.integral(v.withX(0), acceleration, fps),
 		when: input.stopRotation.transformTime(
-			eevent.notHappend, t => t + c.ship.rotationStopDelay
+			eevent.notHappened, t => t + c.ship.rotationStopDelay
 		)
 	});
 	velocity.name = 'ship velocity';

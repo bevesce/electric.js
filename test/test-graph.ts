@@ -107,7 +107,7 @@ describe('graph', function() {
 		expect(g.vertices).to.eql([
 			{
 				id: 0,
-			    name: '| manual event = NotHappend >',
+			    name: '| manual event = notHappened >',
 			    receivers: [ 1 ],
 			    emitters: [],
 			    type: 'emitter'
@@ -152,7 +152,7 @@ describe('graph', function() {
 
 	it('should work with recursion', function() {
 		var collision = electric.e.placeholder(
-			<electric.event<string>>electric.event.notHappend
+			<electric.event<string>>electric.event.notHappened
 		);
 		var bullets = electric.e.constant('s').change({
 			to: electric.e.constant('w'),
@@ -181,7 +181,7 @@ describe('graph', function() {
 			},
 			{
 				id: 2,
-				name: '< whenThen = NotHappend >',
+				name: '< whenThen = notHappened >',
 				receivers: [ 0 ],
 				emitters: [ 0 ],
 				type: 'transformator'

@@ -24,24 +24,24 @@ describe('clock', function() {
 	it('should time intervals', function(done) {
 		var time = sh.stop();
 		expect(clock.interval({ inMs: 1}))
-			.to.emit(electric.event.notHappend)
+			.to.emit(electric.event.notHappened)
 			.after(() => sh.advance(3))
 			.to.emit(electric.event.of(time + 1))
-			.to.emit(electric.event.notHappend)
+			.to.emit(electric.event.notHappened)
 			.to.emit(electric.event.of(time + 2))
-			.to.emit(electric.event.notHappend)
+			.to.emit(electric.event.notHappened)
 			.andBe(done)
 	});
 
 	it('should time intervals with value', function(done) {
 		var time = sh.stop();
 		expect(clock.intervalValue('test', { inMs: 1}))
-			.to.emit(electric.event.notHappend)
+			.to.emit(electric.event.notHappened)
 			.after(() => sh.advance(3))
 			.to.emit(electric.event.of('test'))
-			.to.emit(electric.event.notHappend)
+			.to.emit(electric.event.notHappened)
 			.to.emit(electric.event.of('test'))
-			.to.emit(electric.event.notHappend)
+			.to.emit(electric.event.notHappened)
 			.andBe(done)
 	});
 
@@ -59,10 +59,10 @@ describe('clock', function() {
 		var time = sh.stop();
 		var once = clock.once(1, '!');
 		expect(once)
-			.to.emit(electric.event.notHappend)
+			.to.emit(electric.event.notHappened)
 			.then.after(() => sh.advance(2))
 			.to.emit(electric.event.of('!'))
-			.then.to.emit(electric.event.notHappend)
+			.then.to.emit(electric.event.notHappened)
 			.andBe(done);
 	});
 });

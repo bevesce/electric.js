@@ -15,7 +15,7 @@ function log(emitter) {
 exports.log = log;
 function logEvents(emitter) {
     emitter.plugReceiver(function (x) {
-        if (!x.happend) {
+        if (!x.happened) {
             return;
         }
         console.log(emitter.name, '>>>', x.value);

@@ -30,7 +30,7 @@ function notEmpty(insert) {
         if (text !== '') {
             return eevent.of(item.of(text));
         }
-        return eevent.notHappend;
+        return eevent.notHappened;
     }); });
     t.name = 'not empty';
     return t;

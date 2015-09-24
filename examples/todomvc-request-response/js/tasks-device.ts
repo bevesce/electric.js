@@ -67,7 +67,7 @@ function notEmpty(insert: electric.emitter.Emitter<eevent<string>>) {
 		if (text !== '') {
 			return eevent.of(item.of(text))
 		}
-		return eevent.notHappend
+		return eevent.notHappened
 	}));
 }
 

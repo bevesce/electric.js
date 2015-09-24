@@ -278,16 +278,16 @@ describe('emitter', function () {
             then: function (x) { return x + '!'; }
         });
         expect(whened)
-            .to.emit(eevent.notHappend)
+            .to.emit(eevent.notHappened)
             .then.after(function () { return emitter.emit(1); })
             .then.after(function () { return emitter.emit(3); })
             .to.emit(eevent.of('3!'))
-            .to.emit(eevent.notHappend)
+            .to.emit(eevent.notHappened)
             .then.after(function () { return emitter.emit(4); })
             .then.after(function () { return emitter.emit(1); })
             .and.after(function () { return emitter.emit(5); })
             .to.emit(eevent.of('5!'))
-            .to.emit(eevent.notHappend)
+            .to.emit(eevent.notHappened)
             .andBe(done);
     });
     it('should be whenThenable', function (done) {
@@ -298,29 +298,29 @@ describe('emitter', function () {
             }
         });
         expect(whened)
-            .to.emit(eevent.notHappend)
+            .to.emit(eevent.notHappened)
             .then.after(function () { return emitter.emit(1); })
             .then.after(function () { return emitter.emit(3); })
             .to.emit(eevent.of('3!'))
-            .to.emit(eevent.notHappend)
+            .to.emit(eevent.notHappened)
             .then.after(function () { return emitter.emit(4); })
             .then.after(function () { return emitter.emit(1); })
             .and.after(function () { return emitter.emit(5); })
             .to.emit(eevent.of('5!'))
-            .to.emit(eevent.notHappend)
+            .to.emit(eevent.notHappened)
             .andBe(done);
     });
     it('should produce changes', function (done) {
         var emitter = electric.emitter.manual(0);
         var changes = emitter.changes();
         expect(changes)
-            .to.emit(eevent.notHappend)
+            .to.emit(eevent.notHappened)
             .then.after(function () { return emitter.emit(1); })
             .to.emit(eevent.of({ previous: 0, next: 1 }))
-            .to.emit(eevent.notHappend)
+            .to.emit(eevent.notHappened)
             .then.after(function () { return emitter.emit(2); })
             .to.emit(eevent.of({ previous: 1, next: 2 }))
-            .to.emit(eevent.notHappend)
+            .to.emit(eevent.notHappened)
             .andBe(done);
     });
 });
@@ -346,10 +346,10 @@ describe('emitters recursion', function () {
     });
 });
 describe('manual event emitter', function () {
-    it('should be created with notHappend as initial value', function (done) {
+    it('should be created with notHappened as initial value', function (done) {
         var e = electric.emitter.manualEvent();
         expect(e)
-            .to.emit(eevent.notHappend)
+            .to.emit(eevent.notHappened)
             .andBe(done);
     });
     it('should throw on manual emit', function () {
@@ -360,14 +360,14 @@ describe('manual event emitter', function () {
         var e = electric.emitter.manualEvent();
         var c = electric.receiver.collect(e);
         expect(e)
-            .to.emit(eevent.notHappend)
+            .to.emit(eevent.notHappened)
             .then.after(function () { return e.impulse(1); })
             .to.emit(eevent.of(1))
-            .to.emit(eevent.notHappend)
+            .to.emit(eevent.notHappened)
             .then.after(function () { return e.impulse(1); })
-            .to.emit(eevent.of(1), eevent.notHappend)
+            .to.emit(eevent.of(1), eevent.notHappened)
             .then.after(function () { return e.impulse(2); })
-            .to.emit(eevent.of(2), eevent.notHappend)
+            .to.emit(eevent.of(2), eevent.notHappened)
             .andBe(done);
     });
 });

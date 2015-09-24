@@ -58,7 +58,7 @@ function collection(
 			(toggle, tasks) => toggle.flattenMap(toWhat => {
 				var toggledTasks = tasks.filter(t => t.isCompleted() != toWhat);
 				var changes = toggledTasks.map(t => Change.check(t.id(), toWhat))
-				return changes.length > 0 ? eevent.of(changes) : eevent.notHappend;
+				return changes.length > 0 ? eevent.of(changes) : eevent.notHappened;
 			}),
 			toggleTo, tasks
 		),
@@ -74,7 +74,7 @@ function collection(
 		electric.transformator.map(
 			(clear, tasks) => clear.flattenMap(_ => {
 				var changes = onlyCompleted(tasks).map(t => Change.remove(t.id()));
-				return changes.length > 0 ? eevent.of(changes) : eevent.notHappend;
+				return changes.length > 0 ? eevent.of(changes) : eevent.notHappened;
 			}),
 			input.clear, tasks
 		)
@@ -103,13 +103,13 @@ function notEmpty(insert: electric.emitter.Emitter<eevent<string>>) {
 		if (text !== '') {
 			return eevent.of(item.of(text))
 		}
-		return eevent.notHappend
+		return eevent.notHappened
 	}));
 }
 
 
 function applyChanges(tasks: item[], changes: eevent<Change[]>) {
-	if (!changes.happend) {
+	if (!changes.happened) {
 		return tasks;
 	}
 	var cs = changes.value;

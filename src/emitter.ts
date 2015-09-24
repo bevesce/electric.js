@@ -217,7 +217,7 @@ export class ConcreteEmitter<T>
 	        'changes',
 	        [this],
 	        transformators.changes(this.dirtyCurrentValue()),
-	        ElectricEvent.notHappend
+	        ElectricEvent.notHappened
 	    )
 	}
 
@@ -229,7 +229,7 @@ export class ConcreteEmitter<T>
 			'whenHappensThen',
 			[this],
 			transformators.when(switcher.happens, switcher.then),
-			ElectricEvent.notHappend
+			ElectricEvent.notHappened
 		);
 		return t;
 	}
@@ -239,7 +239,7 @@ export class ConcreteEmitter<T>
 			'whenThen',
 			[this],
 			transformators.whenThen(happens),
-			ElectricEvent.notHappend
+			ElectricEvent.notHappened
 		);
 		return t;
 	}
@@ -581,7 +581,7 @@ export function manualEvent<T>(initialValue?: T, name?: string): ManualEventEmit
 	// pack impulsed values into event
 	// and not allow to emit values
 	// it's done by monkey patching ManualEmitter
-	var e = manual(ElectricEvent.notHappend);
+	var e = manual(ElectricEvent.notHappened);
 	var oldImpulse = e.impulse;
 	(<any>e).impulse = (v: T) => oldImpulse.apply(e, [ElectricEvent.of(v)]);
 	(<any>e).emit = (v: T) => {

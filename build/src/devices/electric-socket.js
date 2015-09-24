@@ -7,7 +7,7 @@ function receiver(name, socket) {
 exports.receiver = receiver;
 function eventReceiver(name, socket) {
     return function (data) {
-        if (data.happend) {
+        if (data.happened) {
             socket.emit(name, data.value);
         }
     };

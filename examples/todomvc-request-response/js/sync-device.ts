@@ -20,11 +20,11 @@ function sync(
 
 	var state = electric.emitter.placeholder('none');
 	var stateChange = electric.transformator.changes(state);
-	var shouldSyncTasks = electric.emitter.constant(eevent.notHappend).change(
+	var shouldSyncTasks = electric.emitter.constant(eevent.notHappened).change(
 		{
 			to: (_, diff) => {
 				if (diff.next === 'success' || diff.next === 'waiting') {
-					return electric.emitter.constant(eevent.notHappend);
+					return electric.emitter.constant(eevent.notHappened);
 				}
 				else {
 					return electric.transformator.merge(

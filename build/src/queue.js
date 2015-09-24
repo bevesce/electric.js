@@ -21,9 +21,9 @@ var Queue = (function () {
         }
     };
     Queue.prototype._dispatchEvent = function (f, v) {
-        if (v.happend) {
+        if (v.happened) {
             f(v);
-            f(eevent.notHappend);
+            f(eevent.notHappened);
             this._clear(f);
         }
         else {

@@ -150,14 +150,14 @@ var ConcreteEmitter = (function () {
         return namedTransformator("accumulate(" + fn(accumulator) + ")", [this], transformators.accumulate(acc, accumulator), acc);
     };
     ConcreteEmitter.prototype.changes = function () {
-        return namedTransformator('changes', [this], transformators.changes(this.dirtyCurrentValue()), ElectricEvent.notHappend);
+        return namedTransformator('changes', [this], transformators.changes(this.dirtyCurrentValue()), ElectricEvent.notHappened);
     };
     ConcreteEmitter.prototype.when = function (switcher) {
-        var t = namedTransformator('whenHappensThen', [this], transformators.when(switcher.happens, switcher.then), ElectricEvent.notHappend);
+        var t = namedTransformator('whenHappensThen', [this], transformators.when(switcher.happens, switcher.then), ElectricEvent.notHappened);
         return t;
     };
     ConcreteEmitter.prototype.whenThen = function (happens) {
-        var t = namedTransformator('whenThen', [this], transformators.whenThen(happens), ElectricEvent.notHappend);
+        var t = namedTransformator('whenThen', [this], transformators.whenThen(happens), ElectricEvent.notHappened);
         return t;
     };
     ConcreteEmitter.prototype.sample = function (initialValue, samplingEvent) {
@@ -228,7 +228,7 @@ function manualEvent(initialValue, name) {
     // pack impulsed values into event
     // and not allow to emit values
     // it's done by monkey patching ManualEmitter
-    var e = manual(ElectricEvent.notHappend);
+    var e = manual(ElectricEvent.notHappened);
     var oldImpulse = e.impulse;
     e.impulse = function (v) { return oldImpulse.apply(e, [ElectricEvent.of(v)]); };
     e.emit = function (v) {

@@ -38,10 +38,10 @@ var ship = shipDevice(shipStartingPoint, shipInput);
 var asteroidMotherStartingPoint = Point.of(3 * window.innerWidth / 4, window.innerHeight / 2, -Math.PI / 2);
 var asteroidMother = motherDevice(asteroidMotherStartingPoint, clock.intervalOfRandom(-1, 1, { inMs: c.asteroidMother.velocityShangeInterval }));
 //// bullets, asteroids & collisions
-var bulletBulletCollision = electric.emitter.placeholder(electric.event.notHappend);
-var bulletAsteroidCollision = electric.emitter.placeholder(electric.event.notHappend);
-var bulletMotherCollision = electric.emitter.placeholder(electric.event.notHappend);
-var bulletShipCollision = electric.emitter.placeholder(electric.event.notHappend);
+var bulletBulletCollision = electric.emitter.placeholder(electric.event.notHappened);
+var bulletAsteroidCollision = electric.emitter.placeholder(electric.event.notHappened);
+var bulletMotherCollision = electric.emitter.placeholder(electric.event.notHappened);
+var bulletShipCollision = electric.emitter.placeholder(electric.event.notHappened);
 var bullets = bulletsDevice({
     shoot: ship.shot,
     removeBoth: bulletBulletCollision,
@@ -74,14 +74,14 @@ var dashboard = require('./dashboard');
 score.plugReceiver(dashboard.score());
 var collisionsToDraw = cont([]).change({ to: function (cs, c) { return insert(cs, c); }, when: collisions.all }, {
     to: function (cs, _) { return cont([]); },
-    when: collisions.all.transformTime(electric.event.notHappend, function (t) { return t + c.collision.duration; })
+    when: collisions.all.transformTime(electric.event.notHappened, function (t) { return t + c.collision.duration; })
 });
 collisionsToDraw.name = 'visible collisions';
 var allToDraw = electric.transformator.map(function (s, bs, ms, ebs, cs) { return ({
     ship: s, bullets: bs, mothership: ms, asteroids: ebs, collisions: cs, state: 'ok'
 }); }, ship.xya, bullets.xy, asteroidMother.xya, asteroids.xy, collisionsToDraw);
 allToDraw.name = 'objects positions';
-var gameEnd = collisions.gameEnding.transformTime(electric.event.notHappend, function (t) { return t + 10; });
+var gameEnd = collisions.gameEnding.transformTime(electric.event.notHappened, function (t) { return t + 10; });
 gameEnd.name = 'game over';
 var spaceState = allToDraw.change({
     to: function (s, _) {
@@ -108,9 +108,9 @@ spaceState.plugReceiver(function renderOnCanvas(a) {
     draw.asteroidMother(a.mothership);
     draw.ship(a.ship);
 });
-var gameOver = cont(electric.event.notHappend).change({ to: clock.intervalValue(true, { inMs: c.gameover.interval }), when: gameEnd });
+var gameOver = cont(electric.event.notHappened).change({ to: clock.intervalValue(true, { inMs: c.gameover.interval }), when: gameEnd });
 gameOver.plugReceiver(function (e) {
-    if (e.happend) {
+    if (e.happened) {
         draw.gameOver(width, height);
     }
 });

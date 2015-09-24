@@ -53,13 +53,13 @@ exports.merge = merge;
 //         `cumulateOverTime(${overInMs}ms)`,
 //         [emitter],
 //         transformators.cumulateOverTime(overInMs),
-//         eevent.notHappend
+//         eevent.notHappened
 //     );
 // }
 function hold(initialValue, emitter) {
     function transform(emit) {
         return function holdTransform(v, i) {
-            if (v[i].happend) {
+            if (v[i].happened) {
                 emit(v[i].value);
             }
         };
@@ -69,14 +69,14 @@ function hold(initialValue, emitter) {
 exports.hold = hold;
 ;
 function changes(emitter) {
-    return namedTransformator('changes', [emitter], transformators.changes(emitter.dirtyCurrentValue()), eevent.notHappend);
+    return namedTransformator('changes', [emitter], transformators.changes(emitter.dirtyCurrentValue()), eevent.notHappened);
 }
 exports.changes = changes;
 function skipFirst(emitter) {
     function transform(emit, impulse) {
         var skipped = false;
         return function skipFirstTransform(v, i) {
-            if (v[i].happend) {
+            if (v[i].happened) {
                 if (skipped) {
                     impulse(v[i]);
                 }
@@ -86,7 +86,7 @@ function skipFirst(emitter) {
             }
         };
     }
-    return namedTransformator('skip(1)', [emitter], transform, eevent.notHappend);
+    return namedTransformator('skip(1)', [emitter], transform, eevent.notHappened);
 }
 exports.skipFirst = skipFirst;
 ;

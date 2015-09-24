@@ -19,7 +19,7 @@ export function log(emitter: Emitter<any>) {
 
 export function logEvents(emitter: Emitter<ElectricEvent<any>>) {
 	emitter.plugReceiver((x: any) => {
-		if (!x.happend) {
+		if (!x.happened) {
 			return;
 		}
 		console.log(emitter.name, '>>>', x.value);

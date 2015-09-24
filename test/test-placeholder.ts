@@ -103,13 +103,13 @@ describe('placeholder in recursion', function() {
 
     it('should allow recursion', function(done) {
         var mouseclick = electric.emitter.manualEvent();
-        var animationBegins = placeholder(<any>eevent.notHappend);
+        var animationBegins = placeholder(<any>eevent.notHappened);
         var animating = electric.emitter.constant(false).change(
             { to: electric.emitter.constant(true), when: animationBegins }
         )
         animationBegins.is(
             transformator.map(
-                (a, c) => a ? eevent.notHappend : c,
+                (a, c) => a ? eevent.notHappened : c,
                 animating,
                 mouseclick
             )
@@ -124,8 +124,8 @@ describe('placeholder in recursion', function() {
     it('should allow recursion with time transformation', function(done) {
         var constant = electric.emitter.constant;
         var mouseclick = electric.emitter.manualEvent();
-        var animationBegins = placeholder(eevent.notHappend);
-        var animationEnds = placeholder(eevent.notHappend);
+        var animationBegins = placeholder(eevent.notHappened);
+        var animationEnds = placeholder(eevent.notHappened);
 
         // start animationg on animationBegins
         // and end on animationEnds (1ms after start)
@@ -144,7 +144,7 @@ describe('placeholder in recursion', function() {
 
         animationBegins.is(
             transformator.map(
-                (a: any, c: any) => a ? eevent.notHappend : c,
+                (a: any, c: any) => a ? eevent.notHappened : c,
                 animating,
                 mouseclick
             )
@@ -152,7 +152,7 @@ describe('placeholder in recursion', function() {
         animationEnds.is(
             animating
                 .transformTime(false, (t: number) => t + 1)
-                .map((v: boolean) => v ? eevent.of(null) : eevent.notHappend)
+                .map((v: boolean) => v ? eevent.of(null) : eevent.notHappened)
         );
         var c = electric.receiver.collect(animating);
 

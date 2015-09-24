@@ -108,10 +108,10 @@ describe('transformators', function () {
         var emitter = electric.emitter.manualEvent();
         var merged = t.merge(emitter);
         expect(merged)
-            .to.emit(eevent.notHappend)
+            .to.emit(eevent.notHappened)
             .then.after(function () { return emitter.impulse(1); })
             .to.emit(eevent.of(1))
-            .to.emit(eevent.notHappend)
+            .to.emit(eevent.notHappened)
             .that.finish(done);
     });
     transformator('merge4', function (done) {
@@ -121,33 +121,33 @@ describe('transformators', function () {
         var emitter4 = electric.emitter.manualEvent();
         var merged = t.merge(emitter1, emitter2, emitter3, emitter4);
         expect(merged)
-            .to.emit(eevent.notHappend)
+            .to.emit(eevent.notHappened)
             .then.after(function () { return emitter1.impulse('1b'); })
             .to.emit(eevent.of('1b'))
-            .to.emit(eevent.notHappend)
+            .to.emit(eevent.notHappened)
             .then.after(function () { return emitter2.impulse('2b'); })
             .to.emit(eevent.of('2b'))
-            .to.emit(eevent.notHappend)
+            .to.emit(eevent.notHappened)
             .then.after(function () { return emitter3.impulse('3b'); })
             .to.emit(eevent.of('3b'))
-            .to.emit(eevent.notHappend)
+            .to.emit(eevent.notHappened)
             .then.after(function () { return emitter4.impulse('4b'); })
             .to.emit(eevent.of('4b'))
-            .to.emit(eevent.notHappend)
+            .to.emit(eevent.notHappened)
             .then.after(function () { return emitter2.impulse('2c'); })
             .to.emit(eevent.of('2c'))
-            .to.emit(eevent.notHappend)
+            .to.emit(eevent.notHappened)
             .that.finish(done);
     });
     //   transformator('cummulateOverTime', function(done) {
-    // var emitter = electric.emitter.manual(eevent.notHappend);
+    // var emitter = electric.emitter.manual(eevent.notHappened);
     // var cumulated = t.cumulateOverTime(emitter, 10);
     // expect(cumulated)
-    // 	.to.emit(eevent.notHappend)
+    // 	.to.emit(eevent.notHappened)
     // 	.then.after(() => emitter.impulse(eevent.of(1)))
     // 	.and.after(() => emitter.impulse(eevent.of(2)))
     // 	.to.emit(eevent.of([1, 2]))
-    // 	.to.emit(eevent.notHappend)
+    // 	.to.emit(eevent.notHappened)
     // 	.and.then.to.finish(done)
     //   });
     transformator('hold', function (done) {
@@ -166,13 +166,13 @@ describe('transformators', function () {
         var emitter = electric.emitter.manual(0);
         var changes = t.changes(emitter);
         expect(changes)
-            .to.emit(eevent.notHappend)
+            .to.emit(eevent.notHappened)
             .then.after(function () { return emitter.emit(1); })
             .to.emit(eevent.of({ previous: 0, next: 1 }))
-            .to.emit(eevent.notHappend)
+            .to.emit(eevent.notHappened)
             .then.after(function () { return emitter.emit(2); })
             .to.emit(eevent.of({ previous: 1, next: 2 }))
-            .to.emit(eevent.notHappend)
+            .to.emit(eevent.notHappened)
             .andBe(done);
     });
 });
@@ -288,10 +288,10 @@ describe('flattens', function () {
 // 	    	{ happens: x => x >= 5, then: x => x}
 //     	);
 // 	    expect(e)
-// 	    	.to.emit(eevent.notHappend)
+// 	    	.to.emit(eevent.notHappened)
 // 	        .then.after(() => y.emit(3))
 // 	        .to.emit(eevent.of(6))
-// 	    	.then.to.emit(eevent.notHappend)
+// 	    	.then.to.emit(eevent.notHappened)
 // 	        .andBe(done);
 // 	});
 // });
