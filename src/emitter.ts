@@ -1,19 +1,23 @@
-import inf = require('./interfaces');
 import scheduler = require('./scheduler');
 import transformators = require('./transformator-helpers');
-import eevent = require('./electric-event');
+import ElectricEvent = require('./electric-event');
 import Wire = require('./wire');
 import fn = require('./utils/fn');
+import EmitFunction = require('./interfaces/t-to-void');
+import receiver = require('./interfaces/receiver');
+import queue = require('./queue');
 
+export import Emitter = require('./interfaces/emitter');
 export import placeholder = require('./placeholder');
 
+var q = queue.empty();
 
 
-export class Emitter<T>
-	implements inf.IEmitter<T>
+export class ConcreteEmitter<T>
+	implements Emitter<T>
 {
 	name: string;
-	private _receivers: Array<inf.IReceiverFunction<T> | inf.IReceiver<T> | inf.IWire<T>>;
+	private _receivers: Array<receiver.ReceiverFunction<T> | receiver.Receiver<T> | Wire<T>>;
 	private _currentValue: T;
 
 	constructor(initialValue: T = undefined) {
@@ -22,39 +26,41 @@ export class Emitter<T>
 		this.name = (this.name);
 	}
 
-	toString() {
-		return `| ${this.name} = ${this.dirtyCurrentValue().toString()} >`;
+	toString(includeCurrentValue = false) {
+		if (includeCurrentValue) {
+			return `| ${this.name} = ${this.dirtyCurrentValue().toString()} >`;
+		}
+		return `| ${this.name} >`;
 	}
 
 	// when reveiver is plugged current value is not emitted to him
 	// instantaneously, but instead it's done asynchronously
-	plugReceiver(receiver: inf.IReceiverFunction<T> | inf.IReceiver<T> | inf.IWire<T>): number {
-		if (typeof receiver !== 'function' && (<inf.IReceiver<T>>receiver).wire) {
-			receiver = (<inf.IReceiver<T>>receiver).wire(this);
+	plugReceiver(receiver: receiver.ReceiverFunction<T> | receiver.Receiver<T> | Wire<T>): number {
+		if (typeof receiver !== 'function' && (<receiver.Receiver<T>>receiver).wire) {
+			receiver = (<receiver.Receiver<T>>receiver).wire(this);
 		}
 		this._receivers.push(receiver);
 		this._asyncDispatchToReceiver(receiver, this._currentValue);
 		return this._receivers.length - 1;
 	}
 
-	_dirtyPlugReceiver(receiver: inf.IReceiverFunction<T> | inf.IReceiver<T> | inf.IWire<T>): number {
-		if (typeof receiver !== 'function' && (<inf.IReceiver<T>>receiver).wire) {
-			receiver = (<inf.IReceiver<T>>receiver).wire(this);
+	_dirtyPlugReceiver(receiver: receiver.ReceiverFunction<T> | receiver.Receiver<T> | Wire<T>): number {
+		if (typeof receiver !== 'function' && (<receiver.Receiver<T>>receiver).wire) {
+			receiver = (<receiver.Receiver<T>>receiver).wire(this);
 		}
 		this._receivers.push(receiver);
-		// this._asyncDispatchToReceiver(receiver, this._currentValue);
 		return this._receivers.length - 1;
 	}
 
 	unplugReceiver(
-		receiverOrId: inf.IDisposable | inf.IReceiverFunction<T> | inf.IReceiver<T> | inf.IWire<T>
+		receiverOrId: number | receiver.ReceiverFunction<T> | receiver.Receiver<T> | Wire<T>
 	) {
 		var index = this._getIndexOfReceiver(receiverOrId);
 		this._receivers.splice(index, 1);
 	}
 
 	_getIndexOfReceiver(
-		receiverOrId: inf.IDisposable | inf.IReceiverFunction<T> | inf.IReceiver<T> | inf.IWire<T>
+		receiverOrId: number | receiver.ReceiverFunction<T> | receiver.Receiver<T> | Wire<T>
 	): number {
 		if (typeof receiverOrId === 'number') {
 			return receiverOrId;
@@ -95,7 +101,6 @@ export class Emitter<T>
 		this._dispatchToReceivers(value);
 		this._currentValue = value;
 	}
-
 	// let's say that f constant(y).impulse(x) is called at t_i
 	// then f(t_i) = x and f(t) = y when t != t_i
 	impulse(value: T) {
@@ -103,6 +108,7 @@ export class Emitter<T>
 			return;
 		}
 		this._dispatchToReceivers(value);
+		_dispatch();
 		this._dispatchToReceivers(this._currentValue);
 	}
 
@@ -117,14 +123,14 @@ export class Emitter<T>
 	private _dispatchToReceivers(value: T) {
 		var currentReceivers = this._receivers.slice();
 		for (var receiver of currentReceivers) {
-			// this._asyncDispatchToReceiver(receiver, value);
 			this._dispatchToReceiver(receiver, value);
 		}
 	}
 
 	protected _dispatchToReceiver(receiver: any, value: T) {
 		if (typeof receiver === 'function') {
-			receiver(value);
+			q.add(receiver, value);
+			// receiver(value);
 		}
 		else {
 			receiver.receive(value);
@@ -140,13 +146,20 @@ export class Emitter<T>
 
 	protected _asyncDispatchToReceiver(receiver: any, value?: T) {
 		scheduler.scheduleTimeout(
-			() => this._dispatchToReceiver(receiver, value),
+			() => {
+				if (typeof receiver === 'function') {
+					receiver(value);
+				}
+				else {
+					receiver.receive(value);
+				}
+			},
 			0
 		);
 	}
 
 	// transformators
-	map<NewT>(mapping: (v: T) => NewT): inf.IEmitter<NewT> {
+	map<NewT>(mapping: (v: T) => NewT): Emitter<NewT> {
 		return namedTransformator(
 			`map(${fn(mapping)})`,
 			[this],
@@ -155,7 +168,7 @@ export class Emitter<T>
 		);
 	}
 
-	filter(initialValue: T, predicate: (v: T) => boolean): inf.IEmitter<T> {
+	filter(initialValue: T, predicate: (v: T) => boolean): Emitter<T> {
 		return namedTransformator(
 			`filter(${fn(predicate)})`,
 			[this],
@@ -164,7 +177,7 @@ export class Emitter<T>
 		);
 	}
 
-	filterMap<NewT>(initialValue: T, mapping: (v: T) => NewT | void): inf.IEmitter<NewT> {
+	filterMap<NewT>(initialValue: NewT, mapping: (v: T) => NewT | void): Emitter<NewT> {
 		return namedTransformator(
 			`filterMap(${fn(mapping)})`,
 			[this],
@@ -173,7 +186,7 @@ export class Emitter<T>
 		);
 	}
 
-	transformTime(initialValue: T, timeShift: (t: number) => number, t0 = 0): inf.IEmitter<T> {
+	transformTime(initialValue: T, timeShift: (t: number) => number, t0 = 0): Emitter<T> {
 		var t = namedTransformator(
 			`transformTime(${fn(timeShift)})`,
 			[this],
@@ -186,7 +199,10 @@ export class Emitter<T>
 		return t;
 	}
 
-	accumulate<NewT>(initialValue: NewT, accumulator: (acc: NewT, value: T) => NewT): inf.IEmitter<NewT> {
+	accumulate<NewT>(
+		initialValue: NewT,
+		accumulator: (acc: NewT, value: T) => NewT
+	): Emitter<NewT> {
 		var acc = accumulator(initialValue, this.dirtyCurrentValue())
 		return namedTransformator(
 			`accumulate(${fn(accumulator)})`,
@@ -196,48 +212,39 @@ export class Emitter<T>
 		);
 	}
 
-	merge(...emitters: inf.IEmitter<T>[]): inf.IEmitter<T> {
-		return namedTransformator(
-			'merge',
-			[<inf.IEmitter<T>>this].concat(emitters),
-			transformators.merge(),
-			this.dirtyCurrentValue()
-		);
-	}
-
-	changes<InOut>(): inf.IEmitter<eevent<{ previous: InOut, next: InOut }>> {
+	changes<InOut>(): Emitter<ElectricEvent<{ previous: InOut, next: InOut }>> {
 	    return namedTransformator(
 	        'changes',
 	        [this],
 	        transformators.changes(this.dirtyCurrentValue()),
-	        eevent.notHappend
+	        ElectricEvent.notHappened
 	    )
 	}
 
 	when<NewT>(switcher: {
 		happens: (value: T) => boolean,
 		then: (value: T) => NewT
-	}): inf.IEmitter<eevent<NewT>> {
+	}): Emitter<ElectricEvent<NewT>> {
 		var t = namedTransformator(
 			'whenHappensThen',
 			[this],
 			transformators.when(switcher.happens, switcher.then),
-			eevent.notHappend
+			ElectricEvent.notHappened
 		);
 		return t;
 	}
 
-	whenThen<NewT>(happens: (value: T) => NewT | void): inf.IEmitter<eevent<NewT>> {
+	whenThen<NewT>(happens: (value: T) => NewT | void): Emitter<ElectricEvent<NewT>> {
 		var t = namedTransformator(
 			'whenThen',
 			[this],
 			transformators.whenThen(happens),
-			eevent.notHappend
+			ElectricEvent.notHappened
 		);
 		return t;
 	}
 
-	sample(initialValue: T, samplingEvent: inf.IEmitter<eevent<any>>): inf.IEmitter<T> {
+	sample(initialValue: T, samplingEvent: Emitter<ElectricEvent<any>>): Emitter<T> {
 		var t = namedTransformator(
 			'sample',
 			[this, samplingEvent],
@@ -248,281 +255,292 @@ export class Emitter<T>
 	}
 
 	change<S1>(
-	    switcher1: { when: inf.IEmitter<eevent<S1>>, to: inf.IEmitter<T> | ((t: T, k: S1) => inf.IEmitter<T>) }
-	): inf.IEmitter<T>;
+	    switcher1: { when: Emitter<ElectricEvent<S1>>, to: Emitter<T> | ((t: T, k: S1) => Emitter<T>) }
+	): Emitter<T>;
 	change<S1, S2>(
-	    switcher1: { when: inf.IEmitter<eevent<S1>>, to: inf.IEmitter<T> | ((t: T, k: S1) => inf.IEmitter<T>) },
-	    switcher2: { when: inf.IEmitter<eevent<S2>>, to: inf.IEmitter<T> | ((t: T, k: S2) => inf.IEmitter<T>) }
-	): inf.IEmitter<T>;
+	    switcher1: { when: Emitter<ElectricEvent<S1>>, to: Emitter<T> | ((t: T, k: S1) => Emitter<T>) },
+	    switcher2: { when: Emitter<ElectricEvent<S2>>, to: Emitter<T> | ((t: T, k: S2) => Emitter<T>) }
+	): Emitter<T>;
 	change<S1, S2, S3>(
-	    switcher1: { when: inf.IEmitter<eevent<S1>>, to: inf.IEmitter<T> | ((t: T, k: S1) => inf.IEmitter<T>) },
-	    switcher2: { when: inf.IEmitter<eevent<S2>>, to: inf.IEmitter<T> | ((t: T, k: S2) => inf.IEmitter<T>) },
-	    switcher3: { when: inf.IEmitter<eevent<S3>>, to: inf.IEmitter<T> | ((t: T, k: S3) => inf.IEmitter<T>) }
-	): inf.IEmitter<T>;
+	    switcher1: { when: Emitter<ElectricEvent<S1>>, to: Emitter<T> | ((t: T, k: S1) => Emitter<T>) },
+	    switcher2: { when: Emitter<ElectricEvent<S2>>, to: Emitter<T> | ((t: T, k: S2) => Emitter<T>) },
+	    switcher3: { when: Emitter<ElectricEvent<S3>>, to: Emitter<T> | ((t: T, k: S3) => Emitter<T>) }
+	): Emitter<T>;
 	change<S1, S2, S3, S4>(
-	    switcher1: { when: inf.IEmitter<eevent<S1>>, to: inf.IEmitter<T> | ((t: T, k: S1) => inf.IEmitter<T>) },
-	    switcher2: { when: inf.IEmitter<eevent<S2>>, to: inf.IEmitter<T> | ((t: T, k: S2) => inf.IEmitter<T>) },
-	    switcher3: { when: inf.IEmitter<eevent<S3>>, to: inf.IEmitter<T> | ((t: T, k: S3) => inf.IEmitter<T>) },
-	    switcher4: { when: inf.IEmitter<eevent<S4>>, to: inf.IEmitter<T> | ((t: T, k: S4) => inf.IEmitter<T>) }
-	): inf.IEmitter<T>;
+	    switcher1: { when: Emitter<ElectricEvent<S1>>, to: Emitter<T> | ((t: T, k: S1) => Emitter<T>) },
+	    switcher2: { when: Emitter<ElectricEvent<S2>>, to: Emitter<T> | ((t: T, k: S2) => Emitter<T>) },
+	    switcher3: { when: Emitter<ElectricEvent<S3>>, to: Emitter<T> | ((t: T, k: S3) => Emitter<T>) },
+	    switcher4: { when: Emitter<ElectricEvent<S4>>, to: Emitter<T> | ((t: T, k: S4) => Emitter<T>) }
+	): Emitter<T>;
 	change<S1, S2, S3, S4, S5>(
-	    switcher1: { when: inf.IEmitter<eevent<S1>>, to: inf.IEmitter<T> | ((t: T, k: S1) => inf.IEmitter<T>) },
-	    switcher2: { when: inf.IEmitter<eevent<S2>>, to: inf.IEmitter<T> | ((t: T, k: S2) => inf.IEmitter<T>) },
-	    switcher3: { when: inf.IEmitter<eevent<S3>>, to: inf.IEmitter<T> | ((t: T, k: S3) => inf.IEmitter<T>) },
-	    switcher4: { when: inf.IEmitter<eevent<S4>>, to: inf.IEmitter<T> | ((t: T, k: S4) => inf.IEmitter<T>) },
-	    switcher5: { when: inf.IEmitter<eevent<S5>>, to: inf.IEmitter<T> | ((t: T, k: S5) => inf.IEmitter<T>) }
-	): inf.IEmitter<T>;
+	    switcher1: { when: Emitter<ElectricEvent<S1>>, to: Emitter<T> | ((t: T, k: S1) => Emitter<T>) },
+	    switcher2: { when: Emitter<ElectricEvent<S2>>, to: Emitter<T> | ((t: T, k: S2) => Emitter<T>) },
+	    switcher3: { when: Emitter<ElectricEvent<S3>>, to: Emitter<T> | ((t: T, k: S3) => Emitter<T>) },
+	    switcher4: { when: Emitter<ElectricEvent<S4>>, to: Emitter<T> | ((t: T, k: S4) => Emitter<T>) },
+	    switcher5: { when: Emitter<ElectricEvent<S5>>, to: Emitter<T> | ((t: T, k: S5) => Emitter<T>) }
+	): Emitter<T>;
 	change<S1, S2, S3, S4, S5, S6>(
-	    switcher1: { when: inf.IEmitter<eevent<S1>>, to: inf.IEmitter<T> | ((t: T, k: S1) => inf.IEmitter<T>) },
-	    switcher2: { when: inf.IEmitter<eevent<S2>>, to: inf.IEmitter<T> | ((t: T, k: S2) => inf.IEmitter<T>) },
-	    switcher3: { when: inf.IEmitter<eevent<S3>>, to: inf.IEmitter<T> | ((t: T, k: S3) => inf.IEmitter<T>) },
-	    switcher4: { when: inf.IEmitter<eevent<S4>>, to: inf.IEmitter<T> | ((t: T, k: S4) => inf.IEmitter<T>) },
-	    switcher5: { when: inf.IEmitter<eevent<S5>>, to: inf.IEmitter<T> | ((t: T, k: S5) => inf.IEmitter<T>) },
-	    switcher6: { when: inf.IEmitter<eevent<S6>>, to: inf.IEmitter<T> | ((t: T, k: S6) => inf.IEmitter<T>) }
-	): inf.IEmitter<T>;
+	    switcher1: { when: Emitter<ElectricEvent<S1>>, to: Emitter<T> | ((t: T, k: S1) => Emitter<T>) },
+	    switcher2: { when: Emitter<ElectricEvent<S2>>, to: Emitter<T> | ((t: T, k: S2) => Emitter<T>) },
+	    switcher3: { when: Emitter<ElectricEvent<S3>>, to: Emitter<T> | ((t: T, k: S3) => Emitter<T>) },
+	    switcher4: { when: Emitter<ElectricEvent<S4>>, to: Emitter<T> | ((t: T, k: S4) => Emitter<T>) },
+	    switcher5: { when: Emitter<ElectricEvent<S5>>, to: Emitter<T> | ((t: T, k: S5) => Emitter<T>) },
+	    switcher6: { when: Emitter<ElectricEvent<S6>>, to: Emitter<T> | ((t: T, k: S6) => Emitter<T>) }
+	): Emitter<T>;
 	change<S1, S2, S3, S4, S5, S6, S7>(
-	    switcher1: { when: inf.IEmitter<eevent<S1>>, to: inf.IEmitter<T> | ((t: T, k: S1) => inf.IEmitter<T>) },
-	    switcher2: { when: inf.IEmitter<eevent<S2>>, to: inf.IEmitter<T> | ((t: T, k: S2) => inf.IEmitter<T>) },
-	    switcher3: { when: inf.IEmitter<eevent<S3>>, to: inf.IEmitter<T> | ((t: T, k: S3) => inf.IEmitter<T>) },
-	    switcher4: { when: inf.IEmitter<eevent<S4>>, to: inf.IEmitter<T> | ((t: T, k: S4) => inf.IEmitter<T>) },
-	    switcher5: { when: inf.IEmitter<eevent<S5>>, to: inf.IEmitter<T> | ((t: T, k: S5) => inf.IEmitter<T>) },
-	    switcher6: { when: inf.IEmitter<eevent<S6>>, to: inf.IEmitter<T> | ((t: T, k: S6) => inf.IEmitter<T>) },
-	    switcher7: { when: inf.IEmitter<eevent<S7>>, to: inf.IEmitter<T> | ((t: T, k: S7) => inf.IEmitter<T>) }
-	): inf.IEmitter<T>;
+	    switcher1: { when: Emitter<ElectricEvent<S1>>, to: Emitter<T> | ((t: T, k: S1) => Emitter<T>) },
+	    switcher2: { when: Emitter<ElectricEvent<S2>>, to: Emitter<T> | ((t: T, k: S2) => Emitter<T>) },
+	    switcher3: { when: Emitter<ElectricEvent<S3>>, to: Emitter<T> | ((t: T, k: S3) => Emitter<T>) },
+	    switcher4: { when: Emitter<ElectricEvent<S4>>, to: Emitter<T> | ((t: T, k: S4) => Emitter<T>) },
+	    switcher5: { when: Emitter<ElectricEvent<S5>>, to: Emitter<T> | ((t: T, k: S5) => Emitter<T>) },
+	    switcher6: { when: Emitter<ElectricEvent<S6>>, to: Emitter<T> | ((t: T, k: S6) => Emitter<T>) },
+	    switcher7: { when: Emitter<ElectricEvent<S7>>, to: Emitter<T> | ((t: T, k: S7) => Emitter<T>) }
+	): Emitter<T>;
 	change<S1, S2, S3, S4, S5, S6, S7, S8>(
-		switcher1: { when: inf.IEmitter<eevent<S1>>, to: inf.IEmitter<T> | ((t: T, k: S1) => inf.IEmitter<T>) },
-		switcher2: { when: inf.IEmitter<eevent<S2>>, to: inf.IEmitter<T> | ((t: T, k: S2) => inf.IEmitter<T>) },
-		switcher3: { when: inf.IEmitter<eevent<S3>>, to: inf.IEmitter<T> | ((t: T, k: S3) => inf.IEmitter<T>) },
-		switcher4: { when: inf.IEmitter<eevent<S4>>, to: inf.IEmitter<T> | ((t: T, k: S4) => inf.IEmitter<T>) },
-		switcher5: { when: inf.IEmitter<eevent<S5>>, to: inf.IEmitter<T> | ((t: T, k: S5) => inf.IEmitter<T>) },
-		switcher6: { when: inf.IEmitter<eevent<S6>>, to: inf.IEmitter<T> | ((t: T, k: S6) => inf.IEmitter<T>) },
-		switcher7: { when: inf.IEmitter<eevent<S7>>, to: inf.IEmitter<T> | ((t: T, k: S7) => inf.IEmitter<T>) },
-		switcher8: { when: inf.IEmitter<eevent<S8>>, to: inf.IEmitter<T> | ((t: T, k: S8) => inf.IEmitter<T>) }
-	): inf.IEmitter<T>;
+		switcher1: { when: Emitter<ElectricEvent<S1>>, to: Emitter<T> | ((t: T, k: S1) => Emitter<T>) },
+		switcher2: { when: Emitter<ElectricEvent<S2>>, to: Emitter<T> | ((t: T, k: S2) => Emitter<T>) },
+		switcher3: { when: Emitter<ElectricEvent<S3>>, to: Emitter<T> | ((t: T, k: S3) => Emitter<T>) },
+		switcher4: { when: Emitter<ElectricEvent<S4>>, to: Emitter<T> | ((t: T, k: S4) => Emitter<T>) },
+		switcher5: { when: Emitter<ElectricEvent<S5>>, to: Emitter<T> | ((t: T, k: S5) => Emitter<T>) },
+		switcher6: { when: Emitter<ElectricEvent<S6>>, to: Emitter<T> | ((t: T, k: S6) => Emitter<T>) },
+		switcher7: { when: Emitter<ElectricEvent<S7>>, to: Emitter<T> | ((t: T, k: S7) => Emitter<T>) },
+		switcher8: { when: Emitter<ElectricEvent<S8>>, to: Emitter<T> | ((t: T, k: S8) => Emitter<T>) }
+	): Emitter<T>;
 	change<S1, S2, S3, S4, S5, S6, S7, S8, S9>(
-	    switcher1: { when: inf.IEmitter<eevent<S1>>, to: inf.IEmitter<T> | ((t: T, k: S1) => inf.IEmitter<T>) },
-	    switcher2: { when: inf.IEmitter<eevent<S2>>, to: inf.IEmitter<T> | ((t: T, k: S2) => inf.IEmitter<T>) },
-	    switcher3: { when: inf.IEmitter<eevent<S3>>, to: inf.IEmitter<T> | ((t: T, k: S3) => inf.IEmitter<T>) },
-	    switcher4: { when: inf.IEmitter<eevent<S4>>, to: inf.IEmitter<T> | ((t: T, k: S4) => inf.IEmitter<T>) },
-	    switcher5: { when: inf.IEmitter<eevent<S5>>, to: inf.IEmitter<T> | ((t: T, k: S5) => inf.IEmitter<T>) },
-	    switcher6: { when: inf.IEmitter<eevent<S6>>, to: inf.IEmitter<T> | ((t: T, k: S6) => inf.IEmitter<T>) },
-	    switcher7: { when: inf.IEmitter<eevent<S7>>, to: inf.IEmitter<T> | ((t: T, k: S7) => inf.IEmitter<T>) },
-	    switcher8: { when: inf.IEmitter<eevent<S8>>, to: inf.IEmitter<T> | ((t: T, k: S8) => inf.IEmitter<T>) },
-	    switcher9: { when: inf.IEmitter<eevent<S9>>, to: inf.IEmitter<T> | ((t: T, k: S9) => inf.IEmitter<T>) }
-	): inf.IEmitter<T>;
+	    switcher1: { when: Emitter<ElectricEvent<S1>>, to: Emitter<T> | ((t: T, k: S1) => Emitter<T>) },
+	    switcher2: { when: Emitter<ElectricEvent<S2>>, to: Emitter<T> | ((t: T, k: S2) => Emitter<T>) },
+	    switcher3: { when: Emitter<ElectricEvent<S3>>, to: Emitter<T> | ((t: T, k: S3) => Emitter<T>) },
+	    switcher4: { when: Emitter<ElectricEvent<S4>>, to: Emitter<T> | ((t: T, k: S4) => Emitter<T>) },
+	    switcher5: { when: Emitter<ElectricEvent<S5>>, to: Emitter<T> | ((t: T, k: S5) => Emitter<T>) },
+	    switcher6: { when: Emitter<ElectricEvent<S6>>, to: Emitter<T> | ((t: T, k: S6) => Emitter<T>) },
+	    switcher7: { when: Emitter<ElectricEvent<S7>>, to: Emitter<T> | ((t: T, k: S7) => Emitter<T>) },
+	    switcher8: { when: Emitter<ElectricEvent<S8>>, to: Emitter<T> | ((t: T, k: S8) => Emitter<T>) },
+	    switcher9: { when: Emitter<ElectricEvent<S9>>, to: Emitter<T> | ((t: T, k: S9) => Emitter<T>) }
+	): Emitter<T>;
 	change<S1, S2, S3, S4, S5, S6, S7, S8, S9, S10>(
-	    switcher1: { when: inf.IEmitter<eevent<S1>>, to: inf.IEmitter<T> | ((t: T, k: S1) => inf.IEmitter<T>) },
-	    switcher2: { when: inf.IEmitter<eevent<S2>>, to: inf.IEmitter<T> | ((t: T, k: S2) => inf.IEmitter<T>) },
-	    switcher3: { when: inf.IEmitter<eevent<S3>>, to: inf.IEmitter<T> | ((t: T, k: S3) => inf.IEmitter<T>) },
-	    switcher4: { when: inf.IEmitter<eevent<S4>>, to: inf.IEmitter<T> | ((t: T, k: S4) => inf.IEmitter<T>) },
-	    switcher5: { when: inf.IEmitter<eevent<S5>>, to: inf.IEmitter<T> | ((t: T, k: S5) => inf.IEmitter<T>) },
-	    switcher6: { when: inf.IEmitter<eevent<S6>>, to: inf.IEmitter<T> | ((t: T, k: S6) => inf.IEmitter<T>) },
-	    switcher7: { when: inf.IEmitter<eevent<S7>>, to: inf.IEmitter<T> | ((t: T, k: S7) => inf.IEmitter<T>) },
-	    switcher8: { when: inf.IEmitter<eevent<S8>>, to: inf.IEmitter<T> | ((t: T, k: S8) => inf.IEmitter<T>) },
-	    switcher9: { when: inf.IEmitter<eevent<S9>>, to: inf.IEmitter<T> | ((t: T, k: S9) => inf.IEmitter<T>) },
-	    switcher10: { when: inf.IEmitter<eevent<S10>>, to: inf.IEmitter<T> | ((t: T, k: S10) => inf.IEmitter<T>) }
-	): inf.IEmitter<T>;
+	    switcher1: { when: Emitter<ElectricEvent<S1>>, to: Emitter<T> | ((t: T, k: S1) => Emitter<T>) },
+	    switcher2: { when: Emitter<ElectricEvent<S2>>, to: Emitter<T> | ((t: T, k: S2) => Emitter<T>) },
+	    switcher3: { when: Emitter<ElectricEvent<S3>>, to: Emitter<T> | ((t: T, k: S3) => Emitter<T>) },
+	    switcher4: { when: Emitter<ElectricEvent<S4>>, to: Emitter<T> | ((t: T, k: S4) => Emitter<T>) },
+	    switcher5: { when: Emitter<ElectricEvent<S5>>, to: Emitter<T> | ((t: T, k: S5) => Emitter<T>) },
+	    switcher6: { when: Emitter<ElectricEvent<S6>>, to: Emitter<T> | ((t: T, k: S6) => Emitter<T>) },
+	    switcher7: { when: Emitter<ElectricEvent<S7>>, to: Emitter<T> | ((t: T, k: S7) => Emitter<T>) },
+	    switcher8: { when: Emitter<ElectricEvent<S8>>, to: Emitter<T> | ((t: T, k: S8) => Emitter<T>) },
+	    switcher9: { when: Emitter<ElectricEvent<S9>>, to: Emitter<T> | ((t: T, k: S9) => Emitter<T>) },
+	    switcher10: { when: Emitter<ElectricEvent<S10>>, to: Emitter<T> | ((t: T, k: S10) => Emitter<T>) }
+	): Emitter<T>;
 	change<S1, S2, S3, S4, S5, S6, S7, S8, S9, S10, S11>(
-	    switcher1: { when: inf.IEmitter<eevent<S1>>, to: inf.IEmitter<T> | ((t: T, k: S1) => inf.IEmitter<T>) },
-	    switcher2: { when: inf.IEmitter<eevent<S2>>, to: inf.IEmitter<T> | ((t: T, k: S2) => inf.IEmitter<T>) },
-	    switcher3: { when: inf.IEmitter<eevent<S3>>, to: inf.IEmitter<T> | ((t: T, k: S3) => inf.IEmitter<T>) },
-	    switcher4: { when: inf.IEmitter<eevent<S4>>, to: inf.IEmitter<T> | ((t: T, k: S4) => inf.IEmitter<T>) },
-	    switcher5: { when: inf.IEmitter<eevent<S5>>, to: inf.IEmitter<T> | ((t: T, k: S5) => inf.IEmitter<T>) },
-	    switcher6: { when: inf.IEmitter<eevent<S6>>, to: inf.IEmitter<T> | ((t: T, k: S6) => inf.IEmitter<T>) },
-	    switcher7: { when: inf.IEmitter<eevent<S7>>, to: inf.IEmitter<T> | ((t: T, k: S7) => inf.IEmitter<T>) },
-	    switcher8: { when: inf.IEmitter<eevent<S8>>, to: inf.IEmitter<T> | ((t: T, k: S8) => inf.IEmitter<T>) },
-	    switcher9: { when: inf.IEmitter<eevent<S9>>, to: inf.IEmitter<T> | ((t: T, k: S9) => inf.IEmitter<T>) },
-	    switcher10: { when: inf.IEmitter<eevent<S10>>, to: inf.IEmitter<T> | ((t: T, k: S10) => inf.IEmitter<T>) },
-	    switcher11: { when: inf.IEmitter<eevent<S11>>, to: inf.IEmitter<T> | ((t: T, k: S11) => inf.IEmitter<T>) }
-	): inf.IEmitter<T>;
+	    switcher1: { when: Emitter<ElectricEvent<S1>>, to: Emitter<T> | ((t: T, k: S1) => Emitter<T>) },
+	    switcher2: { when: Emitter<ElectricEvent<S2>>, to: Emitter<T> | ((t: T, k: S2) => Emitter<T>) },
+	    switcher3: { when: Emitter<ElectricEvent<S3>>, to: Emitter<T> | ((t: T, k: S3) => Emitter<T>) },
+	    switcher4: { when: Emitter<ElectricEvent<S4>>, to: Emitter<T> | ((t: T, k: S4) => Emitter<T>) },
+	    switcher5: { when: Emitter<ElectricEvent<S5>>, to: Emitter<T> | ((t: T, k: S5) => Emitter<T>) },
+	    switcher6: { when: Emitter<ElectricEvent<S6>>, to: Emitter<T> | ((t: T, k: S6) => Emitter<T>) },
+	    switcher7: { when: Emitter<ElectricEvent<S7>>, to: Emitter<T> | ((t: T, k: S7) => Emitter<T>) },
+	    switcher8: { when: Emitter<ElectricEvent<S8>>, to: Emitter<T> | ((t: T, k: S8) => Emitter<T>) },
+	    switcher9: { when: Emitter<ElectricEvent<S9>>, to: Emitter<T> | ((t: T, k: S9) => Emitter<T>) },
+	    switcher10: { when: Emitter<ElectricEvent<S10>>, to: Emitter<T> | ((t: T, k: S10) => Emitter<T>) },
+	    switcher11: { when: Emitter<ElectricEvent<S11>>, to: Emitter<T> | ((t: T, k: S11) => Emitter<T>) }
+	): Emitter<T>;
 	change<S1, S2, S3, S4, S5, S6, S7, S8, S9, S10, S11, S12>(
-	    switcher1: { when: inf.IEmitter<eevent<S1>>, to: inf.IEmitter<T> | ((t: T, k: S1) => inf.IEmitter<T>) },
-	    switcher2: { when: inf.IEmitter<eevent<S2>>, to: inf.IEmitter<T> | ((t: T, k: S2) => inf.IEmitter<T>) },
-	    switcher3: { when: inf.IEmitter<eevent<S3>>, to: inf.IEmitter<T> | ((t: T, k: S3) => inf.IEmitter<T>) },
-	    switcher4: { when: inf.IEmitter<eevent<S4>>, to: inf.IEmitter<T> | ((t: T, k: S4) => inf.IEmitter<T>) },
-	    switcher5: { when: inf.IEmitter<eevent<S5>>, to: inf.IEmitter<T> | ((t: T, k: S5) => inf.IEmitter<T>) },
-	    switcher6: { when: inf.IEmitter<eevent<S6>>, to: inf.IEmitter<T> | ((t: T, k: S6) => inf.IEmitter<T>) },
-	    switcher7: { when: inf.IEmitter<eevent<S7>>, to: inf.IEmitter<T> | ((t: T, k: S7) => inf.IEmitter<T>) },
-	    switcher8: { when: inf.IEmitter<eevent<S8>>, to: inf.IEmitter<T> | ((t: T, k: S8) => inf.IEmitter<T>) },
-	    switcher9: { when: inf.IEmitter<eevent<S9>>, to: inf.IEmitter<T> | ((t: T, k: S9) => inf.IEmitter<T>) },
-	    switcher10: { when: inf.IEmitter<eevent<S10>>, to: inf.IEmitter<T> | ((t: T, k: S10) => inf.IEmitter<T>) },
-	    switcher11: { when: inf.IEmitter<eevent<S11>>, to: inf.IEmitter<T> | ((t: T, k: S11) => inf.IEmitter<T>) },
-	    switcher12: { when: inf.IEmitter<eevent<S12>>, to: inf.IEmitter<T> | ((t: T, k: S12) => inf.IEmitter<T>) }
-	): inf.IEmitter<T>;
+	    switcher1: { when: Emitter<ElectricEvent<S1>>, to: Emitter<T> | ((t: T, k: S1) => Emitter<T>) },
+	    switcher2: { when: Emitter<ElectricEvent<S2>>, to: Emitter<T> | ((t: T, k: S2) => Emitter<T>) },
+	    switcher3: { when: Emitter<ElectricEvent<S3>>, to: Emitter<T> | ((t: T, k: S3) => Emitter<T>) },
+	    switcher4: { when: Emitter<ElectricEvent<S4>>, to: Emitter<T> | ((t: T, k: S4) => Emitter<T>) },
+	    switcher5: { when: Emitter<ElectricEvent<S5>>, to: Emitter<T> | ((t: T, k: S5) => Emitter<T>) },
+	    switcher6: { when: Emitter<ElectricEvent<S6>>, to: Emitter<T> | ((t: T, k: S6) => Emitter<T>) },
+	    switcher7: { when: Emitter<ElectricEvent<S7>>, to: Emitter<T> | ((t: T, k: S7) => Emitter<T>) },
+	    switcher8: { when: Emitter<ElectricEvent<S8>>, to: Emitter<T> | ((t: T, k: S8) => Emitter<T>) },
+	    switcher9: { when: Emitter<ElectricEvent<S9>>, to: Emitter<T> | ((t: T, k: S9) => Emitter<T>) },
+	    switcher10: { when: Emitter<ElectricEvent<S10>>, to: Emitter<T> | ((t: T, k: S10) => Emitter<T>) },
+	    switcher11: { when: Emitter<ElectricEvent<S11>>, to: Emitter<T> | ((t: T, k: S11) => Emitter<T>) },
+	    switcher12: { when: Emitter<ElectricEvent<S12>>, to: Emitter<T> | ((t: T, k: S12) => Emitter<T>) }
+	): Emitter<T>;
 	change<S1, S2, S3, S4, S5, S6, S7, S8, S9, S10, S11, S12, S13>(
-	    switcher1: { when: inf.IEmitter<eevent<S1>>, to: inf.IEmitter<T> | ((t: T, k: S1) => inf.IEmitter<T>) },
-	    switcher2: { when: inf.IEmitter<eevent<S2>>, to: inf.IEmitter<T> | ((t: T, k: S2) => inf.IEmitter<T>) },
-	    switcher3: { when: inf.IEmitter<eevent<S3>>, to: inf.IEmitter<T> | ((t: T, k: S3) => inf.IEmitter<T>) },
-	    switcher4: { when: inf.IEmitter<eevent<S4>>, to: inf.IEmitter<T> | ((t: T, k: S4) => inf.IEmitter<T>) },
-	    switcher5: { when: inf.IEmitter<eevent<S5>>, to: inf.IEmitter<T> | ((t: T, k: S5) => inf.IEmitter<T>) },
-	    switcher6: { when: inf.IEmitter<eevent<S6>>, to: inf.IEmitter<T> | ((t: T, k: S6) => inf.IEmitter<T>) },
-	    switcher7: { when: inf.IEmitter<eevent<S7>>, to: inf.IEmitter<T> | ((t: T, k: S7) => inf.IEmitter<T>) },
-	    switcher8: { when: inf.IEmitter<eevent<S8>>, to: inf.IEmitter<T> | ((t: T, k: S8) => inf.IEmitter<T>) },
-	    switcher9: { when: inf.IEmitter<eevent<S9>>, to: inf.IEmitter<T> | ((t: T, k: S9) => inf.IEmitter<T>) },
-	    switcher10: { when: inf.IEmitter<eevent<S10>>, to: inf.IEmitter<T> | ((t: T, k: S10) => inf.IEmitter<T>) },
-	    switcher11: { when: inf.IEmitter<eevent<S11>>, to: inf.IEmitter<T> | ((t: T, k: S11) => inf.IEmitter<T>) },
-	    switcher12: { when: inf.IEmitter<eevent<S12>>, to: inf.IEmitter<T> | ((t: T, k: S12) => inf.IEmitter<T>) },
-	    switcher13: { when: inf.IEmitter<eevent<S13>>, to: inf.IEmitter<T> | ((t: T, k: S13) => inf.IEmitter<T>) }
-	): inf.IEmitter<T>;
+	    switcher1: { when: Emitter<ElectricEvent<S1>>, to: Emitter<T> | ((t: T, k: S1) => Emitter<T>) },
+	    switcher2: { when: Emitter<ElectricEvent<S2>>, to: Emitter<T> | ((t: T, k: S2) => Emitter<T>) },
+	    switcher3: { when: Emitter<ElectricEvent<S3>>, to: Emitter<T> | ((t: T, k: S3) => Emitter<T>) },
+	    switcher4: { when: Emitter<ElectricEvent<S4>>, to: Emitter<T> | ((t: T, k: S4) => Emitter<T>) },
+	    switcher5: { when: Emitter<ElectricEvent<S5>>, to: Emitter<T> | ((t: T, k: S5) => Emitter<T>) },
+	    switcher6: { when: Emitter<ElectricEvent<S6>>, to: Emitter<T> | ((t: T, k: S6) => Emitter<T>) },
+	    switcher7: { when: Emitter<ElectricEvent<S7>>, to: Emitter<T> | ((t: T, k: S7) => Emitter<T>) },
+	    switcher8: { when: Emitter<ElectricEvent<S8>>, to: Emitter<T> | ((t: T, k: S8) => Emitter<T>) },
+	    switcher9: { when: Emitter<ElectricEvent<S9>>, to: Emitter<T> | ((t: T, k: S9) => Emitter<T>) },
+	    switcher10: { when: Emitter<ElectricEvent<S10>>, to: Emitter<T> | ((t: T, k: S10) => Emitter<T>) },
+	    switcher11: { when: Emitter<ElectricEvent<S11>>, to: Emitter<T> | ((t: T, k: S11) => Emitter<T>) },
+	    switcher12: { when: Emitter<ElectricEvent<S12>>, to: Emitter<T> | ((t: T, k: S12) => Emitter<T>) },
+	    switcher13: { when: Emitter<ElectricEvent<S13>>, to: Emitter<T> | ((t: T, k: S13) => Emitter<T>) }
+	): Emitter<T>;
 	change<S1, S2, S3, S4, S5, S6, S7, S8, S9, S10, S11, S12, S13, S14>(
-	    switcher1: { when: inf.IEmitter<eevent<S1>>, to: inf.IEmitter<T> | ((t: T, k: S1) => inf.IEmitter<T>) },
-	    switcher2: { when: inf.IEmitter<eevent<S2>>, to: inf.IEmitter<T> | ((t: T, k: S2) => inf.IEmitter<T>) },
-	    switcher3: { when: inf.IEmitter<eevent<S3>>, to: inf.IEmitter<T> | ((t: T, k: S3) => inf.IEmitter<T>) },
-	    switcher4: { when: inf.IEmitter<eevent<S4>>, to: inf.IEmitter<T> | ((t: T, k: S4) => inf.IEmitter<T>) },
-	    switcher5: { when: inf.IEmitter<eevent<S5>>, to: inf.IEmitter<T> | ((t: T, k: S5) => inf.IEmitter<T>) },
-	    switcher6: { when: inf.IEmitter<eevent<S6>>, to: inf.IEmitter<T> | ((t: T, k: S6) => inf.IEmitter<T>) },
-	    switcher7: { when: inf.IEmitter<eevent<S7>>, to: inf.IEmitter<T> | ((t: T, k: S7) => inf.IEmitter<T>) },
-	    switcher8: { when: inf.IEmitter<eevent<S8>>, to: inf.IEmitter<T> | ((t: T, k: S8) => inf.IEmitter<T>) },
-	    switcher9: { when: inf.IEmitter<eevent<S9>>, to: inf.IEmitter<T> | ((t: T, k: S9) => inf.IEmitter<T>) },
-	    switcher10: { when: inf.IEmitter<eevent<S10>>, to: inf.IEmitter<T> | ((t: T, k: S10) => inf.IEmitter<T>) },
-	    switcher11: { when: inf.IEmitter<eevent<S11>>, to: inf.IEmitter<T> | ((t: T, k: S11) => inf.IEmitter<T>) },
-	    switcher12: { when: inf.IEmitter<eevent<S12>>, to: inf.IEmitter<T> | ((t: T, k: S12) => inf.IEmitter<T>) },
-	    switcher13: { when: inf.IEmitter<eevent<S13>>, to: inf.IEmitter<T> | ((t: T, k: S13) => inf.IEmitter<T>) },
-	    switcher14: { when: inf.IEmitter<eevent<S14>>, to: inf.IEmitter<T> | ((t: T, k: S14) => inf.IEmitter<T>) }
-	): inf.IEmitter<T>;
+	    switcher1: { when: Emitter<ElectricEvent<S1>>, to: Emitter<T> | ((t: T, k: S1) => Emitter<T>) },
+	    switcher2: { when: Emitter<ElectricEvent<S2>>, to: Emitter<T> | ((t: T, k: S2) => Emitter<T>) },
+	    switcher3: { when: Emitter<ElectricEvent<S3>>, to: Emitter<T> | ((t: T, k: S3) => Emitter<T>) },
+	    switcher4: { when: Emitter<ElectricEvent<S4>>, to: Emitter<T> | ((t: T, k: S4) => Emitter<T>) },
+	    switcher5: { when: Emitter<ElectricEvent<S5>>, to: Emitter<T> | ((t: T, k: S5) => Emitter<T>) },
+	    switcher6: { when: Emitter<ElectricEvent<S6>>, to: Emitter<T> | ((t: T, k: S6) => Emitter<T>) },
+	    switcher7: { when: Emitter<ElectricEvent<S7>>, to: Emitter<T> | ((t: T, k: S7) => Emitter<T>) },
+	    switcher8: { when: Emitter<ElectricEvent<S8>>, to: Emitter<T> | ((t: T, k: S8) => Emitter<T>) },
+	    switcher9: { when: Emitter<ElectricEvent<S9>>, to: Emitter<T> | ((t: T, k: S9) => Emitter<T>) },
+	    switcher10: { when: Emitter<ElectricEvent<S10>>, to: Emitter<T> | ((t: T, k: S10) => Emitter<T>) },
+	    switcher11: { when: Emitter<ElectricEvent<S11>>, to: Emitter<T> | ((t: T, k: S11) => Emitter<T>) },
+	    switcher12: { when: Emitter<ElectricEvent<S12>>, to: Emitter<T> | ((t: T, k: S12) => Emitter<T>) },
+	    switcher13: { when: Emitter<ElectricEvent<S13>>, to: Emitter<T> | ((t: T, k: S13) => Emitter<T>) },
+	    switcher14: { when: Emitter<ElectricEvent<S14>>, to: Emitter<T> | ((t: T, k: S14) => Emitter<T>) }
+	): Emitter<T>;
 	change<S1, S2, S3, S4, S5, S6, S7, S8, S9, S10, S11, S12, S13, S14, S15>(
-	    switcher1: { when: inf.IEmitter<eevent<S1>>, to: inf.IEmitter<T> | ((t: T, k: S1) => inf.IEmitter<T>) },
-	    switcher2: { when: inf.IEmitter<eevent<S2>>, to: inf.IEmitter<T> | ((t: T, k: S2) => inf.IEmitter<T>) },
-	    switcher3: { when: inf.IEmitter<eevent<S3>>, to: inf.IEmitter<T> | ((t: T, k: S3) => inf.IEmitter<T>) },
-	    switcher4: { when: inf.IEmitter<eevent<S4>>, to: inf.IEmitter<T> | ((t: T, k: S4) => inf.IEmitter<T>) },
-	    switcher5: { when: inf.IEmitter<eevent<S5>>, to: inf.IEmitter<T> | ((t: T, k: S5) => inf.IEmitter<T>) },
-	    switcher6: { when: inf.IEmitter<eevent<S6>>, to: inf.IEmitter<T> | ((t: T, k: S6) => inf.IEmitter<T>) },
-	    switcher7: { when: inf.IEmitter<eevent<S7>>, to: inf.IEmitter<T> | ((t: T, k: S7) => inf.IEmitter<T>) },
-	    switcher8: { when: inf.IEmitter<eevent<S8>>, to: inf.IEmitter<T> | ((t: T, k: S8) => inf.IEmitter<T>) },
-	    switcher9: { when: inf.IEmitter<eevent<S9>>, to: inf.IEmitter<T> | ((t: T, k: S9) => inf.IEmitter<T>) },
-	    switcher10: { when: inf.IEmitter<eevent<S10>>, to: inf.IEmitter<T> | ((t: T, k: S10) => inf.IEmitter<T>) },
-	    switcher11: { when: inf.IEmitter<eevent<S11>>, to: inf.IEmitter<T> | ((t: T, k: S11) => inf.IEmitter<T>) },
-	    switcher12: { when: inf.IEmitter<eevent<S12>>, to: inf.IEmitter<T> | ((t: T, k: S12) => inf.IEmitter<T>) },
-	    switcher13: { when: inf.IEmitter<eevent<S13>>, to: inf.IEmitter<T> | ((t: T, k: S13) => inf.IEmitter<T>) },
-	    switcher14: { when: inf.IEmitter<eevent<S14>>, to: inf.IEmitter<T> | ((t: T, k: S14) => inf.IEmitter<T>) },
-	    switcher15: { when: inf.IEmitter<eevent<S15>>, to: inf.IEmitter<T> | ((t: T, k: S15) => inf.IEmitter<T>) }
-	): inf.IEmitter<T>;
+	    switcher1: { when: Emitter<ElectricEvent<S1>>, to: Emitter<T> | ((t: T, k: S1) => Emitter<T>) },
+	    switcher2: { when: Emitter<ElectricEvent<S2>>, to: Emitter<T> | ((t: T, k: S2) => Emitter<T>) },
+	    switcher3: { when: Emitter<ElectricEvent<S3>>, to: Emitter<T> | ((t: T, k: S3) => Emitter<T>) },
+	    switcher4: { when: Emitter<ElectricEvent<S4>>, to: Emitter<T> | ((t: T, k: S4) => Emitter<T>) },
+	    switcher5: { when: Emitter<ElectricEvent<S5>>, to: Emitter<T> | ((t: T, k: S5) => Emitter<T>) },
+	    switcher6: { when: Emitter<ElectricEvent<S6>>, to: Emitter<T> | ((t: T, k: S6) => Emitter<T>) },
+	    switcher7: { when: Emitter<ElectricEvent<S7>>, to: Emitter<T> | ((t: T, k: S7) => Emitter<T>) },
+	    switcher8: { when: Emitter<ElectricEvent<S8>>, to: Emitter<T> | ((t: T, k: S8) => Emitter<T>) },
+	    switcher9: { when: Emitter<ElectricEvent<S9>>, to: Emitter<T> | ((t: T, k: S9) => Emitter<T>) },
+	    switcher10: { when: Emitter<ElectricEvent<S10>>, to: Emitter<T> | ((t: T, k: S10) => Emitter<T>) },
+	    switcher11: { when: Emitter<ElectricEvent<S11>>, to: Emitter<T> | ((t: T, k: S11) => Emitter<T>) },
+	    switcher12: { when: Emitter<ElectricEvent<S12>>, to: Emitter<T> | ((t: T, k: S12) => Emitter<T>) },
+	    switcher13: { when: Emitter<ElectricEvent<S13>>, to: Emitter<T> | ((t: T, k: S13) => Emitter<T>) },
+	    switcher14: { when: Emitter<ElectricEvent<S14>>, to: Emitter<T> | ((t: T, k: S14) => Emitter<T>) },
+	    switcher15: { when: Emitter<ElectricEvent<S15>>, to: Emitter<T> | ((t: T, k: S15) => Emitter<T>) }
+	): Emitter<T>;
 	change<S1, S2, S3, S4, S5, S6, S7, S8, S9, S10, S11, S12, S13, S14, S15, S16>(
-	    switcher1: { when: inf.IEmitter<eevent<S1>>, to: inf.IEmitter<T> | ((t: T, k: S1) => inf.IEmitter<T>) },
-	    switcher2: { when: inf.IEmitter<eevent<S2>>, to: inf.IEmitter<T> | ((t: T, k: S2) => inf.IEmitter<T>) },
-	    switcher3: { when: inf.IEmitter<eevent<S3>>, to: inf.IEmitter<T> | ((t: T, k: S3) => inf.IEmitter<T>) },
-	    switcher4: { when: inf.IEmitter<eevent<S4>>, to: inf.IEmitter<T> | ((t: T, k: S4) => inf.IEmitter<T>) },
-	    switcher5: { when: inf.IEmitter<eevent<S5>>, to: inf.IEmitter<T> | ((t: T, k: S5) => inf.IEmitter<T>) },
-	    switcher6: { when: inf.IEmitter<eevent<S6>>, to: inf.IEmitter<T> | ((t: T, k: S6) => inf.IEmitter<T>) },
-	    switcher7: { when: inf.IEmitter<eevent<S7>>, to: inf.IEmitter<T> | ((t: T, k: S7) => inf.IEmitter<T>) },
-	    switcher8: { when: inf.IEmitter<eevent<S8>>, to: inf.IEmitter<T> | ((t: T, k: S8) => inf.IEmitter<T>) },
-	    switcher9: { when: inf.IEmitter<eevent<S9>>, to: inf.IEmitter<T> | ((t: T, k: S9) => inf.IEmitter<T>) },
-	    switcher10: { when: inf.IEmitter<eevent<S10>>, to: inf.IEmitter<T> | ((t: T, k: S10) => inf.IEmitter<T>) },
-	    switcher11: { when: inf.IEmitter<eevent<S11>>, to: inf.IEmitter<T> | ((t: T, k: S11) => inf.IEmitter<T>) },
-	    switcher12: { when: inf.IEmitter<eevent<S12>>, to: inf.IEmitter<T> | ((t: T, k: S12) => inf.IEmitter<T>) },
-	    switcher13: { when: inf.IEmitter<eevent<S13>>, to: inf.IEmitter<T> | ((t: T, k: S13) => inf.IEmitter<T>) },
-	    switcher14: { when: inf.IEmitter<eevent<S14>>, to: inf.IEmitter<T> | ((t: T, k: S14) => inf.IEmitter<T>) },
-	    switcher15: { when: inf.IEmitter<eevent<S15>>, to: inf.IEmitter<T> | ((t: T, k: S15) => inf.IEmitter<T>) },
-	    switcher16: { when: inf.IEmitter<eevent<S16>>, to: inf.IEmitter<T> | ((t: T, k: S16) => inf.IEmitter<T>) }
-	): inf.IEmitter<T>;
+	    switcher1: { when: Emitter<ElectricEvent<S1>>, to: Emitter<T> | ((t: T, k: S1) => Emitter<T>) },
+	    switcher2: { when: Emitter<ElectricEvent<S2>>, to: Emitter<T> | ((t: T, k: S2) => Emitter<T>) },
+	    switcher3: { when: Emitter<ElectricEvent<S3>>, to: Emitter<T> | ((t: T, k: S3) => Emitter<T>) },
+	    switcher4: { when: Emitter<ElectricEvent<S4>>, to: Emitter<T> | ((t: T, k: S4) => Emitter<T>) },
+	    switcher5: { when: Emitter<ElectricEvent<S5>>, to: Emitter<T> | ((t: T, k: S5) => Emitter<T>) },
+	    switcher6: { when: Emitter<ElectricEvent<S6>>, to: Emitter<T> | ((t: T, k: S6) => Emitter<T>) },
+	    switcher7: { when: Emitter<ElectricEvent<S7>>, to: Emitter<T> | ((t: T, k: S7) => Emitter<T>) },
+	    switcher8: { when: Emitter<ElectricEvent<S8>>, to: Emitter<T> | ((t: T, k: S8) => Emitter<T>) },
+	    switcher9: { when: Emitter<ElectricEvent<S9>>, to: Emitter<T> | ((t: T, k: S9) => Emitter<T>) },
+	    switcher10: { when: Emitter<ElectricEvent<S10>>, to: Emitter<T> | ((t: T, k: S10) => Emitter<T>) },
+	    switcher11: { when: Emitter<ElectricEvent<S11>>, to: Emitter<T> | ((t: T, k: S11) => Emitter<T>) },
+	    switcher12: { when: Emitter<ElectricEvent<S12>>, to: Emitter<T> | ((t: T, k: S12) => Emitter<T>) },
+	    switcher13: { when: Emitter<ElectricEvent<S13>>, to: Emitter<T> | ((t: T, k: S13) => Emitter<T>) },
+	    switcher14: { when: Emitter<ElectricEvent<S14>>, to: Emitter<T> | ((t: T, k: S14) => Emitter<T>) },
+	    switcher15: { when: Emitter<ElectricEvent<S15>>, to: Emitter<T> | ((t: T, k: S15) => Emitter<T>) },
+	    switcher16: { when: Emitter<ElectricEvent<S16>>, to: Emitter<T> | ((t: T, k: S16) => Emitter<T>) }
+	): Emitter<T>;
 	change<S1, S2, S3, S4, S5, S6, S7, S8, S9, S10, S11, S12, S13, S14, S15, S16, S17>(
-	    switcher1: { when: inf.IEmitter<eevent<S1>>, to: inf.IEmitter<T> | ((t: T, k: S1) => inf.IEmitter<T>) },
-	    switcher2: { when: inf.IEmitter<eevent<S2>>, to: inf.IEmitter<T> | ((t: T, k: S2) => inf.IEmitter<T>) },
-	    switcher3: { when: inf.IEmitter<eevent<S3>>, to: inf.IEmitter<T> | ((t: T, k: S3) => inf.IEmitter<T>) },
-	    switcher4: { when: inf.IEmitter<eevent<S4>>, to: inf.IEmitter<T> | ((t: T, k: S4) => inf.IEmitter<T>) },
-	    switcher5: { when: inf.IEmitter<eevent<S5>>, to: inf.IEmitter<T> | ((t: T, k: S5) => inf.IEmitter<T>) },
-	    switcher6: { when: inf.IEmitter<eevent<S6>>, to: inf.IEmitter<T> | ((t: T, k: S6) => inf.IEmitter<T>) },
-	    switcher7: { when: inf.IEmitter<eevent<S7>>, to: inf.IEmitter<T> | ((t: T, k: S7) => inf.IEmitter<T>) },
-	    switcher8: { when: inf.IEmitter<eevent<S8>>, to: inf.IEmitter<T> | ((t: T, k: S8) => inf.IEmitter<T>) },
-	    switcher9: { when: inf.IEmitter<eevent<S9>>, to: inf.IEmitter<T> | ((t: T, k: S9) => inf.IEmitter<T>) },
-	    switcher10: { when: inf.IEmitter<eevent<S10>>, to: inf.IEmitter<T> | ((t: T, k: S10) => inf.IEmitter<T>) },
-	    switcher11: { when: inf.IEmitter<eevent<S11>>, to: inf.IEmitter<T> | ((t: T, k: S11) => inf.IEmitter<T>) },
-	    switcher12: { when: inf.IEmitter<eevent<S12>>, to: inf.IEmitter<T> | ((t: T, k: S12) => inf.IEmitter<T>) },
-	    switcher13: { when: inf.IEmitter<eevent<S13>>, to: inf.IEmitter<T> | ((t: T, k: S13) => inf.IEmitter<T>) },
-	    switcher14: { when: inf.IEmitter<eevent<S14>>, to: inf.IEmitter<T> | ((t: T, k: S14) => inf.IEmitter<T>) },
-	    switcher15: { when: inf.IEmitter<eevent<S15>>, to: inf.IEmitter<T> | ((t: T, k: S15) => inf.IEmitter<T>) },
-	    switcher16: { when: inf.IEmitter<eevent<S16>>, to: inf.IEmitter<T> | ((t: T, k: S16) => inf.IEmitter<T>) },
-	    switcher17: { when: inf.IEmitter<eevent<S17>>, to: inf.IEmitter<T> | ((t: T, k: S17) => inf.IEmitter<T>) }
-	): inf.IEmitter<T>;
+	    switcher1: { when: Emitter<ElectricEvent<S1>>, to: Emitter<T> | ((t: T, k: S1) => Emitter<T>) },
+	    switcher2: { when: Emitter<ElectricEvent<S2>>, to: Emitter<T> | ((t: T, k: S2) => Emitter<T>) },
+	    switcher3: { when: Emitter<ElectricEvent<S3>>, to: Emitter<T> | ((t: T, k: S3) => Emitter<T>) },
+	    switcher4: { when: Emitter<ElectricEvent<S4>>, to: Emitter<T> | ((t: T, k: S4) => Emitter<T>) },
+	    switcher5: { when: Emitter<ElectricEvent<S5>>, to: Emitter<T> | ((t: T, k: S5) => Emitter<T>) },
+	    switcher6: { when: Emitter<ElectricEvent<S6>>, to: Emitter<T> | ((t: T, k: S6) => Emitter<T>) },
+	    switcher7: { when: Emitter<ElectricEvent<S7>>, to: Emitter<T> | ((t: T, k: S7) => Emitter<T>) },
+	    switcher8: { when: Emitter<ElectricEvent<S8>>, to: Emitter<T> | ((t: T, k: S8) => Emitter<T>) },
+	    switcher9: { when: Emitter<ElectricEvent<S9>>, to: Emitter<T> | ((t: T, k: S9) => Emitter<T>) },
+	    switcher10: { when: Emitter<ElectricEvent<S10>>, to: Emitter<T> | ((t: T, k: S10) => Emitter<T>) },
+	    switcher11: { when: Emitter<ElectricEvent<S11>>, to: Emitter<T> | ((t: T, k: S11) => Emitter<T>) },
+	    switcher12: { when: Emitter<ElectricEvent<S12>>, to: Emitter<T> | ((t: T, k: S12) => Emitter<T>) },
+	    switcher13: { when: Emitter<ElectricEvent<S13>>, to: Emitter<T> | ((t: T, k: S13) => Emitter<T>) },
+	    switcher14: { when: Emitter<ElectricEvent<S14>>, to: Emitter<T> | ((t: T, k: S14) => Emitter<T>) },
+	    switcher15: { when: Emitter<ElectricEvent<S15>>, to: Emitter<T> | ((t: T, k: S15) => Emitter<T>) },
+	    switcher16: { when: Emitter<ElectricEvent<S16>>, to: Emitter<T> | ((t: T, k: S16) => Emitter<T>) },
+	    switcher17: { when: Emitter<ElectricEvent<S17>>, to: Emitter<T> | ((t: T, k: S17) => Emitter<T>) }
+	): Emitter<T>;
 	change<S1, S2, S3, S4, S5, S6, S7, S8, S9, S10, S11, S12, S13, S14, S15, S16, S17, S18>(
-	    switcher1: { when: inf.IEmitter<eevent<S1>>, to: inf.IEmitter<T> | ((t: T, k: S1) => inf.IEmitter<T>) },
-	    switcher2: { when: inf.IEmitter<eevent<S2>>, to: inf.IEmitter<T> | ((t: T, k: S2) => inf.IEmitter<T>) },
-	    switcher3: { when: inf.IEmitter<eevent<S3>>, to: inf.IEmitter<T> | ((t: T, k: S3) => inf.IEmitter<T>) },
-	    switcher4: { when: inf.IEmitter<eevent<S4>>, to: inf.IEmitter<T> | ((t: T, k: S4) => inf.IEmitter<T>) },
-	    switcher5: { when: inf.IEmitter<eevent<S5>>, to: inf.IEmitter<T> | ((t: T, k: S5) => inf.IEmitter<T>) },
-	    switcher6: { when: inf.IEmitter<eevent<S6>>, to: inf.IEmitter<T> | ((t: T, k: S6) => inf.IEmitter<T>) },
-	    switcher7: { when: inf.IEmitter<eevent<S7>>, to: inf.IEmitter<T> | ((t: T, k: S7) => inf.IEmitter<T>) },
-	    switcher8: { when: inf.IEmitter<eevent<S8>>, to: inf.IEmitter<T> | ((t: T, k: S8) => inf.IEmitter<T>) },
-	    switcher9: { when: inf.IEmitter<eevent<S9>>, to: inf.IEmitter<T> | ((t: T, k: S9) => inf.IEmitter<T>) },
-	    switcher10: { when: inf.IEmitter<eevent<S10>>, to: inf.IEmitter<T> | ((t: T, k: S10) => inf.IEmitter<T>) },
-	    switcher11: { when: inf.IEmitter<eevent<S11>>, to: inf.IEmitter<T> | ((t: T, k: S11) => inf.IEmitter<T>) },
-	    switcher12: { when: inf.IEmitter<eevent<S12>>, to: inf.IEmitter<T> | ((t: T, k: S12) => inf.IEmitter<T>) },
-	    switcher13: { when: inf.IEmitter<eevent<S13>>, to: inf.IEmitter<T> | ((t: T, k: S13) => inf.IEmitter<T>) },
-	    switcher14: { when: inf.IEmitter<eevent<S14>>, to: inf.IEmitter<T> | ((t: T, k: S14) => inf.IEmitter<T>) },
-	    switcher15: { when: inf.IEmitter<eevent<S15>>, to: inf.IEmitter<T> | ((t: T, k: S15) => inf.IEmitter<T>) },
-	    switcher16: { when: inf.IEmitter<eevent<S16>>, to: inf.IEmitter<T> | ((t: T, k: S16) => inf.IEmitter<T>) },
-	    switcher17: { when: inf.IEmitter<eevent<S17>>, to: inf.IEmitter<T> | ((t: T, k: S17) => inf.IEmitter<T>) },
-	    switcher18: { when: inf.IEmitter<eevent<S18>>, to: inf.IEmitter<T> | ((t: T, k: S18) => inf.IEmitter<T>) }
-	): inf.IEmitter<T>;
+	    switcher1: { when: Emitter<ElectricEvent<S1>>, to: Emitter<T> | ((t: T, k: S1) => Emitter<T>) },
+	    switcher2: { when: Emitter<ElectricEvent<S2>>, to: Emitter<T> | ((t: T, k: S2) => Emitter<T>) },
+	    switcher3: { when: Emitter<ElectricEvent<S3>>, to: Emitter<T> | ((t: T, k: S3) => Emitter<T>) },
+	    switcher4: { when: Emitter<ElectricEvent<S4>>, to: Emitter<T> | ((t: T, k: S4) => Emitter<T>) },
+	    switcher5: { when: Emitter<ElectricEvent<S5>>, to: Emitter<T> | ((t: T, k: S5) => Emitter<T>) },
+	    switcher6: { when: Emitter<ElectricEvent<S6>>, to: Emitter<T> | ((t: T, k: S6) => Emitter<T>) },
+	    switcher7: { when: Emitter<ElectricEvent<S7>>, to: Emitter<T> | ((t: T, k: S7) => Emitter<T>) },
+	    switcher8: { when: Emitter<ElectricEvent<S8>>, to: Emitter<T> | ((t: T, k: S8) => Emitter<T>) },
+	    switcher9: { when: Emitter<ElectricEvent<S9>>, to: Emitter<T> | ((t: T, k: S9) => Emitter<T>) },
+	    switcher10: { when: Emitter<ElectricEvent<S10>>, to: Emitter<T> | ((t: T, k: S10) => Emitter<T>) },
+	    switcher11: { when: Emitter<ElectricEvent<S11>>, to: Emitter<T> | ((t: T, k: S11) => Emitter<T>) },
+	    switcher12: { when: Emitter<ElectricEvent<S12>>, to: Emitter<T> | ((t: T, k: S12) => Emitter<T>) },
+	    switcher13: { when: Emitter<ElectricEvent<S13>>, to: Emitter<T> | ((t: T, k: S13) => Emitter<T>) },
+	    switcher14: { when: Emitter<ElectricEvent<S14>>, to: Emitter<T> | ((t: T, k: S14) => Emitter<T>) },
+	    switcher15: { when: Emitter<ElectricEvent<S15>>, to: Emitter<T> | ((t: T, k: S15) => Emitter<T>) },
+	    switcher16: { when: Emitter<ElectricEvent<S16>>, to: Emitter<T> | ((t: T, k: S16) => Emitter<T>) },
+	    switcher17: { when: Emitter<ElectricEvent<S17>>, to: Emitter<T> | ((t: T, k: S17) => Emitter<T>) },
+	    switcher18: { when: Emitter<ElectricEvent<S18>>, to: Emitter<T> | ((t: T, k: S18) => Emitter<T>) }
+	): Emitter<T>;
 	change<S1, S2, S3, S4, S5, S6, S7, S8, S9, S10, S11, S12, S13, S14, S15, S16, S17, S18, S19>(
-	    switcher1: { when: inf.IEmitter<eevent<S1>>, to: inf.IEmitter<T> | ((t: T, k: S1) => inf.IEmitter<T>) },
-	    switcher2: { when: inf.IEmitter<eevent<S2>>, to: inf.IEmitter<T> | ((t: T, k: S2) => inf.IEmitter<T>) },
-	    switcher3: { when: inf.IEmitter<eevent<S3>>, to: inf.IEmitter<T> | ((t: T, k: S3) => inf.IEmitter<T>) },
-	    switcher4: { when: inf.IEmitter<eevent<S4>>, to: inf.IEmitter<T> | ((t: T, k: S4) => inf.IEmitter<T>) },
-	    switcher5: { when: inf.IEmitter<eevent<S5>>, to: inf.IEmitter<T> | ((t: T, k: S5) => inf.IEmitter<T>) },
-	    switcher6: { when: inf.IEmitter<eevent<S6>>, to: inf.IEmitter<T> | ((t: T, k: S6) => inf.IEmitter<T>) },
-	    switcher7: { when: inf.IEmitter<eevent<S7>>, to: inf.IEmitter<T> | ((t: T, k: S7) => inf.IEmitter<T>) },
-	    switcher8: { when: inf.IEmitter<eevent<S8>>, to: inf.IEmitter<T> | ((t: T, k: S8) => inf.IEmitter<T>) },
-	    switcher9: { when: inf.IEmitter<eevent<S9>>, to: inf.IEmitter<T> | ((t: T, k: S9) => inf.IEmitter<T>) },
-	    switcher10: { when: inf.IEmitter<eevent<S10>>, to: inf.IEmitter<T> | ((t: T, k: S10) => inf.IEmitter<T>) },
-	    switcher11: { when: inf.IEmitter<eevent<S11>>, to: inf.IEmitter<T> | ((t: T, k: S11) => inf.IEmitter<T>) },
-	    switcher12: { when: inf.IEmitter<eevent<S12>>, to: inf.IEmitter<T> | ((t: T, k: S12) => inf.IEmitter<T>) },
-	    switcher13: { when: inf.IEmitter<eevent<S13>>, to: inf.IEmitter<T> | ((t: T, k: S13) => inf.IEmitter<T>) },
-	    switcher14: { when: inf.IEmitter<eevent<S14>>, to: inf.IEmitter<T> | ((t: T, k: S14) => inf.IEmitter<T>) },
-	    switcher15: { when: inf.IEmitter<eevent<S15>>, to: inf.IEmitter<T> | ((t: T, k: S15) => inf.IEmitter<T>) },
-	    switcher16: { when: inf.IEmitter<eevent<S16>>, to: inf.IEmitter<T> | ((t: T, k: S16) => inf.IEmitter<T>) },
-	    switcher17: { when: inf.IEmitter<eevent<S17>>, to: inf.IEmitter<T> | ((t: T, k: S17) => inf.IEmitter<T>) },
-	    switcher18: { when: inf.IEmitter<eevent<S18>>, to: inf.IEmitter<T> | ((t: T, k: S18) => inf.IEmitter<T>) },
-	    switcher19: { when: inf.IEmitter<eevent<S19>>, to: inf.IEmitter<T> | ((t: T, k: S19) => inf.IEmitter<T>) }
-	): inf.IEmitter<T>;
+	    switcher1: { when: Emitter<ElectricEvent<S1>>, to: Emitter<T> | ((t: T, k: S1) => Emitter<T>) },
+	    switcher2: { when: Emitter<ElectricEvent<S2>>, to: Emitter<T> | ((t: T, k: S2) => Emitter<T>) },
+	    switcher3: { when: Emitter<ElectricEvent<S3>>, to: Emitter<T> | ((t: T, k: S3) => Emitter<T>) },
+	    switcher4: { when: Emitter<ElectricEvent<S4>>, to: Emitter<T> | ((t: T, k: S4) => Emitter<T>) },
+	    switcher5: { when: Emitter<ElectricEvent<S5>>, to: Emitter<T> | ((t: T, k: S5) => Emitter<T>) },
+	    switcher6: { when: Emitter<ElectricEvent<S6>>, to: Emitter<T> | ((t: T, k: S6) => Emitter<T>) },
+	    switcher7: { when: Emitter<ElectricEvent<S7>>, to: Emitter<T> | ((t: T, k: S7) => Emitter<T>) },
+	    switcher8: { when: Emitter<ElectricEvent<S8>>, to: Emitter<T> | ((t: T, k: S8) => Emitter<T>) },
+	    switcher9: { when: Emitter<ElectricEvent<S9>>, to: Emitter<T> | ((t: T, k: S9) => Emitter<T>) },
+	    switcher10: { when: Emitter<ElectricEvent<S10>>, to: Emitter<T> | ((t: T, k: S10) => Emitter<T>) },
+	    switcher11: { when: Emitter<ElectricEvent<S11>>, to: Emitter<T> | ((t: T, k: S11) => Emitter<T>) },
+	    switcher12: { when: Emitter<ElectricEvent<S12>>, to: Emitter<T> | ((t: T, k: S12) => Emitter<T>) },
+	    switcher13: { when: Emitter<ElectricEvent<S13>>, to: Emitter<T> | ((t: T, k: S13) => Emitter<T>) },
+	    switcher14: { when: Emitter<ElectricEvent<S14>>, to: Emitter<T> | ((t: T, k: S14) => Emitter<T>) },
+	    switcher15: { when: Emitter<ElectricEvent<S15>>, to: Emitter<T> | ((t: T, k: S15) => Emitter<T>) },
+	    switcher16: { when: Emitter<ElectricEvent<S16>>, to: Emitter<T> | ((t: T, k: S16) => Emitter<T>) },
+	    switcher17: { when: Emitter<ElectricEvent<S17>>, to: Emitter<T> | ((t: T, k: S17) => Emitter<T>) },
+	    switcher18: { when: Emitter<ElectricEvent<S18>>, to: Emitter<T> | ((t: T, k: S18) => Emitter<T>) },
+	    switcher19: { when: Emitter<ElectricEvent<S19>>, to: Emitter<T> | ((t: T, k: S19) => Emitter<T>) }
+	): Emitter<T>;
 	change<S1, S2, S3, S4, S5, S6, S7, S8, S9, S10, S11, S12, S13, S14, S15, S16, S17, S18, S19, S20>(
-	    switcher1: { when: inf.IEmitter<eevent<S1>>, to: inf.IEmitter<T> | ((t: T, k: S1) => inf.IEmitter<T>) },
-	    switcher2: { when: inf.IEmitter<eevent<S2>>, to: inf.IEmitter<T> | ((t: T, k: S2) => inf.IEmitter<T>) },
-	    switcher3: { when: inf.IEmitter<eevent<S3>>, to: inf.IEmitter<T> | ((t: T, k: S3) => inf.IEmitter<T>) },
-	    switcher4: { when: inf.IEmitter<eevent<S4>>, to: inf.IEmitter<T> | ((t: T, k: S4) => inf.IEmitter<T>) },
-	    switcher5: { when: inf.IEmitter<eevent<S5>>, to: inf.IEmitter<T> | ((t: T, k: S5) => inf.IEmitter<T>) },
-	    switcher6: { when: inf.IEmitter<eevent<S6>>, to: inf.IEmitter<T> | ((t: T, k: S6) => inf.IEmitter<T>) },
-	    switcher7: { when: inf.IEmitter<eevent<S7>>, to: inf.IEmitter<T> | ((t: T, k: S7) => inf.IEmitter<T>) },
-	    switcher8: { when: inf.IEmitter<eevent<S8>>, to: inf.IEmitter<T> | ((t: T, k: S8) => inf.IEmitter<T>) },
-	    switcher9: { when: inf.IEmitter<eevent<S9>>, to: inf.IEmitter<T> | ((t: T, k: S9) => inf.IEmitter<T>) },
-	    switcher10: { when: inf.IEmitter<eevent<S10>>, to: inf.IEmitter<T> | ((t: T, k: S10) => inf.IEmitter<T>) },
-	    switcher11: { when: inf.IEmitter<eevent<S11>>, to: inf.IEmitter<T> | ((t: T, k: S11) => inf.IEmitter<T>) },
-	    switcher12: { when: inf.IEmitter<eevent<S12>>, to: inf.IEmitter<T> | ((t: T, k: S12) => inf.IEmitter<T>) },
-	    switcher13: { when: inf.IEmitter<eevent<S13>>, to: inf.IEmitter<T> | ((t: T, k: S13) => inf.IEmitter<T>) },
-	    switcher14: { when: inf.IEmitter<eevent<S14>>, to: inf.IEmitter<T> | ((t: T, k: S14) => inf.IEmitter<T>) },
-	    switcher15: { when: inf.IEmitter<eevent<S15>>, to: inf.IEmitter<T> | ((t: T, k: S15) => inf.IEmitter<T>) },
-	    switcher16: { when: inf.IEmitter<eevent<S16>>, to: inf.IEmitter<T> | ((t: T, k: S16) => inf.IEmitter<T>) },
-	    switcher17: { when: inf.IEmitter<eevent<S17>>, to: inf.IEmitter<T> | ((t: T, k: S17) => inf.IEmitter<T>) },
-	    switcher18: { when: inf.IEmitter<eevent<S18>>, to: inf.IEmitter<T> | ((t: T, k: S18) => inf.IEmitter<T>) },
-	    switcher19: { when: inf.IEmitter<eevent<S19>>, to: inf.IEmitter<T> | ((t: T, k: S19) => inf.IEmitter<T>) },
-	    switcher20: { when: inf.IEmitter<eevent<S20>>, to: inf.IEmitter<T> | ((t: T, k: S20) => inf.IEmitter<T>) }
-	): inf.IEmitter<T>;
+	    switcher1: { when: Emitter<ElectricEvent<S1>>, to: Emitter<T> | ((t: T, k: S1) => Emitter<T>) },
+	    switcher2: { when: Emitter<ElectricEvent<S2>>, to: Emitter<T> | ((t: T, k: S2) => Emitter<T>) },
+	    switcher3: { when: Emitter<ElectricEvent<S3>>, to: Emitter<T> | ((t: T, k: S3) => Emitter<T>) },
+	    switcher4: { when: Emitter<ElectricEvent<S4>>, to: Emitter<T> | ((t: T, k: S4) => Emitter<T>) },
+	    switcher5: { when: Emitter<ElectricEvent<S5>>, to: Emitter<T> | ((t: T, k: S5) => Emitter<T>) },
+	    switcher6: { when: Emitter<ElectricEvent<S6>>, to: Emitter<T> | ((t: T, k: S6) => Emitter<T>) },
+	    switcher7: { when: Emitter<ElectricEvent<S7>>, to: Emitter<T> | ((t: T, k: S7) => Emitter<T>) },
+	    switcher8: { when: Emitter<ElectricEvent<S8>>, to: Emitter<T> | ((t: T, k: S8) => Emitter<T>) },
+	    switcher9: { when: Emitter<ElectricEvent<S9>>, to: Emitter<T> | ((t: T, k: S9) => Emitter<T>) },
+	    switcher10: { when: Emitter<ElectricEvent<S10>>, to: Emitter<T> | ((t: T, k: S10) => Emitter<T>) },
+	    switcher11: { when: Emitter<ElectricEvent<S11>>, to: Emitter<T> | ((t: T, k: S11) => Emitter<T>) },
+	    switcher12: { when: Emitter<ElectricEvent<S12>>, to: Emitter<T> | ((t: T, k: S12) => Emitter<T>) },
+	    switcher13: { when: Emitter<ElectricEvent<S13>>, to: Emitter<T> | ((t: T, k: S13) => Emitter<T>) },
+	    switcher14: { when: Emitter<ElectricEvent<S14>>, to: Emitter<T> | ((t: T, k: S14) => Emitter<T>) },
+	    switcher15: { when: Emitter<ElectricEvent<S15>>, to: Emitter<T> | ((t: T, k: S15) => Emitter<T>) },
+	    switcher16: { when: Emitter<ElectricEvent<S16>>, to: Emitter<T> | ((t: T, k: S16) => Emitter<T>) },
+	    switcher17: { when: Emitter<ElectricEvent<S17>>, to: Emitter<T> | ((t: T, k: S17) => Emitter<T>) },
+	    switcher18: { when: Emitter<ElectricEvent<S18>>, to: Emitter<T> | ((t: T, k: S18) => Emitter<T>) },
+	    switcher19: { when: Emitter<ElectricEvent<S19>>, to: Emitter<T> | ((t: T, k: S19) => Emitter<T>) },
+	    switcher20: { when: Emitter<ElectricEvent<S20>>, to: Emitter<T> | ((t: T, k: S20) => Emitter<T>) }
+	): Emitter<T>;
 	change(...switchers: {
-		when: inf.IEmitter<eevent<any>>,
-		to: inf.IEmitter<T> | ((t: T, k: any) => inf.IEmitter<T>)
-	}[]): inf.IEmitter<T> {
+		when: Emitter<ElectricEvent<any>>,
+		to: Emitter<T> | ((t: T, k: any) => Emitter<T>)
+	}[]): Emitter<T> {
 		return namedTransformator(
 			'changeToWhen',
-			[<inf.IEmitter<any>>this].concat(switchers.map(s => s.when)),
+			[<Emitter<any>>this].concat(switchers.map(s => s.when)),
 			transformators.change(switchers),
 			this._currentValue
 		);
 	}
 }
 
-export function emitter<T>(initialValue: T): Emitter<T> {
-	return new Emitter(initialValue);
+function _dispatch() {
+	q.dispatch();
+	q = queue.empty();
 }
 
-class ManualEmitter<Out>
-	extends Emitter<Out>
+export class ManualEmitter<Out>
+	extends ConcreteEmitter<Out>
 {
 	emit(v: Out) {
-		scheduler.scheduleTimeout(() => super.emit(v), 0);
+		scheduler.scheduleTimeout(() => {
+			super.emit(v);
+			q.dispatch();
+			q = queue.empty();
+		}, 0);
 	}
+
 	impulse(v: Out) {
-		scheduler.scheduleTimeout(() => super.impulse(v), 0);
+		scheduler.scheduleTimeout(() => {
+			super.impulse(v);
+			q.dispatch();
+			q = queue.empty();
+		}, 0);
 	}
+
 	stabilize() {
 		super.stabilize();
 		this.emit = this.emit;
@@ -536,30 +554,40 @@ export function manual<T>(initialValue: T, name?: string): ManualEmitter<T> {
 	return e;
 }
 
-export function constant<T>(value: T): inf.IEmitter<T> {
-	var e = new Emitter(value);
+export function constant<T>(value: T): Emitter<T> {
+	var e = new ConcreteEmitter(value);
 	e.name = `constant(${value})`;
 	return e;
 }
 
-
 export interface EventEmitter<T>
-	extends inf.IEmitter<eevent<T>> {
+	extends Emitter<ElectricEvent<T>> {
+}
+
+export interface ManualEventEmitter<T>
+	extends EventEmitter<T>
+{
 	impulse(value: T): void;
 }
 
-export function manualEvent<T>(name?: string): EventEmitter<T> {
+
+export function manualEvent<T>(initialValue?: T, name?: string): ManualEventEmitter<T> {
+	// initialValue doesn nothing it just to ease up
+	// typing
+	// instead of var e = <Emitter<ElectricEvent<T>>>manualEvent()
+	// you can do var e = manualEvent(<T>null)
+
 	// manual event emitter should
 	// pack impulsed values into event
 	// and not allow to emit values
 	// it's done by monkey patching ManualEmitter
-	var e = manual(eevent.notHappend);
+	var e = manual(ElectricEvent.notHappened);
 	var oldImpulse = e.impulse;
-	(<any>e).impulse = (v: T) => oldImpulse.apply(e, [eevent.of(v)]);
+	(<any>e).impulse = (v: T) => oldImpulse.apply(e, [ElectricEvent.of(v)]);
 	(<any>e).emit = (v: T) => {
 		throw Error("can't emit from event emitter, only impulse");
 	};
-	e.name = name || 'manualEvent';
+	e.name = name || 'manual event';
 	// monkey patching requires ugly casting...
 	return <any>e;
 }
@@ -569,8 +597,9 @@ type Identifier = number;
 
 interface ITransformGeneratorFunction<In> {
 	(
-		emit: inf.IEmitterFunction<any>,
-		impulse: inf.IEmitterFunction<any>
+		emit: EmitFunction<any>,
+		impulse: EmitFunction<any>,
+		dispatch: () => void
 	): ITransformFunction<In>
 }
 
@@ -578,17 +607,17 @@ interface ITransformFunction<In> {
 	(values: Array<In>, index: Identifier): void;
 }
 
-export class Transformator<In>
-	extends Emitter<any>
-	implements inf.IReceiver<In>
+export class Transformator<In, Out>
+	extends ConcreteEmitter<Out>
+	implements receiver.Receiver<In>
 {
 	protected _wires: Array<Wire<In>>;
 	private _values: Array<In>;
 
 	constructor(
-		emitters: Array<inf.IEmitter<In>>,
-		transform: ITransformGeneratorFunction<In> = undefined,
-		initialValue: any = undefined
+		emitters: Array<Emitter<In>>,
+		initialValue: Out,
+		transform: ITransformGeneratorFunction<In> = undefined
 	) {
 		super(initialValue);
 		this.name = 'transformator'
@@ -600,37 +629,41 @@ export class Transformator<In>
 		this.plugEmitters(emitters);
 	}
 
-	toString() {
-		return `< ${this.name} = ${this.dirtyCurrentValue().toString()} >`;
+	toString(includeCurrentValue = false) {
+		if (includeCurrentValue) {
+			return `< ${this.name} = ${this.dirtyCurrentValue().toString()} >`;
+		}
+		return `< ${this.name} >`;
 	}
 
 	setTransform(transform: ITransformGeneratorFunction<In>) {
 		this._transform = transform(
 			(x: any) => this.emit(x),
-			(x: any) => this.impulse(x)
+			(x: any) => this.impulse(x),
+			_dispatch
 		);
 	}
 
 	private _transform(values: Array<In>, index: Identifier) {
 		// Default implementation that just passes values
 		// Should be overwritten in functions that create Transformators
-		this.emit(values[index]);
+		this.emit(<Out><any>values[index]);
 	}
 
-	private plugEmitters(emitters: Array<inf.IEmitter<In>>) {
+	private plugEmitters(emitters: Array<Emitter<In>>) {
 		emitters.forEach(e => this.wire(e));
 		for (var i = 0; i < emitters.length; i++) {
 			this._values[i] = emitters[i].dirtyCurrentValue();
 		}
 	}
 
-	plugEmitter(emitter: inf.IEmitter<In>) {
+	plugEmitter(emitter: Emitter<In>) {
 		this.wire(emitter);
 		this._values[this._wires.length - 1] = emitter.dirtyCurrentValue();
 		return this._wires.length - 1;
 	}
 
-	unplugEmitter(emitter: inf.IEmitter<In>) {
+	unplugEmitter(emitter: Emitter<In>) {
 		this._wires.filter(w => w.input === emitter).forEach(w => w.unplug());
 	}
 
@@ -641,7 +674,7 @@ export class Transformator<In>
 		this._values.splice(start, this._values.length);
 	}
 
-	wire(emitter: inf.IEmitter<any>) {
+	wire(emitter: Emitter<any>) {
 		var index = this._wires.length;
 		this._wires[index] = new Wire(
 			emitter,
@@ -652,7 +685,7 @@ export class Transformator<In>
 		return this._wires[index];
 	}
 
-	_dirtyGetWireTo(emitter: inf.IEmitter<any>) {
+	_dirtyGetWireTo(emitter: Emitter<any>) {
 		return this._wires.filter(w => w.input === emitter)[0];
 	}
 
@@ -667,13 +700,13 @@ export class Transformator<In>
 }
 
 
-export function namedTransformator<In>(
+export function namedTransformator<In, Out>(
 	name: string,
-	emitters: Array<inf.IEmitter<In>>,
+	emitters: Emitter<In>[],
 	transform: ITransformGeneratorFunction<In> = undefined,
-	initialValue?: any
+	initialValue?: Out
 ) {
-	var t = new Transformator(emitters, transform, initialValue);
+	var t = new Transformator(emitters, initialValue, transform);
 	t.name = name;
 	return t;
 }

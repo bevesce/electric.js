@@ -1,5 +1,3 @@
-import inf = require('../../../src/interfaces');
-
 import item = require('./item');
 import counter = require('./counter');
 import electric = require('../../../src/electric');
@@ -9,15 +7,15 @@ export = collection;
 
 
 function collection(
-	initialTasks: inf.IEmitter<eevent<item[]>>,
+	initialTasks: electric.emitter.EventEmitter<item[]>,
 	input: {
-		insert: inf.IEmitter<eevent<string>>,
-		check: inf.IEmitter<eevent<{ id: number, completed: boolean }>>,
-		toggle: inf.IEmitter<eevent<boolean>>,
-		retitle: inf.IEmitter<eevent<{ id: number, title: string }>>,
-		del: inf.IEmitter<eevent<number>>,
-		clear: inf.IEmitter<eevent<{}>>,
-		filter: inf.IEmitter<string>
+		insert: electric.emitter.EventEmitter<string>,
+		check: electric.emitter.EventEmitter<{ id: number, completed: boolean }>,
+		toggle: electric.emitter.EventEmitter<boolean>,
+		retitle: electric.emitter.EventEmitter<{ id: number, title: string }>,
+		del: electric.emitter.EventEmitter<number>,
+		clear: electric.emitter.EventEmitter<{}>,
+		filter: electric.emitter.Emitter<string>
 	}
 ) {
 	var ac = electric.emitter.placeholder(13);
@@ -28,7 +26,7 @@ function collection(
 		},
 		ac, cc, input.toggle
 	);
-	var insert: inf.IEmitter<eevent<item>> = notEmpty(input.insert);
+	var insert = notEmpty(input.insert);
 
 	var tasks = electric.emitter.constant([]).change(
 		{ to: appended, when: insert },
@@ -63,13 +61,13 @@ function collection(
 	};
 };
 
-function notEmpty(insert: inf.IEmitter<eevent<string>>) {
+function notEmpty(insert: electric.emitter.Emitter<eevent<string>>) {
 	return insert.map(v => v.flattenMap(text => {
 		text = text.trim();
 		if (text !== '') {
 			return eevent.of(item.of(text))
 		}
-		return eevent.notHappend
+		return eevent.notHappened
 	}));
 }
 
@@ -92,7 +90,7 @@ function matchMap<T>(
 
 function checked(
 	items: item[], arg: { id: number, completed: boolean }
-): inf.IEmitter<item[]> {
+): electric.emitter.Emitter<item[]> {
 	return cont(matchMap(
 		items,
 		v => v.id() === arg.id,

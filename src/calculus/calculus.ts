@@ -1,4 +1,4 @@
-import inf = require('../interfaces');
+import electric = require('../electric');
 import clock = require('../clock');
 import scheduler = require('../scheduler');
 import transformator = require('../transformator');
@@ -27,9 +27,9 @@ export interface IntegrableAntiderivative
 
 export function integral<In extends Integrable, Out extends Antiderivative>(
 	initialValue: Out,
-	emitter: inf.IEmitter<In>,
+	emitter: electric.emitter.Emitter<In>,
 	options: TimeOptions
-): inf.IEmitter<Out> {
+): electric.emitter.Emitter<Out> {
 	var timmed = timeValue(emitter, options);
 	var acc = timmed.accumulate(
 		{
@@ -69,9 +69,9 @@ export interface Derivative {
 
 export function differential<In extends Differentiable, Out extends Derivative>(
 	initialValue: Out,
-	emitter: inf.IEmitter<In>,
+	emitter: electric.emitter.Emitter<In>,
 	options: TimeOptions
-): inf.IEmitter<Out>{
+): electric.emitter.Emitter<Out>{
 	var timmed = timeValue(emitter, options);
 	var result = timmed.accumulate(
 		{
@@ -100,9 +100,9 @@ export function differential<In extends Differentiable, Out extends Derivative>(
 
 
 function timeValue<T>(
-	emitter: inf.IEmitter<T>,
+	emitter: electric.emitter.Emitter<T>,
 	options: TimeOptions
-): inf.IEmitter<{ value: T, time: number }> {
+): electric.emitter.Emitter<{ value: T, time: number }> {
 	var time = clock.time(options);
 	var trans =  transformator.map(
 		(t, v) => ({ time: t, value: v }),

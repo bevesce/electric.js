@@ -28,11 +28,17 @@ var Placeholder = (function () {
     function Placeholder(initialValue) {
         this._actions = [];
         this.initialValue = initialValue;
-        this.name = '| placeholder >';
+        this.name = '? placeholder ?';
     }
-    Placeholder.prototype.toString = function () {
-        var subname = this._emitter ? this._emitter.toString() : "| ? = " + this.dirtyCurrentValue() + " >";
-        return "placeholder: " + subname;
+    Placeholder.prototype.toString = function (showCurrentValue) {
+        if (showCurrentValue === void 0) { showCurrentValue = false; }
+        if (this._emitter) {
+            return 'placeholder: ' + this._emitter.toString(showCurrentValue);
+        }
+        else if (showCurrentValue) {
+            return "? placeholder = " + this.dirtyCurrentValue() + " >";
+        }
+        return '? placeholder >';
     };
     Placeholder.prototype.is = function (emitter) {
         if (this._emitter) {
@@ -52,7 +58,7 @@ var Placeholder = (function () {
         else if (this.initialValue !== undefined) {
             return this.initialValue;
         }
-        throw Error('called dirtyCurrentValue() on placeholder without initial value');
+        throw Error('called dirtyCurrentValue() on placeholder without initial value ' + this.name);
     };
     return Placeholder;
 })();
@@ -80,6 +86,7 @@ function doOrQueueAndReturnPlaceholder(name) {
         }
         else {
             var p = placeholder();
+            p.name = p.name + ' ' + name + ' >';
             this._actions.push(function (emitter) {
                 p.is(emitter[name].apply(emitter, args));
             });

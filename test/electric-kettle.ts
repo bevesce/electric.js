@@ -97,7 +97,7 @@ function doneIfWaiting(
 }
 
 function pullFromQueueExecuteAndCheck(chai: any, utils: any, queue: any, show: any) {
-    return function(value: any) {
+    return function boil(value: any) {
         while (!queue.isDone(utils) && queue.top().kind === 'after') {
             queue.pop().value();
         }

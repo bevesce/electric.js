@@ -4,10 +4,10 @@ import electric = require('../../../src/electric');
 
 export = tasksRendererReceiver;
 
-var check: electric.emitter.EventEmitter<{ id: number, completed: boolean }>;
-var del: electric.emitter.EventEmitter<number>;
-var editing: electric.emitter.EventEmitter<number>;
-var retitle: electric.emitter.EventEmitter<{ id: number, title: string }>;
+var check: electric.emitter.ManualEventEmitter<{ id: number, completed: boolean }>;
+var del: electric.emitter.ManualEventEmitter<number>;
+var editing: electric.emitter.ManualEventEmitter<number>;
+var retitle: electric.emitter.ManualEventEmitter<{ id: number, title: string }>;
 
 function tasksRendererReceiver(del_: any, retitle_: any, editing_: any, check_: any) {
 	del = del_;

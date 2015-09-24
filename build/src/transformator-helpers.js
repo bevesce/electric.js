@@ -62,12 +62,13 @@ exports.accumulate = accumulate;
 ;
 function transformTime(timeTransformation, t0) {
     // var firstEmitted = false;
-    return function transform(emit) {
+    return function transform(emit, impulse, dispatch) {
         return function timeTransform(v, i) {
             var delay = timeTransformation(scheduler.now() - t0) + t0 - scheduler.now();
             var toEmit = v[i];
             scheduler.scheduleTimeout(function () {
                 emit(toEmit);
+                dispatch();
             }, delay);
         };
     };
@@ -76,7 +77,7 @@ exports.transformTime = transformTime;
 function sample() {
     return function transform(emit) {
         return function sampleTransform(v, i) {
-            if (i > 0 && v[i].happend) {
+            if (i > 0 && v[i].happened) {
                 emit(v[0]);
             }
         };
@@ -91,11 +92,12 @@ function change(switchers) {
             if (i == 0) {
                 emit(v[0]);
             }
-            else if (v[i].happend) {
+            else if (v[i].happened) {
                 this._wires[0].unplug();
                 var to = switchers[i - 1].to;
                 var e = callIfFunction(to, v[0], v[i].value);
                 this._wires[0] = new Wire(e, this, function (x) { return _this.receiveOn(x, 0); });
+                this.receiveOn(e.dirtyCurrentValue(), 0);
             }
         };
     };
@@ -103,15 +105,15 @@ function change(switchers) {
 exports.change = change;
 function when(happens, then) {
     return function transform(emit, impulse) {
-        var prevHappend = false;
+        var prevhappened = false;
         return function whenTransform(v, i) {
-            var happend = happens(v[i]);
-            if (happend && !prevHappend) {
+            var happened = happens(v[i]);
+            if (happened && !prevhappened) {
                 impulse(eevent.of(then(v[i])));
-                prevHappend = true;
+                prevhappened = true;
             }
-            else if (!happend) {
-                prevHappend = false;
+            else if (!happened) {
+                prevhappened = false;
             }
         };
     };
@@ -119,15 +121,15 @@ function when(happens, then) {
 exports.when = when;
 function whenThen(happens) {
     return function transform(emit, impulse) {
-        var prevHappend;
+        var prevhappened;
         return function whenTransform(v, i) {
-            var happend = happens(v[i]);
-            if (happend && !prevHappend) {
-                impulse(eevent.of(happend));
-                prevHappend = happend;
+            var happened = happens(v[i]);
+            if (happened && !prevhappened) {
+                impulse(eevent.of(happened));
+                prevhappened = happened;
             }
-            else if (!happend) {
-                prevHappend = null;
+            else if (!happened) {
+                prevhappened = null;
             }
         };
     };
@@ -138,7 +140,7 @@ function cumulateOverTime(delayInMiliseconds) {
         var accumulated = [];
         var accumulating = false;
         return function throttleTransform(v, i) {
-            if (!v[i].happend) {
+            if (!v[i].happened) {
                 return;
             }
             accumulated.push(v[i].value);

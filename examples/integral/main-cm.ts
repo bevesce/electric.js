@@ -35,7 +35,7 @@ var sT = electric.calculus.integral(shift(0), vT, interval);
 
 var x0 = 0;
 electric.clock.intervalValue(5, { inMs: intervalInMs }).plugReceiver(function(a) {
-    if (!a.happend) {
+    if (!a.happened) {
         return;
     }
     bar(x0, <number>a.value, 0);

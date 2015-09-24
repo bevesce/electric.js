@@ -1,13 +1,13 @@
-import inf = require('../interfaces');
 import electric = require('../electric');
+import ElectricEvent = require('../electric-event')
 
 export = createArrayDevice;
 
 
 function createArrayDevice<T>(input: {
-	inserts: inf.IEmitter<inf.IElectricEvent<T>>,
-	deletes: inf.IEmitter<inf.IElectricEvent<number>>,
-	edits: inf.IEmitter<inf.IElectricEvent<{ index: number, value: T }>>,
+	inserts: electric.emitter.Emitter<ElectricEvent<T>>,
+	deletes: electric.emitter.Emitter<ElectricEvent<number>>,
+	edits: electric.emitter.Emitter<ElectricEvent<{ index: number, value: T }>>,
 }) {
 	var constant = electric.emitter.constant;
 	function insert(items: any[], value: any) {
@@ -28,7 +28,7 @@ function createArrayDevice<T>(input: {
 	var newItem = input.inserts;
 	var deleteItem = input.deletes;
 	var editItem = input.edits;
-	var items: inf.IEmitter<T[]> = constant(<T[]>[]).change(
+	var items: electric.emitter.Emitter<T[]> = constant(<T[]>[]).change(
 		{ to: (items: T[], value: T) => insert(items, value), when: newItem },
 		{ to: (items: T[], index: number) => remove(items, index), when: deleteItem },
 		{ to: (items: T[], newObj: {index: number, value: T}) => edit(items, newObj.index, newObj.value), when: editItem }

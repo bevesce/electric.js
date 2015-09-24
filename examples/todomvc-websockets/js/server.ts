@@ -59,7 +59,9 @@ function forEach(
 io.on('connection', function(socket: any) {
 	forEach(
 		inputs,
-		(name: string, emitter: electric.emitter.EventEmitter<any>) => socket.on(name, emitter.impulse)
+		(name: string, emitter: electric.emitter.ManualEventEmitter<any>) => {
+			socket.on(name, emitter.impulse)
+		}
 	);
 	var initialTasks = tasks.all.dirtyCurrentValue();
 	var initialChanges = initialTasks.map(Change.appendTask);

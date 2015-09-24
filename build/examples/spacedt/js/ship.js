@@ -1,6 +1,5 @@
 var electric = require('../../../src/electric');
 var eevent = require('../../../src/electric-event');
-var eui = require('../../../src/emitters/ui');
 var calculus = require('../../../src/calculus/calculus');
 var IntegrableAntiderivativeOfTwoNumbers = require('../../../src/calculus/integrable-antiderivative-of-two-numbers');
 var c = require('./constants');
@@ -13,17 +12,29 @@ function shipVelocity(x, y) {
     return IntegrableAntiderivativeOfTwoNumbers.of(x, y, Point.of, c.ship.vbounds);
 }
 function create(startingPoint, input) {
-    var shipA = cont(shipAcceleration(0, 0)).change({ to: function (a, _) { return cont(a.withX(-c.ship.acceleration.angular)); }, when: input.rotateLeft }, { to: function (a, _) { return cont(a.withX(c.ship.acceleration.angular)); }, when: input.rotateRight }, { to: function (a, _) { return cont(a.withX(0)); }, when: input.stopRotateRight }, { to: function (a, _) { return cont(a.withX(0)); }, when: input.stopRotateLeft }, { to: function (a, _) { return cont(a.withY(-c.ship.acceleration.de)); }, when: input.deccelerate }, { to: function (a, _) { return cont(a.withY(c.ship.acceleration.linear)); }, when: input.accelerate }, { to: function (a, _) { return cont(a.withY(0)); }, when: input.stopAcceleration }, { to: function (a, _) { return cont(a.withY(0)); }, when: input.stopDecceleration });
-    shipA.name = 'ship acceleration';
-    var shipV = calculus.integral(shipVelocity(0, 0), shipA, { fps: c.fps }).change({ to: function (v, _) { return calculus.integral(v.withX(0), shipA, { fps: c.fps }); }, when: input.stopRotateRight.transformTime(eevent.notHappend, function (t) { return t + 10; }) }, { to: function (v, _) { return calculus.integral(v.withX(0), shipA, { fps: c.fps }); }, when: input.stopRotateLeft.transformTime(eevent.notHappend, function (t) { return t + 10; }) });
-    shipV.name = 'ship velocity';
-    var shipXYA = calculus.integral(startingPoint, shipV, { fps: c.fps });
-    shipXYA.name = 'ship position';
-    var shot = electric.transformator.map(function (space, xya, v) { return space.map(function (_) { return ({ xya: xya, velocity: v }); }); }, eui.key('space', 'up'), shipXYA, shipV);
+    var fps = { fps: c.fps };
+    var acceleration = cont(shipAcceleration(0, 0)).change({ to: function (a, _) { return cont(a.withX(-c.ship.acceleration.angular)); },
+        when: input.rotateLeft }, { to: function (a, _) { return cont(a.withX(c.ship.acceleration.angular)); },
+        when: input.rotateRight }, { to: function (a, _) { return cont(a.withY(c.ship.acceleration.linear)); },
+        when: input.accelerate }, { to: function (a, _) { return cont(a.withY(-c.ship.acceleration.de)); },
+        when: input.deccelerate }, { to: function (a, _) { return cont(a.withY(0)); },
+        when: input.stopAcceleration }, { to: function (a, _) { return cont(a.withY(0)); },
+        when: input.stopDecceleration }, { to: function (a, _) { return cont(a.withX(0)); },
+        when: input.stopRotation });
+    acceleration.name = 'ship acceleration';
+    var velocity = calculus.integral(shipVelocity(0, 0), acceleration, fps).change({
+        to: function (v, _) { return calculus.integral(v.withX(0), acceleration, fps); },
+        when: input.stopRotation.transformTime(eevent.notHappened, function (t) { return t + c.ship.rotationStopDelay; })
+    });
+    velocity.name = 'ship velocity';
+    var position = calculus.integral(startingPoint, velocity, fps);
+    position.name = 'ship position';
+    var shot = electric.transformator.map(function (space, xya, v) { return space.map(function (_) { return ({ xya: xya, velocity: v }); }); }, input.shoot, position, velocity);
+    shot.name = 'shot';
     return {
-        a: shipA,
-        v: shipV,
-        xya: shipXYA,
+        a: acceleration,
+        v: velocity,
+        xya: position,
         shot: shot
     };
 }

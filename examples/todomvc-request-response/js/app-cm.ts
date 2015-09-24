@@ -1,5 +1,3 @@
-import inf = require('../../../src/interfaces');
-
 import item = require('./item');
 import electric = require('../../../src/electric');
 import eevent = require('../../../src/electric-event');
@@ -11,16 +9,16 @@ import eui = require('../../../src/emitters/ui');
 var hash = eui.hash();
 var newTask = eui.enteredText('new-task');
 var clear = eui.clicks('clear-button');
-var check = <electric.emitter.EventEmitter<{ id: number, completed: boolean }>>electric.emitter.manualEvent('check');
-var del = <electric.emitter.EventEmitter<number>>electric.emitter.manualEvent('delete');
+var check = electric.emitter.manualEvent(<{ id: number, completed: boolean }>null, 'check');
+var del = electric.emitter.manualEvent(<number>null, 'delete');
 var toggle = eui.checkboxClicks('toggle');
-var editingStart = <electric.emitter.EventEmitter<number>>electric.emitter.manualEvent('editing start');
-var retitle = <electric.emitter.EventEmitter<{ id: number, title: string }>>electric.emitter.manualEvent('retitle');
+var editingStart = electric.emitter.manualEvent(<number>null, 'editing start');
+var retitle = electric.emitter.manualEvent(<{ id: number, title: string }>null, 'retitle');
 var syncButtonClick = eui.clicks('sync-button');
 
 
 // Transformators
-var initialTasks = electric.emitter.placeholder(eevent.notHappend);
+var initialTasks = electric.emitter.placeholder(eevent.notHappened);
 
 import tasksDevice = require('./tasks-device');
 var tasks = tasksDevice(
@@ -168,3 +166,6 @@ function disable(element: Element) {
 function enable(element: Element) {
 	element.removeAttribute('disabled');
 }
+
+var g = electric.graph.of(sync.state, 3);
+console.log(g.stringify());

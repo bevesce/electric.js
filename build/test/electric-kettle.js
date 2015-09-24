@@ -89,7 +89,7 @@ function doneIfWaiting(done, waitFor, howLongToWait) {
     return done;
 }
 function pullFromQueueExecuteAndCheck(chai, utils, queue, show) {
-    return function (value) {
+    return function boil(value) {
         while (!queue.isDone(utils) && queue.top().kind === 'after') {
             queue.pop().value();
         }

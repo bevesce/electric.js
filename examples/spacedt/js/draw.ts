@@ -67,5 +67,5 @@ export function gameOver(width: number, height: number) {
 	_ctx.beginPath();
 	_ctx.font = 'bold 48px Avenir, sans-serif';
 	_ctx.fillStyle = c.collision.color;
-	_ctx.fillText('∫GAME OVERdt', random(0, width - 300), random(50, height - 50))
+	_ctx.fillText('GAME OVER', random(0, width - 300), random(50, height - 50))
 }

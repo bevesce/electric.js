@@ -19,23 +19,23 @@ describe('clock', function () {
     it('should time intervals', function (done) {
         var time = sh.stop();
         expect(clock.interval({ inMs: 1 }))
-            .to.emit(electric.event.notHappend)
+            .to.emit(electric.event.notHappened)
             .after(function () { return sh.advance(3); })
             .to.emit(electric.event.of(time + 1))
-            .to.emit(electric.event.notHappend)
+            .to.emit(electric.event.notHappened)
             .to.emit(electric.event.of(time + 2))
-            .to.emit(electric.event.notHappend)
+            .to.emit(electric.event.notHappened)
             .andBe(done);
     });
     it('should time intervals with value', function (done) {
         var time = sh.stop();
         expect(clock.intervalValue('test', { inMs: 1 }))
-            .to.emit(electric.event.notHappend)
+            .to.emit(electric.event.notHappened)
             .after(function () { return sh.advance(3); })
             .to.emit(electric.event.of('test'))
-            .to.emit(electric.event.notHappend)
+            .to.emit(electric.event.notHappened)
             .to.emit(electric.event.of('test'))
-            .to.emit(electric.event.notHappend)
+            .to.emit(electric.event.notHappened)
             .andBe(done);
     });
     it('should strop measuring time after stabilization', function (done) {
@@ -45,6 +45,16 @@ describe('clock', function () {
             .to.emit(time)
             .after(function () { return timer.stabilize(); })
             .after(function () { return sh.advance(3); })
+            .andBe(done);
+    });
+    it('should count down to one event', function (done) {
+        var time = sh.stop();
+        var once = clock.once(1, '!');
+        expect(once)
+            .to.emit(electric.event.notHappened)
+            .then.after(function () { return sh.advance(2); })
+            .to.emit(electric.event.of('!'))
+            .then.to.emit(electric.event.notHappened)
             .andBe(done);
     });
 });

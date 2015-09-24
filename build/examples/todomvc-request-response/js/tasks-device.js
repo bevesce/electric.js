@@ -33,7 +33,7 @@ function notEmpty(insert) {
         if (text !== '') {
             return eevent.of(item.of(text));
         }
-        return eevent.notHappend;
+        return eevent.notHappened;
     }); });
 }
 function appended(items, newItem) {

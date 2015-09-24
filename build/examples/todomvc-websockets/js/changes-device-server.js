@@ -22,23 +22,23 @@ function collection(initialTasks, input) {
     var $ = eevent.lift;
     var changes = electric.transformator.merge(
     // append
-    insert.map($(function (t) { return [Change.append(t.id(), t.isCompleted(), t.title())]; })), 
+    insert.map($(function (t) { return [Change.append(t.id(), t.isCompleted(), t.title())]; })),
     // check
-    input.check.map($(function (t) { return [Change.check(t.id, t.completed)]; })), 
+    input.check.map($(function (t) { return [Change.check(t.id, t.completed)]; })),
     // toggle
     electric.transformator.map(function (toggle, tasks) { return toggle.flattenMap(function (toWhat) {
         var toggledTasks = tasks.filter(function (t) { return t.isCompleted() != toWhat; });
         var changes = toggledTasks.map(function (t) { return Change.check(t.id(), toWhat); });
-        return changes.length > 0 ? eevent.of(changes) : eevent.notHappend;
-    }); }, toggleTo, tasks), 
+        return changes.length > 0 ? eevent.of(changes) : eevent.notHappened;
+    }); }, toggleTo, tasks),
     // retitle
-    input.retitle.map($(function (rt) { return [Change.retitle(rt.id, rt.title)]; })), 
+    input.retitle.map($(function (rt) { return [Change.retitle(rt.id, rt.title)]; })),
     // remove
-    input.del.map($(function (id) { return [Change.remove(id)]; })), 
+    input.del.map($(function (id) { return [Change.remove(id)]; })),
     // clear
     electric.transformator.map(function (clear, tasks) { return clear.flattenMap(function (_) {
         var changes = onlyCompleted(tasks).map(function (t) { return Change.remove(t.id()); });
-        return changes.length > 0 ? eevent.of(changes) : eevent.notHappend;
+        return changes.length > 0 ? eevent.of(changes) : eevent.notHappened;
     }); }, input.clear, tasks));
     var allCount = tasks.map(function (ts) { return ts.length; });
     ac.is(allCount);
@@ -58,11 +58,11 @@ function notEmpty(insert) {
         if (text !== '') {
             return eevent.of(item.of(text));
         }
-        return eevent.notHappend;
+        return eevent.notHappened;
     }); });
 }
 function applyChanges(tasks, changes) {
-    if (!changes.happend) {
+    if (!changes.happened) {
         return tasks;
     }
     var cs = changes.value;

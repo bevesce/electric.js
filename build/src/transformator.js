@@ -1,10 +1,10 @@
 var emitter = require('./emitter');
-var namedTransformator = emitter.namedTransformator;
 var transformators = require('./transformator-helpers');
 var eevent = require('../src/electric-event');
 var fn = require('./utils/fn');
 var mapObj = require('./utils/map-obj');
 var objKeys = require('./utils/objKeys');
+var namedTransformator = emitter.namedTransformator;
 function map(mapping, emitter1, emitter2, emitter3, emitter4, emitter5, emitter6, emitter7) {
     var emitters = Array.prototype.slice.apply(arguments, [1]);
     return namedTransformator("map(" + fn(mapping) + ")", emitters, transformators.map(mapping, emitters.length), mapping.apply(null, emitters.map(function (e) { return e.dirtyCurrentValue(); })));
@@ -45,14 +45,21 @@ function merge() {
     return namedTransformator('merge', emitters, transformators.merge(), emitters[0].dirtyCurrentValue());
 }
 exports.merge = merge;
-function cumulateOverTime(emitter, overInMs) {
-    return namedTransformator("cumulateOverTime(" + overInMs + "ms)", [emitter], transformators.cumulateOverTime(overInMs), eevent.notHappend);
-}
-exports.cumulateOverTime = cumulateOverTime;
+// export function cumulateOverTime<T>(
+//     emitter: emitter.Emitter<eevent<T>>,
+//     overInMs: number
+// ): emitter.Emitter <eevent<T[]>> {
+//     return namedTransformator(
+//         `cumulateOverTime(${overInMs}ms)`,
+//         [emitter],
+//         transformators.cumulateOverTime(overInMs),
+//         eevent.notHappened
+//     );
+// }
 function hold(initialValue, emitter) {
     function transform(emit) {
         return function holdTransform(v, i) {
-            if (v[i].happend) {
+            if (v[i].happened) {
                 emit(v[i].value);
             }
         };
@@ -62,14 +69,14 @@ function hold(initialValue, emitter) {
 exports.hold = hold;
 ;
 function changes(emitter) {
-    return namedTransformator('changes', [emitter], transformators.changes(emitter.dirtyCurrentValue()), eevent.notHappend);
+    return namedTransformator('changes', [emitter], transformators.changes(emitter.dirtyCurrentValue()), eevent.notHappened);
 }
 exports.changes = changes;
 function skipFirst(emitter) {
     function transform(emit, impulse) {
         var skipped = false;
         return function skipFirstTransform(v, i) {
-            if (v[i].happend) {
+            if (v[i].happened) {
                 if (skipped) {
                     impulse(v[i]);
                 }
@@ -79,7 +86,7 @@ function skipFirst(emitter) {
             }
         };
     }
-    return namedTransformator('skip(1)', [emitter], transform, eevent.notHappend);
+    return namedTransformator('skip(1)', [emitter], transform, eevent.notHappened);
 }
 exports.skipFirst = skipFirst;
 ;
@@ -158,3 +165,19 @@ function flattenNamed(emitter) {
     return transformator;
 }
 exports.flattenNamed = flattenNamed;
+function unglitch(emitter) {
+    var transformator = namedTransformator('unglitch', [emitter], transform, emitter.dirtyCurrentValue());
+    function transform(emit) {
+        var value;
+        return function unglitchTransform(v, i) {
+            value = v[i];
+            setTimeout(function () {
+                emit(value);
+            }, 0);
+        };
+    }
+    ;
+    return transformator;
+}
+exports.unglitch = unglitch;
+;

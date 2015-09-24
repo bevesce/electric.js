@@ -11,6 +11,6 @@ export function restoreTasks() {
 	return [];
 }
 
-export function tasksReceiver(tasks: item[]) {
+export function saveTaskToStorage(tasks: item[]) {
 	localStorage.setItem(TASK_KEY, JSON.stringify(tasks));
 }

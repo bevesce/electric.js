@@ -1,5 +1,3 @@
-import inf = require('../../../src/interfaces');
-
 import item = require('./item');
 import electric = require('../../../src/electric');
 import eevent = require('../../../src/electric-event');
@@ -14,11 +12,11 @@ import dom = require('./dom');
 var hash = eui.hash();
 var newTask = eui.enteredText('new-task');
 var clear = eui.clicks('clear-button');
-var check = <electric.emitter.EventEmitter<{ id: number, completed: boolean }>>electric.emitter.manualEvent('check');
-var del = <electric.emitter.EventEmitter<number>>electric.emitter.manualEvent('delete');
+var check = electric.emitter.manualEvent(<{ id: number, completed: boolean }>null, 'check');
+var del = electric.emitter.manualEvent(<number>null, 'delete');
 var toggle = eui.checkboxClicks('toggle');
-var editingStart = <electric.emitter.EventEmitter<number>>electric.emitter.manualEvent('editing start');
-var retitle = <electric.emitter.EventEmitter<{ id: number, title: string }>>electric.emitter.manualEvent('retitle');
+var editingStart = electric.emitter.manualEvent(<number>null, 'editing start');
+var retitle = electric.emitter.manualEvent(<{ id: number, title: string }>null, 'retitle');
 
 // Transformators
 import tasksDevice = require('./changes-device');
@@ -48,22 +46,8 @@ electric.transformator.map(
 	tasks.visible, editingId, tasks.changes.visible
 ).plugReceiver(changesRendererReceiver(del, retitle, editingStart, check));
 
-
-//// Tasks Renderer Receiver
-// var editingId = electric.emitter.constant(undefined).change(
-// 	{ to: (_, k) => electric.emitter.constant(k), when: editingStart },
-// 	{ to: electric.emitter.constant(undefined), when: retitle },
-// 	{ to: electric.emitter.constant(undefined), when: del }
-// );
-
-// import tasksRendererReceiver = require('./tasks-receiver');
-// electric.transformator.map(
-// 	(ts, editingId) => ({tasks: ts, editing: editingId}),
-// 	tasks.visible, editingId
-// ).plugReceiver(tasksRendererReceiver(del, retitle, editingStart, check));
-
 //// Other
-tasks.all.plugReceiver(storage.tasksReceiver);
+tasks.all.plugReceiver(storage.saveTasksToStorage);
 
 newTask.plugReceiver(clearInput);
 function clearInput(_: any) {
@@ -131,3 +115,6 @@ function footerFiltersReceiver() {
 		previousRoute = route;
 	};
 };
+
+var g = electric.graph.of(tasks.all);
+console.log(g.stringify());

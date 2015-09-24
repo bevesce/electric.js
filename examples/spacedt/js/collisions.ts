@@ -1,4 +1,3 @@
-import inf = require('../../../src/interfaces');
 import electric = require('../../../src/electric');
 
 import c = require('./constants');
@@ -19,17 +18,18 @@ interface PreCollision {
 
 
 function create(input: {
-	asteroidsXY: inf.IEmitter<Point[]>,
-	bulletsXY: inf.IEmitter<Point[]>,
-	motherXY: inf.IEmitter<Point>,
-	shipXY: inf.IEmitter<Point>,
+	asteroidsXY: electric.emitter.Emitter<Point[]>,
+	bulletsXY: electric.emitter.Emitter<Point[]>,
+	motherXY: electric.emitter.Emitter<Point>,
+	shipXY: electric.emitter.Emitter<Point>,
 }) {
 	var checkBulletBullet = checkIfCollidingWithDistance(c.bullet.radius + c.bullet.radius);
 	var bulletBullet = input.bulletsXY.whenThen(
-		bullets => collisionCenterMiddle(
+		bullets => collisionCenterInMiddle(
 			checkIfCollidingInOneArray(checkBulletBullet, bullets)
 		)
 	);
+	bulletBullet.name = 'bullet-bullet colission'
 
 	var checkBulletShip = checkIfCollidingWithDistance(c.bullet.radius + c.ship.radius);
 	var bulletsXYshipXY = map(
@@ -37,10 +37,11 @@ function create(input: {
 		input.bulletsXY, input.shipXY
 	)
 	var bulletShip = bulletsXYshipXY.whenThen(
-		(a) => collisionCenterFirstPoint(
+		(a) => collisionCenterAtFirstPoint(
 			checkIfCollidingInArrayVsPoint(checkBulletShip, a.points, a.point)
 		)
 	);
+	bulletBullet.name = 'bullet-ship colission'
 
 	var checkShipAsteroid = checkIfCollidingWithDistance(c.ship.radius + c.asteroid.radius);
 	var shipXYasteroidsXY = map(
@@ -48,7 +49,7 @@ function create(input: {
 		input.shipXY, input.asteroidsXY
 	);
 	var shipAsteroid = shipXYasteroidsXY.whenThen(
-		(a) => collisionCenterMiddle(
+		(a) => collisionCenterInMiddle(
 			checkIfCollidingInArrayVsPoint(checkShipAsteroid, a.points, a.point)
 		)
 	);
@@ -59,10 +60,11 @@ function create(input: {
 		input.bulletsXY, input.asteroidsXY
 	);
 	var bulletAsteroid = bulletsXYasteroidsXY.whenThen(
-		(a) => collisionCenterSecondPoint(
+		(a) => collisionCenterAtSecondPoint(
 			checkIfCollidingBetweenTwoArrays(checkBulletAsteroid, a.points1, a.points2)
 		)
 	);
+	bulletBullet.name = 'bullet-asteroid colission'
 
 	var checkBulletMother = checkIfCollidingWithDistance(c.bullet.radius + c.asteroidMother.radius);
 	var bulletsXYmotherXY = electric.transformator.map(
@@ -70,20 +72,28 @@ function create(input: {
 		input.bulletsXY, input.motherXY
 	)
 	var bulletMother = bulletsXYmotherXY.whenThen(
-		(a) => collisionCenterFirstPoint(
+		(a) => collisionCenterAtFirstPoint(
 			checkIfCollidingInArrayVsPoint(checkBulletMother, a.points, a.point)
 		)
 	);
+	bulletBullet.name = 'bullet-mother colission'
+
 	var checkShipMother = checkIfCollidingWithDistance(c.ship.radius + c.asteroidMother.radius);
 	var shipXYmotherXY = electric.transformator.map(
 		(s, m) => ({ point1: s, point2: m }),
 		input.shipXY, input.motherXY
 	)
 	var shipMother = shipXYmotherXY.whenThen(
-		(a) => collisionCenterFirstPoint(
+		(a) => collisionCenterAtFirstPoint(
 			checkIfCollidingPoints(checkShipMother, a.point1, a.point2)
 		)
 	)
+	bulletBullet.name = 'bullet-bullet collisions'
+	bulletAsteroid.name = 'bullet-asteroid collisions'
+	bulletMother.name = 'bullet-mother collisions'
+	shipMother.name = 'ship-mother collisions'
+	bulletShip.name = 'bullet-ship collisions'
+	shipAsteroid.name = 'ship-asteroid collisions'
 
 	var all = electric.transformator.merge(
 		bulletBullet,
@@ -93,10 +103,12 @@ function create(input: {
 		bulletShip,
 		shipAsteroid
 	);
+	all.name = 'all collisions';
 
 	var gameEnding = electric.transformator.merge(
 		shipMother, shipAsteroid, bulletShip
 	);
+	gameEnding.name = 'game ending collisions'
 
 	return {
 		all: all,
@@ -124,7 +136,9 @@ function create(input: {
 }
 
 
-function checkIfCollidingPoints(check: (p1: Point, p2: Point) => boolean, point1: Point, point2: Point) {
+function checkIfCollidingPoints(
+	check: (p1: Point, p2: Point) => boolean, point1: Point, point2: Point
+) {
 	if (check(point1, point2)) {
 		return {
 			index1: 0,
@@ -136,7 +150,9 @@ function checkIfCollidingPoints(check: (p1: Point, p2: Point) => boolean, point1
 }
 
 
-function checkIfCollidingInOneArray(check: (p1: Point, p2: Point) => boolean, points: Point[]) {
+function checkIfCollidingInOneArray(
+	check: (p1: Point, p2: Point) => boolean, points: Point[]
+) {
 	for (var i = 0; i < points.length; i++) {
 		var point1 = points[i];
 		for (var j = i + 1; j < points.length; j++) {
@@ -153,7 +169,9 @@ function checkIfCollidingInOneArray(check: (p1: Point, p2: Point) => boolean, po
 	}
 }
 
-function checkIfCollidingInArrayVsPoint(check: (p1: Point, p2: Point) => boolean, points: Point[], point: Point) {
+function checkIfCollidingInArrayVsPoint(
+	check: (p1: Point, p2: Point) => boolean, points: Point[], point: Point
+) {
 	for (var i = 0; i < points.length; i++) {
 		var point1 = points[i];
 		if (check(point1, point)) {
@@ -167,7 +185,9 @@ function checkIfCollidingInArrayVsPoint(check: (p1: Point, p2: Point) => boolean
 	}
 }
 
-function checkIfCollidingBetweenTwoArrays(check: (p1: Point, p2: Point) => boolean, points1: Point[], points2: Point[]) {
+function checkIfCollidingBetweenTwoArrays(
+	check: (p1: Point, p2: Point) => boolean, points1: Point[], points2: Point[]
+) {
 	for (var i = 0; i < points1.length; i++) {
 		var point1 = points1[i];
 		for (var j = 0; j < points2.length; j++) {
@@ -184,7 +204,7 @@ function checkIfCollidingBetweenTwoArrays(check: (p1: Point, p2: Point) => boole
 	}
 }
 
-function collisionCenterFirstPoint(collision: PreCollision | void) {
+function collisionCenterAtFirstPoint(collision: PreCollision | void) {
 	if (collision === undefined) {
 		return;
 	}
@@ -196,7 +216,7 @@ function collisionCenterFirstPoint(collision: PreCollision | void) {
 	}
 }
 
-function collisionCenterSecondPoint(collision: PreCollision | void) {
+function collisionCenterAtSecondPoint(collision: PreCollision | void) {
 	if (collision === undefined) {
 		return;
 	}
@@ -208,7 +228,7 @@ function collisionCenterSecondPoint(collision: PreCollision | void) {
 	}
 }
 
-function collisionCenterMiddle(collision: PreCollision | void) {
+function collisionCenterInMiddle(collision: PreCollision | void) {
 	if (collision === undefined) {
 		return;
 	}

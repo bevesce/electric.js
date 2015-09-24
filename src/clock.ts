@@ -1,4 +1,3 @@
-import inf = require('./interfaces');
 import scheduler = require('./scheduler');
 import emitter = require('./emitter');
 
@@ -18,7 +17,7 @@ export function interval(
 export function intervalValue<T>(
 	value: T, options: { inMs?: number, fps?: number }
 ) {
-	var timer = emitter.manualEvent();
+	var timer = emitter.manualEvent(<T>null);
 	var id = scheduler.scheduleInterval(() => {
 		timer.impulse(value)
 	}, calculateInterval(options.inMs, options.fps))
@@ -27,9 +26,35 @@ export function intervalValue<T>(
 	return timer;
 }
 
+export function once<T>(
+	inMs: number, value: T
+) {
+	var timer = emitter.manualEvent(<T>null);
+	var id = scheduler.scheduleTimeout(() => {
+		timer.impulse(value)
+	}, inMs);
+	timer.name = `once(${inMs} ms, ${value})`;
+	timer.setReleaseResources(() => scheduler.unscheduleInterval(id));
+	return timer;
+}
+
+
+export function intervalOfRandom(
+	min: number, max: number,
+	options: { inMs?: number, fps?: number }
+) {
+	var timer = emitter.manualEvent(<number>null);
+	var id = scheduler.scheduleInterval(() => {
+		timer.impulse(random(min, max))
+	}, calculateInterval(options.inMs, options.fps))
+	timer.name = `intervalOfRandom(${min}-${max}, ${calculateEmitterName(options)})`;
+	timer.setReleaseResources(() => scheduler.unscheduleInterval(id));
+	return timer;
+}
+
 export function time(
 	options: { intervalInMs?: number, fps?: number }
-): inf.IEmitter<number> {
+): emitter.Emitter<number> {
 	var interval = calculateInterval(options.intervalInMs, options.fps);
 	var timeEmitter = emitter.manual(scheduler.now());
 	var id = scheduler.scheduleInterval(
@@ -60,4 +85,9 @@ function calculateEmitterName(options: { inMs?: number, intervalInMs?: number, f
 	else {
 		return 'interval: ' + options.intervalInMs + 'ms';
 	}
+}
+
+
+function random(min: number, max: number) {
+    return Math.random() * (max - min) + min;
 }

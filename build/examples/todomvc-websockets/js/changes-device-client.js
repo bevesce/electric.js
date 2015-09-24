@@ -45,7 +45,7 @@ function collection(input) {
 function visibilityChangesOfTask(tasks, f) {
     var changes = [];
     if (f.previous === f.next) {
-        return eevent.notHappend;
+        return eevent.notHappened;
     }
     else if (f.previous === '#/' && f.next === ACTIVE) {
         changes = onlyCompleted(tasks).map(Change.removeTask);
@@ -75,11 +75,11 @@ function visibilityChangesOfTask(tasks, f) {
     else if (f.previous === COMPLETED && f.next === ACTIVE) {
         changes = tasks.map(function (t) { return !t.isCompleted() ? Change.appendTask(t) : Change.removeTask(t); });
     }
-    return changes.length > 0 ? eevent.of(changes) : eevent.notHappend;
+    return changes.length > 0 ? eevent.of(changes) : eevent.notHappened;
 }
 function calculateVisibleChanges(changes, filter, tasks) {
     var visibleChanges = filterMap(changes, changesFilterMap(filter, tasks));
-    return visibleChanges.length > 0 ? eevent.of(visibleChanges) : eevent.notHappend;
+    return visibleChanges.length > 0 ? eevent.of(visibleChanges) : eevent.notHappened;
 }
 function filterMap(items, f) {
     return items.map(f).filter(function (x) { return x !== undefined; });
@@ -165,7 +165,7 @@ function findById(id, tasks) {
     }
 }
 function applyChanges(tasks, changes) {
-    if (!changes.happend) {
+    if (!changes.happened) {
         return tasks;
     }
     var cs = changes.value;

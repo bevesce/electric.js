@@ -10,7 +10,9 @@ function velocity(x, y) {
 var MovingPoint = (function () {
     function MovingPoint(speed, x0, y0, angle) {
         this.v = cont(velocity(0, speed));
+        this.v.name = 'velocity';
         this.xya = calculus.integral(Point.of(x0, y0, angle), this.v, { fps: c.fps });
+        this.xya.name = 'position';
     }
     MovingPoint.start = function (speed, x0, y0, angle) {
         return new MovingPoint(speed, x0, y0, angle);

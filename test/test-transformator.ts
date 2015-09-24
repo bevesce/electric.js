@@ -5,7 +5,6 @@ import electricKettle = require('./electric-kettle');
 electricKettle.pourAsync(chai);
 var expect = chai.expect;
 
-import inf = require('../src/interfaces');
 import electric = require('../src/electric');
 import t = require('../src/transformator');
 import eevent = require('../src/electric-event');
@@ -42,7 +41,7 @@ describe('transformators', function() {
 	});
 
 	transformator('filter1', function(done) {
-		var emitter = electric.emitter.emitter(0);
+		var emitter = electric.emitter.manual(0);
 		var filtered = t.filter(2, x => x > 2, emitter);
 		expect(filtered)
 			.to.emit(2)
@@ -69,7 +68,7 @@ describe('transformators', function() {
 	});
 
 	transformator('filterMap1', function(done) {
-		var emitter = electric.emitter.emitter(0);
+		var emitter = electric.emitter.manual(0);
 		var filterMapped = t.filterMap('2!', x => {
 			if (x > 2) {
 				return x + '!';
@@ -134,59 +133,65 @@ describe('transformators', function() {
 	});
 	transformator('merge1', function(done) {
 		// merge1 does nothing...
-		var emitter = electric.emitter.manual(0);
+		var emitter = electric.emitter.manualEvent();
 		var merged = t.merge(emitter);
 		expect(merged)
-			.to.emit(0)
-			.then.after(() => emitter.emit(1))
-			.to.emit(1)
+			.to.emit(eevent.notHappened)
+			.then.after(() => emitter.impulse(1))
+			.to.emit(eevent.of(1))
+			.to.emit(eevent.notHappened)
 			.that.finish(done);
 	});
 
 	transformator('merge4', function(done) {
-		var emitter1 = electric.emitter.manual('1a');
-		var emitter2 = electric.emitter.manual('2a');
-		var emitter3 = electric.emitter.manual('3a');
-		var emitter4 = electric.emitter.manual('4a');
+		var emitter1 = electric.emitter.manualEvent();
+		var emitter2 = electric.emitter.manualEvent();
+		var emitter3 = electric.emitter.manualEvent();
+		var emitter4 = electric.emitter.manualEvent();
 		var merged = t.merge(
 			emitter1, emitter2, emitter3, emitter4
 		);
 		expect(merged)
-			.to.emit('1a')
-			.then.after(() => emitter1.emit('1b'))
-			.to.emit('1b')
-			.then.after(() => emitter2.emit('2b'))
-			.to.emit('2b')
-			.then.after(() => emitter3.emit('3b'))
-			.to.emit('3b')
-			.then.after(() => emitter4.emit('4b'))
-			.to.emit('4b')
-			.then.after(() => emitter2.emit('2c'))
-			.to.emit('2c')
+			.to.emit(eevent.notHappened)
+			.then.after(() => emitter1.impulse('1b'))
+			.to.emit(eevent.of('1b'))
+			.to.emit(eevent.notHappened)
+			.then.after(() => emitter2.impulse('2b'))
+			.to.emit(eevent.of('2b'))
+			.to.emit(eevent.notHappened)
+			.then.after(() => emitter3.impulse('3b'))
+			.to.emit(eevent.of('3b'))
+			.to.emit(eevent.notHappened)
+			.then.after(() => emitter4.impulse('4b'))
+			.to.emit(eevent.of('4b'))
+			.to.emit(eevent.notHappened)
+			.then.after(() => emitter2.impulse('2c'))
+			.to.emit(eevent.of('2c'))
+			.to.emit(eevent.notHappened)
 			.that.finish(done);
 	});
 
-    transformator('cummulateOverTime', function(done) {
-		var emitter = electric.emitter.manual(eevent.notHappend);
-		var cumulated = t.cumulateOverTime(emitter, 10);
-		expect(cumulated)
-			.to.emit(eevent.notHappend)
-			.then.after(() => emitter.impulse(eevent.of(1)))
-			.and.after(() => emitter.impulse(eevent.of(2)))
-			.to.emit(eevent.of([1, 2]))
-			.to.emit(eevent.notHappend)
-			.and.then.to.finish(done)
-    });
+  //   transformator('cummulateOverTime', function(done) {
+		// var emitter = electric.emitter.manual(eevent.notHappened);
+		// var cumulated = t.cumulateOverTime(emitter, 10);
+		// expect(cumulated)
+		// 	.to.emit(eevent.notHappened)
+		// 	.then.after(() => emitter.impulse(eevent.of(1)))
+		// 	.and.after(() => emitter.impulse(eevent.of(2)))
+		// 	.to.emit(eevent.of([1, 2]))
+		// 	.to.emit(eevent.notHappened)
+		// 	.and.then.to.finish(done)
+  //   });
 
 	transformator('hold', function(done) {
-		var emitter = electric.emitter.manual(eevent.notHappend);
+		var emitter = electric.emitter.manualEvent();
 		var holded = t.hold(0, emitter);
 		expect(holded)
 			.to.emit(0)
-			.then.after(() => emitter.impulse(eevent.of(1)))
+			.then.after(() => emitter.impulse(1))
 			.to.emit(1)
-			.then.after(() => emitter.impulse(eevent.of(1)))
-			.then.after(() => emitter.impulse(eevent.of(2)))
+			.then.after(() => emitter.impulse(1))
+			.then.after(() => emitter.impulse(2))
 			.to.emit(2)
 			.andBe(done);
 	});
@@ -195,13 +200,13 @@ describe('transformators', function() {
 		var emitter = electric.emitter.manual(0);
 		var changes = t.changes(emitter);
 		expect(changes)
-			.to.emit(eevent.notHappend)
+			.to.emit(eevent.notHappened)
 			.then.after(() => emitter.emit(1))
 			.to.emit(eevent.of({ previous: 0, next: 1 }))
-			.to.emit(eevent.notHappend)
+			.to.emit(eevent.notHappened)
 			.then.after(() => emitter.emit(2))
 			.to.emit(eevent.of({ previous: 1, next: 2 }))
-			.to.emit(eevent.notHappend)
+			.to.emit(eevent.notHappened)
 			.andBe(done);
 	});
 });
@@ -274,7 +279,7 @@ describe('flattens', function() {
 			var e1 = electric.emitter.manual('1a');
 			var e2 = electric.emitter.manual('2a');
 			var emitters = electric.emitter.manual(
-				<{ [name: string]: inf.IEmitter<string> }>{
+				<{ [name: string]: electric.emitter.Emitter<string> }>{
 					'0': e0, '1': e1
 				}
 			);
@@ -301,3 +306,40 @@ describe('flattens', function() {
 		});
 	});
 });
+
+
+// describe('unglitch', function() {
+// 	it('should work on normal values', function(done) {
+// 	    var y = electric.emitter.manual(2);
+
+// 	    var a = y.map(x => x + 0);
+// 	    var b = electric.transformator.map(
+// 	        (yv, av) => yv + av,
+// 	        y, a
+// 	    );
+// 	    expect(t.unglitch(b))
+// 	        .to.emit(4)
+// 	        .then.after(() => y.emit(3))
+// 	        .to.emit(6)
+// 	        .andBe(done);
+// 	});
+
+// 	it('should work with events', function(done) {
+// 	    var y = electric.emitter.manual(2);
+
+// 	    var a = y.map(x => x + 0);
+// 	    var b = electric.transformator.map(
+// 	        (yv, av) => yv + av,
+// 	        y, a
+// 	    );
+// 	    var e = t.unglitch(b).when(
+// 	    	{ happens: x => x >= 5, then: x => x}
+//     	);
+// 	    expect(e)
+// 	    	.to.emit(eevent.notHappened)
+// 	        .then.after(() => y.emit(3))
+// 	        .to.emit(eevent.of(6))
+// 	    	.then.to.emit(eevent.notHappened)
+// 	        .andBe(done);
+// 	});
+// });

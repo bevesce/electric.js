@@ -7,7 +7,7 @@ function receiver(name, socket) {
 exports.receiver = receiver;
 function eventReceiver(name, socket) {
     return function (data) {
-        if (data.happend) {
+        if (data.happened) {
             socket.emit(name, data.value);
         }
     };
@@ -25,7 +25,7 @@ function emitter(name, socket, initialValue) {
 exports.emitter = emitter;
 ;
 function eventEmitter(name, socket) {
-    var emitter = electric.emitter.manualEvent();
+    var emitter = electric.emitter.manualEvent(null);
     socket.on(name, function (x) {
         emitter.impulse(x);
     });

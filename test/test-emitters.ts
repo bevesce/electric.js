@@ -45,11 +45,11 @@ describe('emitter from event', function() {
             target: <any>mockTarget,
             type: 'click'
         }))
-            .to.emit(eevent.notHappend)
+            .to.emit(eevent.notHappened)
             .after(() => mockTarget.event(1))
-            .to.emit(eevent.of(1), eevent.notHappend)
+            .to.emit(eevent.of(1), eevent.notHappened)
             .after(() => mockTarget.event(1))
-            .to.emit(eevent.of(1), eevent.notHappend)
+            .to.emit(eevent.of(1), eevent.notHappened)
             .andBe(done);
         expect(mockTarget.listeners['click']).to.not.be.undefined;
     });

@@ -89,21 +89,21 @@ describe('placeholder in recursion', function () {
             .andBe(done);
     });
     it('should allow recursion', function (done) {
-        var mouseclick = electric.emitter.manual(eevent.notHappend);
-        var animationBegins = placeholder(eevent.notHappend);
+        var mouseclick = electric.emitter.manualEvent();
+        var animationBegins = placeholder(eevent.notHappened);
         var animating = electric.emitter.constant(false).change({ to: electric.emitter.constant(true), when: animationBegins });
-        animationBegins.is(transformator.map(function (a, c) { return a ? eevent.notHappend : c; }, animating, mouseclick));
+        animationBegins.is(transformator.map(function (a, c) { return a ? eevent.notHappened : c; }, animating, mouseclick));
         expect(animating)
             .to.emit(false)
-            .after(function () { return mouseclick.impulse(eevent.of(null)); })
+            .after(function () { return mouseclick.impulse(null); })
             .to.emit(true)
             .andBe(done);
     });
     it('should allow recursion with time transformation', function (done) {
         var constant = electric.emitter.constant;
-        var mouseclick = electric.emitter.manual(eevent.notHappend);
-        var animationBegins = placeholder(eevent.notHappend);
-        var animationEnds = placeholder(eevent.notHappend);
+        var mouseclick = electric.emitter.manualEvent();
+        var animationBegins = placeholder(eevent.notHappened);
+        var animationEnds = placeholder(eevent.notHappened);
         // start animationg on animationBegins
         // and end on animationEnds (1ms after start)
         // BUT! don't allow another start before end
@@ -115,17 +115,17 @@ describe('placeholder in recursion', function () {
         //        and te_i is that animationEnds(te_i) is true
         //            and animationBegins(tx) is false for every tx from (tb_i, te_i)
         //    false(t) otherwise
-        animationBegins.is(transformator.map(function (a, c) { return a ? eevent.notHappend : c; }, animating, mouseclick));
+        animationBegins.is(transformator.map(function (a, c) { return a ? eevent.notHappened : c; }, animating, mouseclick));
         animationEnds.is(animating
             .transformTime(false, function (t) { return t + 1; })
-            .map(function (v) { return v ? eevent.of(null) : eevent.notHappend; }));
+            .map(function (v) { return v ? eevent.of(null) : eevent.notHappened; }));
         var c = electric.receiver.collect(animating);
         expect(animating)
             .to.emit(false)
-            .after(function () { return mouseclick.impulse(eevent.of(null)); })
+            .after(function () { return mouseclick.impulse(null); })
             .to.emit(true)
             .to.emit(false)
-            .after(function () { return mouseclick.impulse(eevent.of(null)); })
+            .after(function () { return mouseclick.impulse(null); })
             .to.emit(true)
             .to.emit(false)
             .andBe(done);

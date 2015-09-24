@@ -7,7 +7,7 @@ function formatBoolean(value) {
     return value ? '☑ true' : '☐ false';
 }
 var clicks = ui.clicks('clicker');
-cont('not clicked').change({ to: cont('clicked'), when: clicks }, { to: cont('not clicked'), when: clicks.transformTime(event.notHappend, function (t) { return t + 1000; }) }).plugReceiver(rui.htmlReceiverById('clicked'));
+cont('not clicked').change({ to: cont('clicked'), when: clicks }, { to: cont('not clicked'), when: clicks.transformTime(event.notHappened, function (t) { return t + 1000; }) }).plugReceiver(rui.htmlReceiverById('clicked'));
 cont('not clicked').change({ to: cont('clicked 0'), when: ui.clicks('button0') }, { to: cont('clicked 1'), when: ui.clicks('button1') }).plugReceiver(rui.htmlReceiverById('buttoned'));
 cont('no key pressed').change({ to: function (_, k) { return cont(k); }, when: ui.key('w', 'down') }, { to: function (_, k) { return cont(k); }, when: ui.key('a', 'down') }, { to: function (_, k) { return cont(k); }, when: ui.key('s', 'down') }, { to: function (_, k) { return cont(k); }, when: ui.key('d', 'down') }).plugReceiver(rui.htmlReceiverById('keyed'));
 ui.hash().plugReceiver(rui.htmlReceiverById('hashed'));

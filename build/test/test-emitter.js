@@ -72,6 +72,19 @@ describe('electric emitter', function () {
             .to.emit(2)
             .andBe(done);
     });
+    it('should not allow glitches', function (done) {
+        var y = electric.emitter.manual(2);
+        var a = y.map(function (x) { return x + 0; });
+        var b = electric.transformator.map(function (yv, av) { return yv + av; }, y, a);
+        y.name = 'y';
+        a.name = 'a';
+        b.name = 'b';
+        expect(b)
+            .to.emit(4)
+            .then.after(function () { return y.emit(3); })
+            .to.emit(6)
+            .andBe(done);
+    });
 });
 describe('emitters impulse', function () {
     it('should return to value before impulse', function (done) {
@@ -115,8 +128,8 @@ describe('emitters impulse', function () {
             'a0',
             'a1',
             'a0', 'b0',
-            'a2', 'b2',
-            'a0', 'b0'
+            'b2', 'a2',
+            'b0', 'a0'
         ]); })
             .andBe(done);
     });
@@ -133,11 +146,11 @@ function doubleIfOver2(x) {
 ;
 describe('emitter', function () {
     it('should be pluggable', function () {
-        var emitter = electric.emitter.emitter(0);
+        var emitter = electric.emitter.manual(0);
         emitter.plugReceiver(double);
     });
     it('should be unpluggable', function (done) {
-        var emitter = electric.emitter.emitter(0);
+        var emitter = electric.emitter.manual(0);
         var emitted = -1;
         var disposable = emitter.plugReceiver(function (x) { return emitted = x; });
         expect(emitter)
@@ -214,35 +227,35 @@ describe('emitter', function () {
     });
     it('should be sampleable', function (done) {
         var emitter = electric.emitter.manual(0);
-        var sampler = electric.emitter.manual(eevent.notHappend);
+        var sampler = electric.emitter.manualEvent();
         var sampled = emitter.sample(-1, sampler);
         expect(sampled)
             .to.emit(-1)
-            .then.after(function () { return sampler.impulse(eevent.of(true)); })
+            .then.after(function () { return sampler.impulse(true); })
             .to.emit(0)
             .then.after(function () { return emitter.emit(1); })
-            .then.after(function () { return sampler.impulse(eevent.of(true)); })
+            .then.after(function () { return sampler.impulse(true); })
             .to.emit(1)
             .andBe(done);
     });
     it('should be changeable', function (done) {
         var emitter0 = electric.emitter.constant('0a');
         var emitter1 = electric.emitter.manual('1a');
-        var event1 = electric.emitter.manual(eevent.notHappend);
-        var event2 = electric.emitter.emitter(eevent.notHappend);
+        var event1 = electric.emitter.manualEvent();
+        var event2 = electric.emitter.manualEvent();
         var changing = emitter0.change({ to: emitter1, when: event1 }, {
             to: function (x, s) { return electric.emitter.constant('2a<' + s + '><' + x + '>'); },
             when: event2
         });
         expect(changing)
             .to.emit('0a')
-            .then.after(function () { return event1.impulse(eevent.of(1)); })
+            .then.after(function () { return event1.impulse(1); })
             .to.emit('1a')
             .then.after(function () { return emitter1.emit('1b'); })
             .to.emit('1b')
             .then.after(function () { return emitter1.emit('1c'); })
             .to.emit('1c')
-            .then.after(function () { return event2.impulse(eevent.of(13)); })
+            .then.after(function () { return event2.impulse(13); })
             .to.emit('2a<13><1c>')
             .andBe(done);
     });
@@ -258,21 +271,6 @@ describe('emitter', function () {
             .to.emit([0, 1, 2])
             .andBe(done);
     });
-    it('should be mergeable', function (done) {
-        // value of emitter1 is initial value
-        // of merged
-        var emitter1 = electric.emitter.manual('1a');
-        var emitter2 = electric.emitter.manual('2a');
-        var merged = emitter1.merge(emitter2);
-        expect(merged)
-            .to.emit('1a')
-            .then.after(function () { return emitter2.emit('2b'); })
-            .to.emit('2b')
-            .then.after(function () { return emitter1.emit('1a'); })
-            .and.after(function () { return emitter1.emit('1c'); })
-            .to.emit('1c')
-            .andBe(done);
-    });
     it('should be whenable', function (done) {
         var emitter = electric.emitter.manual(0);
         var whened = emitter.when({
@@ -280,16 +278,16 @@ describe('emitter', function () {
             then: function (x) { return x + '!'; }
         });
         expect(whened)
-            .to.emit(eevent.notHappend)
+            .to.emit(eevent.notHappened)
             .then.after(function () { return emitter.emit(1); })
             .then.after(function () { return emitter.emit(3); })
             .to.emit(eevent.of('3!'))
-            .to.emit(eevent.notHappend)
+            .to.emit(eevent.notHappened)
             .then.after(function () { return emitter.emit(4); })
             .then.after(function () { return emitter.emit(1); })
             .and.after(function () { return emitter.emit(5); })
             .to.emit(eevent.of('5!'))
-            .to.emit(eevent.notHappend)
+            .to.emit(eevent.notHappened)
             .andBe(done);
     });
     it('should be whenThenable', function (done) {
@@ -300,37 +298,37 @@ describe('emitter', function () {
             }
         });
         expect(whened)
-            .to.emit(eevent.notHappend)
+            .to.emit(eevent.notHappened)
             .then.after(function () { return emitter.emit(1); })
             .then.after(function () { return emitter.emit(3); })
             .to.emit(eevent.of('3!'))
-            .to.emit(eevent.notHappend)
+            .to.emit(eevent.notHappened)
             .then.after(function () { return emitter.emit(4); })
             .then.after(function () { return emitter.emit(1); })
             .and.after(function () { return emitter.emit(5); })
             .to.emit(eevent.of('5!'))
-            .to.emit(eevent.notHappend)
+            .to.emit(eevent.notHappened)
             .andBe(done);
     });
     it('should produce changes', function (done) {
         var emitter = electric.emitter.manual(0);
         var changes = emitter.changes();
         expect(changes)
-            .to.emit(eevent.notHappend)
+            .to.emit(eevent.notHappened)
             .then.after(function () { return emitter.emit(1); })
             .to.emit(eevent.of({ previous: 0, next: 1 }))
-            .to.emit(eevent.notHappend)
+            .to.emit(eevent.notHappened)
             .then.after(function () { return emitter.emit(2); })
             .to.emit(eevent.of({ previous: 1, next: 2 }))
-            .to.emit(eevent.notHappend)
+            .to.emit(eevent.notHappened)
             .andBe(done);
     });
 });
 describe('emitters recursion', function () {
     it('should work...', function (done) {
         var constant = electric.emitter.constant;
-        var emitter1 = electric.emitter.manual(eevent.notHappend);
-        var emitter2 = electric.emitter.manual(eevent.notHappend);
+        var emitter1 = electric.emitter.manualEvent();
+        var emitter2 = electric.emitter.manualEvent();
         function color() {
             return constant('red').change({
                 to: function () { return constant('blue'); }, when: emitter1
@@ -342,16 +340,16 @@ describe('emitters recursion', function () {
         var r = [];
         expect(color())
             .to.emit('red')
-            .then.after(function () { return emitter1.impulse(eevent.of(null)); })
+            .then.after(function () { return emitter1.impulse(null); })
             .to.emit('blue')
             .andBe(done);
     });
 });
 describe('manual event emitter', function () {
-    it('should be created with notHappend as initial value', function (done) {
+    it('should be created with notHappened as initial value', function (done) {
         var e = electric.emitter.manualEvent();
         expect(e)
-            .to.emit(eevent.notHappend)
+            .to.emit(eevent.notHappened)
             .andBe(done);
     });
     it('should throw on manual emit', function () {
@@ -360,14 +358,16 @@ describe('manual event emitter', function () {
     });
     it('should impulse values packed in ElectricEvent', function (done) {
         var e = electric.emitter.manualEvent();
+        var c = electric.receiver.collect(e);
         expect(e)
-            .to.emit(eevent.notHappend)
+            .to.emit(eevent.notHappened)
             .then.after(function () { return e.impulse(1); })
-            .to.emit(eevent.of(1), eevent.notHappend)
+            .to.emit(eevent.of(1))
+            .to.emit(eevent.notHappened)
             .then.after(function () { return e.impulse(1); })
-            .to.emit(eevent.of(1), eevent.notHappend)
+            .to.emit(eevent.of(1), eevent.notHappened)
             .then.after(function () { return e.impulse(2); })
-            .to.emit(eevent.of(2), eevent.notHappend)
+            .to.emit(eevent.of(2), eevent.notHappened)
             .andBe(done);
     });
 });

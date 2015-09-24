@@ -3,24 +3,36 @@ var c = require('./constants');
 var map = electric.transformator.map;
 function create(input) {
     var checkBulletBullet = checkIfCollidingWithDistance(c.bullet.radius + c.bullet.radius);
-    var bulletBullet = input.bulletsXY.whenThen(function (bullets) { return collisionCenterMiddle(checkIfCollidingInOneArray(checkBulletBullet, bullets)); });
+    var bulletBullet = input.bulletsXY.whenThen(function (bullets) { return collisionCenterInMiddle(checkIfCollidingInOneArray(checkBulletBullet, bullets)); });
+    bulletBullet.name = 'bullet-bullet colission';
     var checkBulletShip = checkIfCollidingWithDistance(c.bullet.radius + c.ship.radius);
     var bulletsXYshipXY = map(function (bs, s) { return ({ points: bs, point: s }); }, input.bulletsXY, input.shipXY);
-    var bulletShip = bulletsXYshipXY.whenThen(function (a) { return collisionCenterFirstPoint(checkIfCollidingInArrayVsPoint(checkBulletShip, a.points, a.point)); });
+    var bulletShip = bulletsXYshipXY.whenThen(function (a) { return collisionCenterAtFirstPoint(checkIfCollidingInArrayVsPoint(checkBulletShip, a.points, a.point)); });
+    bulletBullet.name = 'bullet-ship colission';
     var checkShipAsteroid = checkIfCollidingWithDistance(c.ship.radius + c.asteroid.radius);
     var shipXYasteroidsXY = map(function (s, as) { return ({ point: s, points: as }); }, input.shipXY, input.asteroidsXY);
-    var shipAsteroid = shipXYasteroidsXY.whenThen(function (a) { return collisionCenterMiddle(checkIfCollidingInArrayVsPoint(checkShipAsteroid, a.points, a.point)); });
+    var shipAsteroid = shipXYasteroidsXY.whenThen(function (a) { return collisionCenterInMiddle(checkIfCollidingInArrayVsPoint(checkShipAsteroid, a.points, a.point)); });
     var checkBulletAsteroid = checkIfCollidingWithDistance(c.bullet.radius + c.asteroid.radius);
     var bulletsXYasteroidsXY = electric.transformator.map(function (bs, as) { return ({ points1: bs, points2: as }); }, input.bulletsXY, input.asteroidsXY);
-    var bulletAsteroid = bulletsXYasteroidsXY.whenThen(function (a) { return collisionCenterSecondPoint(checkIfCollidingBetweenTwoArrays(checkBulletAsteroid, a.points1, a.points2)); });
+    var bulletAsteroid = bulletsXYasteroidsXY.whenThen(function (a) { return collisionCenterAtSecondPoint(checkIfCollidingBetweenTwoArrays(checkBulletAsteroid, a.points1, a.points2)); });
+    bulletBullet.name = 'bullet-asteroid colission';
     var checkBulletMother = checkIfCollidingWithDistance(c.bullet.radius + c.asteroidMother.radius);
     var bulletsXYmotherXY = electric.transformator.map(function (bs, m) { return ({ points: bs, point: m }); }, input.bulletsXY, input.motherXY);
-    var bulletMother = bulletsXYmotherXY.whenThen(function (a) { return collisionCenterFirstPoint(checkIfCollidingInArrayVsPoint(checkBulletMother, a.points, a.point)); });
+    var bulletMother = bulletsXYmotherXY.whenThen(function (a) { return collisionCenterAtFirstPoint(checkIfCollidingInArrayVsPoint(checkBulletMother, a.points, a.point)); });
+    bulletBullet.name = 'bullet-mother colission';
     var checkShipMother = checkIfCollidingWithDistance(c.ship.radius + c.asteroidMother.radius);
     var shipXYmotherXY = electric.transformator.map(function (s, m) { return ({ point1: s, point2: m }); }, input.shipXY, input.motherXY);
-    var shipMother = shipXYmotherXY.whenThen(function (a) { return collisionCenterFirstPoint(checkIfCollidingPoints(checkShipMother, a.point1, a.point2)); });
+    var shipMother = shipXYmotherXY.whenThen(function (a) { return collisionCenterAtFirstPoint(checkIfCollidingPoints(checkShipMother, a.point1, a.point2)); });
+    bulletBullet.name = 'bullet-bullet collisions';
+    bulletAsteroid.name = 'bullet-asteroid collisions';
+    bulletMother.name = 'bullet-mother collisions';
+    shipMother.name = 'ship-mother collisions';
+    bulletShip.name = 'bullet-ship collisions';
+    shipAsteroid.name = 'ship-asteroid collisions';
     var all = electric.transformator.merge(bulletBullet, bulletAsteroid, bulletMother, shipMother, bulletShip, shipAsteroid);
+    all.name = 'all collisions';
     var gameEnding = electric.transformator.merge(shipMother, shipAsteroid, bulletShip);
+    gameEnding.name = 'game ending collisions';
     return {
         all: all,
         asteroid: {
@@ -100,7 +112,7 @@ function checkIfCollidingBetweenTwoArrays(check, points1, points2) {
         }
     }
 }
-function collisionCenterFirstPoint(collision) {
+function collisionCenterAtFirstPoint(collision) {
     if (collision === undefined) {
         return;
     }
@@ -111,7 +123,7 @@ function collisionCenterFirstPoint(collision) {
         y: collision.point1.y
     };
 }
-function collisionCenterSecondPoint(collision) {
+function collisionCenterAtSecondPoint(collision) {
     if (collision === undefined) {
         return;
     }
@@ -122,7 +134,7 @@ function collisionCenterSecondPoint(collision) {
         y: collision.point2.y
     };
 }
-function collisionCenterMiddle(collision) {
+function collisionCenterInMiddle(collision) {
     if (collision === undefined) {
         return;
     }

@@ -14,7 +14,7 @@ export function speed() {
 	var aSpeedCurrent = document.getElementById('angular-speed-current');
 	var aSpeedRight = document.getElementById('angular-speed-right');
 
-	return function(s: IntegrableAntiderivativeOfTwoNumbers<Point>) {
+	return function speedometer(s: IntegrableAntiderivativeOfTwoNumbers<Point>) {
 		var speed = Math.abs(s.y);
 		var w = speedBar.offsetWidth;
 		var wh = w / 2;
@@ -41,5 +41,7 @@ export function speed() {
 
 
 export function score() {
-	return rui.htmlReceiverById('score');
+	var r = rui.htmlReceiverById('score');
+	(<any>r).name = 'show score'
+	return r;
 }

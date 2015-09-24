@@ -16,12 +16,12 @@ describe('collection', function() {
 	var init = ['1', '2', '3'];
 
 	function makeTasks(initial: string[] | item[], route = '#/', itemify = true) {
-		var title = <electric.emitter.EventEmitter<string>>electric.emitter.manualEvent();
-		var check = <electric.emitter.EventEmitter<{id: number, completed: boolean}>>electric.emitter.manualEvent();
-		var toggle = <electric.emitter.EventEmitter<boolean>>electric.emitter.manualEvent();
-		var retitle = <electric.emitter.EventEmitter<{ id: number, title: string }>>electric.emitter.manualEvent();
-		var del = <electric.emitter.EventEmitter<number>>electric.emitter.manualEvent();
-		var clear = <electric.emitter.EventEmitter<{}>>electric.emitter.manualEvent();
+		var title = electric.emitter.manualEvent(<string>null);
+		var check = electric.emitter.manualEvent(<{id: number, completed: boolean}>null);
+		var toggle = electric.emitter.manualEvent(<boolean>null);
+		var retitle = electric.emitter.manualEvent(<{ id: number, title: string }>null);
+		var del = electric.emitter.manualEvent(<number>null);
+		var clear = electric.emitter.manualEvent();
 		var hash = electric.emitter.manual(route);
 		var input = {
 			insert: title,

@@ -3,20 +3,16 @@ var electric = require('../../../src/electric');
 var eevent = require('../../../src/electric-event');
 function collection(initial, input) {
     var initialTasks = electric.emitter.constant(initial);
-    var ac = electric.emitter.placeholder(13);
-    var cc = electric.emitter.placeholder(26);
-    var toggleTo = electric.transformator.map(function (a, c, t) {
-        return t.map(function (_) { return a !== c; });
-    }, ac, cc, input.toggle);
-    var insert = notEmpty(input.insert);
-    var tasks = initialTasks.change({ to: appended, when: insert }, { to: checked, when: input.check }, { to: allWithCompleted, when: toggleTo }, { to: retitled, when: input.retitle }, { to: deleted, when: input.del }, { to: cleared, when: input.clear });
-    var $ = eevent.lift;
+    var tasks = initialTasks.change({ to: appended, when: notEmpty(input.insert) }, { to: checked, when: input.check }, { to: toggled, when: input.toggle }, { to: retitled, when: input.retitle }, { to: deleted, when: input.del }, { to: cleared, when: input.clear });
+    tasks.name = 'tasks';
     var visible = electric.transformator.map(filterWithRoute, tasks, input.filter);
+    visible.name = 'visible';
     var allCount = tasks.map(function (ts) { return ts.length; });
-    ac.is(allCount);
+    allCount.name = 'count of all tasks';
     var completedCount = tasks.map(function (ts) { return onlyCompleted(ts).length; });
-    cc.is(completedCount);
+    completedCount.name = 'count of completed tasks';
     var activeCount = tasks.map(function (ts) { return onlyActive(ts).length; });
+    activeCount.name = 'count of active tasks';
     return {
         all: tasks,
         visible: visible,
@@ -29,13 +25,15 @@ function collection(initial, input) {
 }
 ;
 function notEmpty(insert) {
-    return insert.map(function (v) { return v.flattenMap(function (text) {
+    var t = insert.map(function (v) { return v.flattenMap(function (text) {
         text = text.trim();
         if (text !== '') {
             return eevent.of(item.of(text));
         }
-        return eevent.notHappend;
+        return eevent.notHappened;
     }); });
+    t.name = 'not empty';
+    return t;
 }
 function appended(items, newItem) {
     return cont(items.concat(newItem));
@@ -52,7 +50,12 @@ function matchMap(items, match, map) {
 function checked(items, arg) {
     return cont(matchMap(items, function (v) { return v.id() === arg.id; }, function (v) { return v.withCompleted(arg.completed); }));
 }
-function allWithCompleted(items, completed) {
+function toggled(items, completed) {
+    var noAll = items.length;
+    console.log(items);
+    var noCompleted = items.filter(function (t) { return t.isCompleted(); }).length;
+    var completed = noAll !== noCompleted;
+    console.log(noAll, noCompleted, completed);
     return cont(items.map(function (i) { return i.withCompleted(completed); }));
 }
 function retitled(items, arg) {

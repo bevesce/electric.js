@@ -1,4 +1,3 @@
-import inf = require('../../../src/interfaces');
 import electric = require('../../../src/electric');
 import IntegrableAntiderivativeOfTwoNumbers = require('../../../src/calculus/integrable-antiderivative-of-two-numbers');
 
@@ -26,19 +25,23 @@ function shootBullet(bullets: MovingPoint[], xya: Point, velocity: Velocity) {
 
 
 function create(input: {
-	shoot: inf.IEmitter<inf.IElectricEvent<{ xya: Point, velocity: Velocity }>>,
-	removeBoth: inf.IEmitter<inf.IElectricEvent<collision.Collision>>,
-	removeFirst: inf.IEmitter<inf.IElectricEvent<collision.Collision>>
+	shoot: electric.emitter.EventEmitter<{ xya: Point, velocity: Velocity }>,
+	removeBoth: electric.emitter.EventEmitter<collision.Collision>,
+	removeFirst: electric.emitter.EventEmitter<collision.Collision>
 }) {
+	input.removeBoth.name = 'bullets collisions';
+	input.removeFirst.name = 'bullet collisions';
 	var bullets = cont(<MovingPoint[]>[]).change(
 		{ to: (bs, s) => shootBullet(bs, s.xya, s.velocity), when: input.shoot },
 		{ to: (bs, c) => remove(bs, c.index1, c.index2), when: input.removeBoth },
 		{ to: (bs, c) => remove(bs, c.index1), when: input.removeFirst }
 	);
+	bullets.name = 'bullets'
 
 	var bulletsXY = electric.transformator.flattenMany(
 		bullets.map(bs => bs.map(b => b.xya))
 	);
+	bulletsXY.name = 'bullets positions'
 	return {
 		all: bullets,
 		xy: bulletsXY
