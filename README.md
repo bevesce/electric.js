@@ -1,19 +1,18 @@
+![icon](icon.png)
+
 # Electric.js 
-## version 0.0.0
 
-Documentation is under construction.
-Electric.js lets you create reactive applications similary to building electric circuits. 
+Exercise in implementing FRP-like framework in JavaScript. 
 
-
-## Changelog
-
-- 2015-09-25 - release 0.0.0
+Look at examples if you want to know how it works. Not intended for production.
 
 ## Installation
 
 Electric.js is a CommonJS module so you can use it with webpack, browserify or similar tools. Compiled library is in build/src, main file to require is *electric.js*.
 
 # Core
+
+Application written using Electric.js is build from `Emitters` that emit some data over time, `Devices` that transform it and `Receivers` that do something with this data.
 
 ## Emitters
 
@@ -42,11 +41,13 @@ Electric.js is a CommonJS module so you can use it with webpack, browserify or s
 - `receiver.log`
 - `receiver.logEvent`
 
+## Application graph
+
+Structure of application written using Electric.js is well organized - so well that it can be automatically represented as a graph. Loot at [examples/graph](https://github.com/bevesce/electric.js/blob/master/examples/graph/main.js) and [examples/spacedt](https://github.com/bevesce/electric.js/blob/master/examples/spacedt/js/app-cm.ts#L184)
+
 ## Recursion
 
-## Graph
-
-
+It's valid to have cycle in devices/emitters graph. 
 
 # Other modules
 
@@ -74,4 +75,3 @@ describe('electric emitter', function() {
     });
 });
 ```
-
